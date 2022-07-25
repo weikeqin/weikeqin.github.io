@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="JVM 内置了自动内存分配管理机制。这个机制可以大大降低手动分配回收机制可能带来的内存泄露和内存溢出风险，使 Java 开发人员不需要关注每个对象的内存分配以及回收，从而更专注于业务本身。    JVM 自动内存分配管理机制的好处很多，但实则是把双刃剑。这个机制在提升 Java 开发效率的同时，也容易使 Java 开发人员过度依赖于自动化，弱化对内存的管理能力，这样系统就很容易发生 JVM 的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JVM运行时内存区域">
+<meta property="og:url" content="http://weikeqin.com/2018/08/12/jvm-memory-area/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="JVM 内置了自动内存分配管理机制。这个机制可以大大降低手动分配回收机制可能带来的内存泄露和内存溢出风险，使 Java 开发人员不需要关注每个对象的内存分配以及回收，从而更专注于业务本身。    JVM 自动内存分配管理机制的好处很多，但实则是把双刃剑。这个机制在提升 Java 开发效率的同时，也容易使 Java 开发人员过度依赖于自动化，弱化对内存的管理能力，这样系统就很容易发生 JVM 的">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/java-process-memory-use.png">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/Java-Runtime-data-area-jdk7.jpg">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/Java-Runtime-data-area-jdk7.png">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/JVM_Internal_Architecture_small.png">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/young-generation-eden.png">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/young-generation.png">
+<meta property="og:image" content="http://weikeqin.com/img/java/JVM/Memory/java-heap-memory-model.png">
+<meta property="article:published_time" content="2018-08-12T02:48:21.000Z">
+<meta property="article:modified_time" content="2022-07-03T15:20:57.771Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="jvm">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/java/JVM/Memory/java-process-memory-use.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2018/08/12/jvm-memory-area/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2018/08/12/jvm-memory-area/","path":"2018/08/12/jvm-memory-area/","title":"JVM运行时内存区域"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>JVM运行时内存区域 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Java%E5%86%85%E5%AD%98%E5%8C%BA%E5%9F%9F"><span class="nav-number">1.</span> <span class="nav-text">1.　Java内存区域</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E7%A8%8B%E5%BA%8F%E8%AE%A1%E6%95%B0%E5%99%A8-Program-Counter-Register"><span class="nav-number">1.1.</span> <span class="nav-text">1.1　程序计数器(Program Counter Register)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-Java%E8%99%9A%E6%8B%9F%E6%9C%BA%E6%A0%88-Java-Virtal-Machine-Stack"><span class="nav-number">1.2.</span> <span class="nav-text">1.2　Java虚拟机栈(Java Virtal Machine Stack)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-%E6%9C%AC%E5%9C%B0%E6%96%B9%E6%B3%95%E6%A0%88-Native-Method-Stack"><span class="nav-number">1.3.</span> <span class="nav-text">1.3　本地方法栈(Native Method Stack)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-%E5%A0%86-Heap"><span class="nav-number">1.4.</span> <span class="nav-text">1.4　堆(Heap)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-5-%E6%96%B9%E6%B3%95%E5%8C%BA-Method-Area"><span class="nav-number">1.5.</span> <span class="nav-text">1.5　方法区(Method Area)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-6-%E7%9B%B4%E6%8E%A5%E5%86%85%E5%AD%98-Direct-Memory"><span class="nav-number">1.6.</span> <span class="nav-text">1.6　直接内存(Direct Memory)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-7-Java-SE-7-%E8%A7%84%E8%8C%83%E7%9A%84%E5%85%B8%E5%9E%8B%E7%9A%84-JVM-%E6%A0%B8%E5%BF%83%E5%86%85%E9%83%A8%E7%BB%84%E4%BB%B6"><span class="nav-number">1.7.</span> <span class="nav-text">1.7　Java SE 7 规范的典型的 JVM 核心内部组件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-OOM%E5%8F%AF%E8%83%BD%E5%8F%91%E7%94%9F%E5%9C%A8%E5%93%AA%E4%BA%9B%E5%8C%BA%E5%9F%9F%E4%B8%8A%EF%BC%9F"><span class="nav-number">2.</span> <span class="nav-text">2.　OOM可能发生在哪些区域上？</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E5%A0%86%E5%86%85%E5%AD%98"><span class="nav-number">2.1.</span> <span class="nav-text">2.1　堆内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-Java%E8%99%9A%E6%8B%9F%E6%9C%BA%E6%A0%88%E5%92%8C%E6%9C%AC%E5%9C%B0%E6%96%B9%E6%B3%95%E6%A0%88"><span class="nav-number">2.2.</span> <span class="nav-text">2.2　Java虚拟机栈和本地方法栈</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E7%9B%B4%E6%8E%A5%E5%86%85%E5%AD%98"><span class="nav-number">2.3.</span> <span class="nav-text">2.3　直接内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-%E6%96%B9%E6%B3%95%E5%8C%BA"><span class="nav-number">2.4.</span> <span class="nav-text">2.4　方法区</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%A0%86%E5%86%85%E5%AD%98%E7%BB%93%E6%9E%84%E6%98%AF%E6%80%8E%E4%B9%88%E6%A0%B7%E7%9A%84%EF%BC%9F"><span class="nav-number">3.</span> <span class="nav-text">3.　堆内存结构是怎么样的？</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E6%96%B0%E7%94%9F%E4%BB%A3-Young-Generation-%E7%9A%84Eden%E5%8C%BA%E5%9F%9F"><span class="nav-number">3.1.</span> <span class="nav-text">3.1　新生代(Young Generation)的Eden区域</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E6%96%B0%E7%94%9F%E4%BB%A3-Young-Generation-%E7%9A%84Survivor%E5%8C%BA%E5%9F%9F"><span class="nav-number">3.2.</span> <span class="nav-text">3.2　新生代(Young Generation)的Survivor区域</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E8%80%81%E5%B9%B4%E4%BB%A3-Old-Generation"><span class="nav-number">3.3.</span> <span class="nav-text">3.3　老年代 (Old Generation)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E6%B0%B8%E4%B9%85%E4%BB%A3"><span class="nav-number">3.4.</span> <span class="nav-text">3.4　永久代</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-Vritual%E7%A9%BA%E9%97%B4"><span class="nav-number">3.5.</span> <span class="nav-text">3.5　Vritual空间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-6-%E6%80%BB%E7%BB%93"><span class="nav-number">3.6.</span> <span class="nav-text">3.6　总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E5%B8%B8%E7%94%A8%E9%85%8D%E7%BD%AE"><span class="nav-number">3.7.</span> <span class="nav-text">4.　常用配置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-JVM%E8%AE%BE%E7%BD%AEYoung-Gen%E5%8F%82%E6%95%B0%E4%BC%98%E5%85%88%E7%BA%A7"><span class="nav-number">3.8.</span> <span class="nav-text">4.1　JVM设置Young Gen参数优先级</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%B8%B8%E8%A7%81%E9%85%8D%E7%BD%AE%E6%B1%87%E6%80%BB"><span class="nav-number">4.</span> <span class="nav-text">5.　常见配置汇总</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E5%A0%86%E8%AE%BE%E7%BD%AE"><span class="nav-number">4.1.</span> <span class="nav-text">5.1　堆设置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-%E6%94%B6%E9%9B%86%E5%99%A8%E8%AE%BE%E7%BD%AE"><span class="nav-number">4.2.</span> <span class="nav-text">5.2　收集器设置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E7%BB%9F%E8%AE%A1%E4%BF%A1%E6%81%AF"><span class="nav-number">4.3.</span> <span class="nav-text">5.3　垃圾回收统计信息</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-%E5%B9%B6%E8%A1%8C%E6%94%B6%E9%9B%86%E5%99%A8%E8%AE%BE%E7%BD%AE"><span class="nav-number">4.4.</span> <span class="nav-text">5.4　并行收集器设置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-5-%E5%B9%B6%E5%8F%91%E6%94%B6%E9%9B%86%E5%99%A8%E8%AE%BE%E7%BD%AE"><span class="nav-number">4.5.</span> <span class="nav-text">5.5　并发收集器设置</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E8%B0%83%E4%BC%98%E6%80%BB%E7%BB%93"><span class="nav-number">5.</span> <span class="nav-text">6.　调优总结</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1-%E5%B9%B4%E8%BD%BB%E4%BB%A3%E5%A4%A7%E5%B0%8F%E9%80%89%E6%8B%A9"><span class="nav-number">5.1.</span> <span class="nav-text">6.1　年轻代大小选择</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-%E5%B9%B4%E8%80%81%E4%BB%A3%E5%A4%A7%E5%B0%8F%E9%80%89%E6%8B%A9"><span class="nav-number">5.2.</span> <span class="nav-text">6.2　年老代大小选择</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-3-%E8%BE%83%E5%B0%8F%E5%A0%86%E5%BC%95%E8%B5%B7%E7%9A%84%E7%A2%8E%E7%89%87%E9%97%AE%E9%A2%98"><span class="nav-number">5.3.</span> <span class="nav-text">6.3　较小堆引起的碎片问题</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">6.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/08/12/jvm-memory-area/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JVM运行时内存区域
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-08-12 10:48:21" itemprop="dateCreated datePublished" datetime="2018-08-12T10:48:21+08:00">2018-08-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-03 23:20:57" itemprop="dateModified" datetime="2022-07-03T23:20:57+08:00">2022-07-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/jvm/" itemprop="url" rel="index"><span itemprop="name">jvm</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2018/08/12/jvm-memory-area/" class="post-meta-item leancloud_visitors" data-flag-title="JVM运行时内存区域" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <blockquote>
+<p> JVM 内置了自动内存分配管理机制。这个机制可以大大降低手动分配回收机制可能带来的内存泄露和内存溢出风险，使 Java 开发人员不需要关注每个对象的内存分配以及回收，从而更专注于业务本身。</p>
+</blockquote>
+<blockquote>
+<p> JVM 自动内存分配管理机制的好处很多，但实则是把双刃剑。这个机制在提升 Java 开发效率的同时，也容易使 Java 开发人员过度依赖于自动化，弱化对内存的管理能力，这样系统就很容易发生 JVM 的堆内存异常，垃圾回收（GC）的方式不合适以及 GC 次数过于频繁等问题，这些都将直接影响到应用服务的性能。</p>
+</blockquote>
+<blockquote>
+<p> JVM的内存划分中，有部分区域是线程私有的，有部分是属于整个JVM进程；有些区域会抛出OOM异常，有些则不会，了解JVM的内存区域划分以及特征，是定位线上内存问题的基础。那么JVM内存区域是怎么划分的呢？</p>
+</blockquote>
+<p>  <img src="/img/java/JVM/Memory/java-process-memory-use.png" alt="运行中的Java进程内存占用情况"></p>
+<p>  <img src="/img/java/JVM/Memory/Java-Runtime-data-area-jdk7.jpg" alt=" Java虚拟机运行时数据区 - 大小和实际内存大小有差距"><br>  Java虚拟机运行时数据区 (仅参考模型)</p>
+<p>  <img src="/img/java/JVM/Memory/Java-Runtime-data-area-jdk7.png" alt=" Java虚拟机运行时数据区-大概比例 "><br>  Java虚拟机运行时数据区-大概比例</p>
+<h1 id="1-Java内存区域"><a href="#1-Java内存区域" class="headerlink" title="1.　Java内存区域"></a>1.　Java内存区域</h1><blockquote>
+<p>   Java虚拟机在执行Java程序的过程中会把它管理的内存划分为若干个不同的数据区域，这些区域都有各自的用途，以及创建和销毁的时间，有的随着虚拟机进程启动而存在，有的区域则依赖于用户线程的启动和结束而建立和销毁。</p>
+</blockquote>
+<blockquote>
+<p> 根据《Java 虚拟机规范》的规定，Java 虚拟机所管理的内存一共分为 Program Counter Register（程序计数器）、VM Stack（虚拟机栈）、Native Method Stack（本地方法栈）、Heap（堆）、Method Area（方法区）五个区域。</p>
+</blockquote>
+<h2 id="1-1-程序计数器-Program-Counter-Register"><a href="#1-1-程序计数器-Program-Counter-Register" class="headerlink" title="1.1　程序计数器(Program Counter Register)"></a>1.1　程序计数器(Program Counter Register)</h2><blockquote>
+<p> <code>程序计数器</code>(Program Counter Register)，简称PC，在JVM规范中，每个线程都有自己的程序计数器。</p>
+</blockquote>
+<blockquote>
+<p> 这是一块比较小的内存空间，存储当前线程正在执行的Java方法的JVM指令(或操作码)地址，即字节码的行号。如果当前方法是 native 方法，那么程序计数器的值为 undefined。</p>
+</blockquote>
+<blockquote>
+<p> 举个例子，下面是一段输出 Hello World 的代码，代码和反编译后的文件如下: </p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">HelloWorld</span><span class="token punctuation">&#123;</span>
+	<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+		<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"Hello, World!"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">Classfile <span class="token file-path string">/home/wkq/workspaces/java_test/HelloWorld.class</span>
+  Last modified <span class="token date number">Jun 21</span><span class="token punctuation">,</span> <span class="token number">2020</span><span class="token operator">;</span> size <span class="token number">427</span> bytes
+  SHA<span class="token operator">-</span><span class="token number">256</span> checksum <span class="token hash constant">cc0de3eb12561fe81dfb95961d817665276587839bdf652b6f4070c1b9942f10</span>
+  Compiled from <span class="token string">"HelloWorld.java"</span>
+public class HelloWorld
+  <span class="token property">minor version:</span> <span class="token number">0</span>
+  <span class="token property">major version:</span> <span class="token number">58</span>
+  <span class="token property">flags:</span> <span class="token operator">(</span><span class="token number">0x0021</span><span class="token operator">)</span> ACC_PUBLIC<span class="token punctuation">,</span> ACC_SUPER
+  <span class="token property">this_class:</span> <span class="token operator">#</span><span class="token number">21</span>                         <span class="token operator">/</span><span class="token operator">/</span> HelloWorld
+  <span class="token property">super_class:</span> <span class="token operator">#</span><span class="token number">2</span>                         <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>Object
+  <span class="token property">interfaces:</span> <span class="token number">0</span><span class="token punctuation">,</span> fields<span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> methods<span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> attributes<span class="token operator">:</span> <span class="token number">1</span>
+<span class="token property">Constant pool:</span>
+   <span class="token operator">#</span><span class="token number">1</span> <span class="token operator">=</span> Methodref          <span class="token operator">#</span><span class="token number">2</span><span class="token punctuation">.</span><span class="token operator">#</span><span class="token number">3</span>          <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>Object<span class="token punctuation">.</span><span class="token string">"&lt;init>"</span><span class="token operator">:</span><span class="token operator">(</span><span class="token operator">)</span>V
+   <span class="token operator">#</span><span class="token number">2</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">4</span>             <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>Object
+   <span class="token operator">#</span><span class="token number">3</span> <span class="token operator">=</span> NameAndType        <span class="token operator">#</span><span class="token number">5</span><span class="token operator">:</span><span class="token operator">#</span><span class="token number">6</span>          <span class="token operator">/</span><span class="token operator">/</span> <span class="token string">"&lt;init>"</span><span class="token operator">:</span><span class="token operator">(</span><span class="token operator">)</span>V
+   <span class="token operator">#</span><span class="token number">4</span> <span class="token operator">=</span> Utf8               java<span class="token operator">/</span>lang<span class="token operator">/</span>Object
+   <span class="token operator">#</span><span class="token number">5</span> <span class="token operator">=</span> Utf8               <span class="token operator">&lt;</span>init<span class="token operator">></span>
+   <span class="token operator">#</span><span class="token number">6</span> <span class="token operator">=</span> Utf8               <span class="token operator">(</span><span class="token operator">)</span>V
+   <span class="token operator">#</span><span class="token number">7</span> <span class="token operator">=</span> Fieldref           <span class="token operator">#</span><span class="token number">8</span><span class="token punctuation">.</span><span class="token operator">#</span><span class="token number">9</span>          <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>System<span class="token punctuation">.</span>out<span class="token operator">:</span>Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+   <span class="token operator">#</span><span class="token number">8</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">10</span>            <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>System
+   <span class="token operator">#</span><span class="token number">9</span> <span class="token operator">=</span> NameAndType        <span class="token operator">#</span><span class="token number">11</span><span class="token operator">:</span><span class="token operator">#</span><span class="token number">12</span>        <span class="token operator">/</span><span class="token operator">/</span> out<span class="token operator">:</span>Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+  <span class="token operator">#</span><span class="token number">10</span> <span class="token operator">=</span> Utf8               java<span class="token operator">/</span>lang<span class="token operator">/</span>System
+  <span class="token operator">#</span><span class="token number">11</span> <span class="token operator">=</span> Utf8               out
+  <span class="token operator">#</span><span class="token number">12</span> <span class="token operator">=</span> Utf8               Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+  <span class="token operator">#</span><span class="token number">13</span> <span class="token operator">=</span> String             <span class="token operator">#</span><span class="token number">14</span>            <span class="token operator">/</span><span class="token operator">/</span> Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+  <span class="token operator">#</span><span class="token number">14</span> <span class="token operator">=</span> Utf8               Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+  <span class="token operator">#</span><span class="token number">15</span> <span class="token operator">=</span> Methodref          <span class="token operator">#</span><span class="token number">16</span><span class="token punctuation">.</span><span class="token operator">#</span><span class="token number">17</span>        <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token punctuation">.</span>println<span class="token operator">:</span><span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">16</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">18</span>            <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream
+  <span class="token operator">#</span><span class="token number">17</span> <span class="token operator">=</span> NameAndType        <span class="token operator">#</span><span class="token number">19</span><span class="token operator">:</span><span class="token operator">#</span><span class="token number">20</span>        <span class="token operator">/</span><span class="token operator">/</span> println<span class="token operator">:</span><span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">18</span> <span class="token operator">=</span> Utf8               java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream
+  <span class="token operator">#</span><span class="token number">19</span> <span class="token operator">=</span> Utf8               println
+  <span class="token operator">#</span><span class="token number">20</span> <span class="token operator">=</span> Utf8               <span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">21</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">22</span>            <span class="token operator">/</span><span class="token operator">/</span> HelloWorld
+  <span class="token operator">#</span><span class="token number">22</span> <span class="token operator">=</span> Utf8               HelloWorld
+  <span class="token operator">#</span><span class="token number">23</span> <span class="token operator">=</span> Utf8               Code
+  <span class="token operator">#</span><span class="token number">24</span> <span class="token operator">=</span> Utf8               LineNumberTable
+  <span class="token operator">#</span><span class="token number">25</span> <span class="token operator">=</span> Utf8               main
+  <span class="token operator">#</span><span class="token number">26</span> <span class="token operator">=</span> Utf8               <span class="token operator">(</span><span class="token punctuation">[</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">27</span> <span class="token operator">=</span> Utf8               SourceFile
+  <span class="token operator">#</span><span class="token number">28</span> <span class="token operator">=</span> Utf8               HelloWorld<span class="token punctuation">.</span>java
+<span class="token operator">&#123;</span>
+  public HelloWorld<span class="token operator">(</span><span class="token operator">)</span><span class="token operator">;</span>
+    <span class="token property">descriptor:</span> <span class="token operator">(</span><span class="token operator">)</span>V
+    <span class="token property">flags:</span> <span class="token operator">(</span><span class="token number">0x0001</span><span class="token operator">)</span> ACC_PUBLIC
+    <span class="token property">Code:</span>
+      stack<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> locals<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> args_size<span class="token operator">=</span><span class="token number">1</span>
+         <span class="token number">0</span><span class="token operator">:</span> aload_0
+         <span class="token number">1</span><span class="token operator">:</span> invokespecial <span class="token operator">#</span><span class="token number">1</span>                  <span class="token operator">/</span><span class="token operator">/</span> Method java<span class="token operator">/</span>lang<span class="token operator">/</span>Object<span class="token punctuation">.</span><span class="token string">"&lt;init>"</span><span class="token operator">:</span><span class="token operator">(</span><span class="token operator">)</span>V
+         <span class="token number">4</span><span class="token operator">:</span> return
+      <span class="token property">LineNumberTable:</span>
+        <span class="token property">line 1:</span> <span class="token number">0</span>
+
+  public static void main<span class="token operator">(</span>java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>String<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token operator">)</span><span class="token operator">;</span>
+    <span class="token property">descriptor:</span> <span class="token operator">(</span><span class="token punctuation">[</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+    <span class="token property">flags:</span> <span class="token operator">(</span><span class="token number">0x0009</span><span class="token operator">)</span> ACC_PUBLIC<span class="token punctuation">,</span> ACC_STATIC
+    <span class="token property">Code:</span>
+      stack<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">,</span> locals<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> args_size<span class="token operator">=</span><span class="token number">1</span>
+         <span class="token number">0</span><span class="token operator">:</span> getstatic     <span class="token operator">#</span><span class="token number">7</span>                  <span class="token operator">/</span><span class="token operator">/</span> Field java<span class="token operator">/</span>lang<span class="token operator">/</span>System<span class="token punctuation">.</span>out<span class="token operator">:</span>Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+         <span class="token number">3</span><span class="token operator">:</span> ldc           <span class="token operator">#</span><span class="token number">13</span>                 <span class="token operator">/</span><span class="token operator">/</span> String Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+         <span class="token number">5</span><span class="token operator">:</span> invokevirtual <span class="token operator">#</span><span class="token number">15</span>                 <span class="token operator">/</span><span class="token operator">/</span> Method java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token punctuation">.</span>println<span class="token operator">:</span><span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+         <span class="token number">8</span><span class="token operator">:</span> return
+      <span class="token property">LineNumberTable:</span>
+        <span class="token property">line 3:</span> <span class="token number">0</span>
+        <span class="token property">line 4:</span> <span class="token number">8</span>
+<span class="token operator">&#125;</span>
+<span class="token property">SourceFile:</span> <span class="token string">"HelloWorld.java"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> LineNumberTable，是指每一个java字节码指令对应java代码文件中的第几行，以方便定位。</p>
+</blockquote>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">LineNumberTable:</span>
+  <span class="token property">line 3:</span> <span class="token number">0</span>
+  <span class="token property">line 4:</span> <span class="token number">8</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> 其中 line 3  line 4 指的的代码中的行号， 0 8 指的是 java字节码的指令 </p>
+</blockquote>
+<p>  该内存区域是唯一一个在Java虚拟机规范中没有规定任何 OutOfMemoryError 情况的内存区域。</p>
+<h2 id="1-2-Java虚拟机栈-Java-Virtal-Machine-Stack"><a href="#1-2-Java虚拟机栈-Java-Virtal-Machine-Stack" class="headerlink" title="1.2　Java虚拟机栈(Java Virtal Machine Stack)"></a>1.2　Java虚拟机栈(Java Virtal Machine Stack)</h2><p>  Java虚拟机栈(Java Virtal Machine Stack)，同样也是属于线程私有区域，该区域存储着局部变量表，编译时期可知的各种基本类型数据、对象引用、方法出口等信息。</p>
+<blockquote>
+<p> 局部变量表存放了编译期可知的各种基本数据类型(boolean、byte、char、short、int、float、long、double)、对象引用和returnAddress类型（指向了一条字节码指令的地址）。<br>  其中64位长度的long和double类型的数据会占用2个局部变量空间（slot），其余的数据类型占1个。</p>
+</blockquote>
+<p>  局部变量表所需的内存空间在编译期间分配完成，当进入一个方法时，这个方法需要在帧中分配多大的局部变量空间是完全确定的，在方法运行期间不会改变局部变量表的大小。</p>
+<p>  在这个java栈中又会包含多个栈帧，每运行一个方法就创建一个栈帧，用于存储局部变量表、操作栈、方法返回值等。每一个方法从调用直至执行完成的过程，就对应一个栈帧在java栈中入栈到出栈的过程。<br>  每次方法调用时，一个新的栈帧创建并压栈到栈顶。当方法正常返回或抛出未捕获的异常时，栈帧就会出栈。除了栈帧的压栈和出栈，栈不能被直接操作。所以可以在堆上分配栈帧，并且不需要连续内存。</p>
+<p>  栈可以是动态分配也可以固定大小。<br>  如果线程请求一个超过允许范围的空间，就会抛出一个StackOverflowError。<br>  如果线程需要一个新的栈帧，但是没有足够的内存可以分配，就会抛出一个 OutOfMemoryError。</p>
+<span id="more"></span>
+<h2 id="1-3-本地方法栈-Native-Method-Stack"><a href="#1-3-本地方法栈-Native-Method-Stack" class="headerlink" title="1.3　本地方法栈(Native Method Stack)"></a>1.3　本地方法栈(Native Method Stack)</h2><p>  第三，本地方法栈(Native Method Stack)与虚拟机栈类似，本地方法栈是在调用本地方法时使用的栈，每个线程都有一个本地方法栈。</p>
+<h2 id="1-4-堆-Heap"><a href="#1-4-堆-Heap" class="headerlink" title="1.4　堆(Heap)"></a>1.4　堆(Heap)</h2><p>  第四，堆(Heap),几乎所有创建的Java对象实例，都是被直接分配到堆上的。这块是GC的主要区域。<br>  堆被所有的线程所共享，在堆上的区域，会被垃圾回收器做进一步划分，例如新生代、老年代的划分。<br>  Java虚拟机在启动的时候，可以使用 <code>Xms</code> <code>Xmx</code> 之类的参数指定堆区域的大小。</p>
+<h2 id="1-5-方法区-Method-Area"><a href="#1-5-方法区-Method-Area" class="headerlink" title="1.5　方法区(Method Area)"></a>1.5　方法区(Method Area)</h2><p>  第五，方法区(Method Area)。方法区与堆一样，也是所有的线程所共享。<br>  存储被虚拟机加载的元(Meta)数据，包括类信息、构造函数、常量池、静态变量、即时编译器编译后的代码等数据。<br>  这里需要注意的是运行时常量池也在方法区中。<br>  根据Java虚拟机规范的规定，当方法区无法满足内存分配需求时，将抛出OutOfMemoryError异常。由于早期HotSpot JVM的实现，将CG分代收集拓展到了方法区，因此很多人会将方法区称为永久代。Oracle JDK8中已永久代移除永久代，同时增加了元数据区(Metaspace)。</p>
+<p>  虽然JVM规范把方法区描述为堆的一个逻辑部分，但它却有个别名non-heap(非堆)，所以大家不要搞混淆了。方法区还包含一个运行时常量池。</p>
+<p>  运行时常量池(Run-Time Constant Pool)，这是方法区的一部分，受到方法区内存的限制，当常量池无法再申请到内存时，会抛出OutOfMemoryError异常。<br>  常量池主要存放两大类常量：<br>    (1)字面量(Literal)，如文本字符串、final常量值<br>    (2)符号引用，存放了与编译相关的一些常量，因为Java不像C++那样有连接的过程，因此字段方法这些符号引用在运行期就需要进行转换，以便得到真正的内存入口地址。</p>
+<p>  class文件中的常量池，也称为静态常量池，JVM虚拟机完成类装载操作后，会把静态常量池加载到内存中，存放在运行时常量池。</p>
+<!--
+  在Class文件中，除了有类的版本、方法、字段、接口等描述信息外，还有一项信息是常量池。每个Class文件的头四个字节称为Magic Number，它的作用是确定这是否是一个可以被虚拟机接受的文件；接着的四个字节存储的是Class文件的版本号。紧挨着版本号之后的，就是常量池入口了。
+-->
+
+<h2 id="1-6-直接内存-Direct-Memory"><a href="#1-6-直接内存-Direct-Memory" class="headerlink" title="1.6　直接内存(Direct Memory)"></a>1.6　直接内存(Direct Memory)</h2><p>  第七，直接内存(Direct Memory)，直接内存并不属于Java规范规定的属于Java虚拟机运行时数据区的一部分。<br>  Java的NIO可以使用Native方法直接在java堆外分配内存，使用DirectByteBuffer对象作为这个堆外内存的引用。</p>
+<h2 id="1-7-Java-SE-7-规范的典型的-JVM-核心内部组件"><a href="#1-7-Java-SE-7-规范的典型的-JVM-核心内部组件" class="headerlink" title="1.7　Java SE 7 规范的典型的 JVM 核心内部组件"></a>1.7　Java SE 7 规范的典型的 JVM 核心内部组件</h2><p>  <img src="/img/java/JVM/Memory/JVM_Internal_Architecture_small.png" alt=" Java SE 7 规范的典型的 JVM 核心内部组件 "></p>
+<h1 id="2-OOM可能发生在哪些区域上？"><a href="#2-OOM可能发生在哪些区域上？" class="headerlink" title="2.　OOM可能发生在哪些区域上？"></a>2.　OOM可能发生在哪些区域上？</h1><table>
+<thead>
+<tr>
+<th align="left">内存区域</th>
+<th align="left">是否线程私有</th>
+<th align="left">是否可能发生OOM</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">程序计数器</td>
+<td align="left">是</td>
+<td align="left">否</td>
+</tr>
+<tr>
+<td align="left">虚拟机栈</td>
+<td align="left">是</td>
+<td align="left">是</td>
+</tr>
+<tr>
+<td align="left">本地方法栈</td>
+<td align="left">是</td>
+<td align="left">是</td>
+</tr>
+<tr>
+<td align="left">方法区</td>
+<td align="left">否</td>
+<td align="left">是</td>
+</tr>
+<tr>
+<td align="left">直接内存</td>
+<td align="left">否</td>
+<td align="left">是</td>
+</tr>
+<tr>
+<td align="left">堆</td>
+<td align="left">否</td>
+<td align="left">是</td>
+</tr>
+</tbody></table>
+<p>  根据javadoc的描述，OOM是指JVM的内存不够用了，同时垃圾收集器也无法提供更多的内存。从描述中可以看出，在JVM抛出OutOfMemoryError之前，垃圾收集器一般会出马先尝试回收内存。<br>  从上面分析的Java数据区来看，除了程序计数器不会发生OOM外，哪些区域会发生OOM的情况呢？</p>
+<h2 id="2-1-堆内存"><a href="#2-1-堆内存" class="headerlink" title="2.1　堆内存"></a>2.1　堆内存</h2><p>  第一，堆内存。堆内存不足是最常见的发送OOM的原因之一，如果在堆中没有内存完成对象实例的分配，并且堆无法再扩展时，将抛出OutOfMemoryError异常，抛出的错误信息是“java.lang.OutOfMemoryError:Java heap space”。当前主流的JVM可以通过<code>-Xmx</code>和<code>-Xms</code>来控制堆内存的大小，发生堆上OOM的可能是存在内存泄露，也可能是堆大小分配不合理。</p>
+<h2 id="2-2-Java虚拟机栈和本地方法栈"><a href="#2-2-Java虚拟机栈和本地方法栈" class="headerlink" title="2.2　Java虚拟机栈和本地方法栈"></a>2.2　Java虚拟机栈和本地方法栈</h2><p>  第二，Java虚拟机栈和本地方法栈，这两个区域的区别不过是虚拟机栈为虚拟机执行Java方法服务，而本地方法栈则为虚拟机使用到的Native方法服务，在内存分配异常上是相同的。在JVM规范中，对Java虚拟机栈规定了两种异常：1.如果线程请求的栈大于所分配的栈大小，则抛出StackOverFlowError错误，比如进行了一个不会停止的递归调用；2. 如果虚拟机栈是可以动态拓展的，拓展时无法申请到足够的内存，则抛出OutOfMemoryError错误。</p>
+<h2 id="2-3-直接内存"><a href="#2-3-直接内存" class="headerlink" title="2.3　直接内存"></a>2.3　直接内存</h2><p>  第三，直接内存。直接内存虽然不是虚拟机运行时数据区的一部分，但既然是内存，就会受到物理内存的限制。在JDK1.4中引入的NIO使用Native函数库在堆外内存上直接分配内存，但直接内存不足时，也会导致OOM。</p>
+<h2 id="2-4-方法区"><a href="#2-4-方法区" class="headerlink" title="2.4　方法区"></a>2.4　方法区</h2><p>  第四，方法区。随着Metaspace元数据区的引入，方法区的OOM错误信息也变成了“java.lang.OutOfMemoryError:Metaspace”。对于旧版本的Oracle JDK，由于永久代的大小有限，而JVM对永久代的垃圾回收并不积极，如果往永久代不断写入数据，例如String.Intern()的调用，在永久代占用太多空间导致内存不足，也会出现OOM的问题，对应的错误信息为“java.lang.OutOfMemoryError:PermGen space”</p>
+<h1 id="3-堆内存结构是怎么样的？"><a href="#3-堆内存结构是怎么样的？" class="headerlink" title="3.　堆内存结构是怎么样的？"></a>3.　堆内存结构是怎么样的？</h1><p>  站在垃圾收集器的角度来看，可以把内存分为新生代与老年代。内存的分配规则取决于当前使用的是哪种垃圾收集器的组合，以及内存相关的参数配置。<br>  往大的方向说，对象优先分配在新生代的Eden区域，而大对象直接进入老年代。</p>
+<p>  可以借助一些工具来了解JVM的内存内容，具体到特定的内存区域，应该用什么工具去定位呢？<br>  图形化工具。图形化工具的优点是直观，连接到Java进程后，可以显示堆内存、堆外内存的使用情况，类似的工具有JConsole,jvisualvm 等。<br>  命令行工具。这类工具可以在运行时进行查询，包括jstat，jmap等，可以对堆内存、方法区等进行查看。定位线上问题时也多会使用这些工具。jmap也可以生成堆转储文件(Heap Dump)文件，如果是在linux上，可以将堆转储文件拉到本地来，使用Eclipse MAT进行分析，也可以使用jhap进行分析。</p>
+<h2 id="3-1-新生代-Young-Generation-的Eden区域"><a href="#3-1-新生代-Young-Generation-的Eden区域" class="headerlink" title="3.1　新生代(Young Generation)的Eden区域"></a>3.1　新生代(Young Generation)的Eden区域</h2><p>  第一, 新生代的Eden区域，对象优先分配在该区域，同时JVM可以为每个线程分配一个私有的缓存区域，称为TLAB(Thread Local Allocation Buffer)，避免多线程同时分配内存时需要使用加锁等机制而影响分配速度。TLAB在堆上分配，位于Eden中。TLAB的结构如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// ThreadLocalAllocBuffer: a descriptor for thread-local storage used by</span>
+<span class="token comment">// the threads for allocation.</span>
+<span class="token comment">//            It is thread-private at any time, but maybe multiplexed over</span>
+<span class="token comment">//            time across multiple threads. The park()/unpark() pair is</span>
+<span class="token comment">//            used to make it avaiable for such multiplexing.</span>
+<span class="token keyword">class</span> <span class="token class-name">ThreadLocalAllocBuffer</span><span class="token operator">:</span> <span class="token keyword">public</span> <span class="token class-name">CHeapObj</span><span class="token generics"><span class="token punctuation">&lt;</span>mtThread<span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+  friend <span class="token keyword">class</span> <span class="token class-name">VMStructs</span><span class="token punctuation">;</span>
+<span class="token keyword">private</span><span class="token operator">:</span>
+  <span class="token class-name">HeapWord</span><span class="token operator">*</span> _start<span class="token punctuation">;</span>                              <span class="token comment">// address of TLAB</span>
+  <span class="token class-name">HeapWord</span><span class="token operator">*</span> _top<span class="token punctuation">;</span>                                <span class="token comment">// address after last allocation</span>
+  <span class="token class-name">HeapWord</span><span class="token operator">*</span> _pf_top<span class="token punctuation">;</span>                             <span class="token comment">// allocation prefetch watermark</span>
+  <span class="token class-name">HeapWord</span><span class="token operator">*</span> _end<span class="token punctuation">;</span>                                <span class="token comment">// allocation end (excluding alignment_reserve)</span>
+  size_t    _desired_size<span class="token punctuation">;</span>                       <span class="token comment">// desired size   (including alignment_reserve)</span>
+  size_t    _refill_waste_limit<span class="token punctuation">;</span>                 <span class="token comment">// hold onto tlab if free() is larger than this</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  从本质上来说，TLAB的管理是依靠三个指针：start、end、top。start与end标记了Eden中被该TLAB管理的区域，该区域不会被其他线程分配内存所使用，top是分配指针，开始时指向start的位置，随着内存分配的进行，慢慢向end靠近，当撞上end时触发TLAB refill。<br>  因此内存中Eden的结构大体为：<br>  <img src="/img/java/JVM/Memory/young-generation-eden.png" alt=" Eden结构 "></p>
+<h2 id="3-2-新生代-Young-Generation-的Survivor区域"><a href="#3-2-新生代-Young-Generation-的Survivor区域" class="headerlink" title="3.2　新生代(Young Generation)的Survivor区域"></a>3.2　新生代(Young Generation)的Survivor区域</h2><p>  第二、新生代的Survivor区域。当Eden区域内存不足时会触发Minor GC，也称为新生代GC，在Minor GC存活下来的对象，会被复制到Survivor区域中。<br>  Survivor区的作用在于避免过早触发Full GC。如果没有Survivor，Eden区每进行一次Minor GC都把对象直接送到老年代，老年代很快便会内存不足引发Full GC。<br>  新生代中有两个Survivor区，两个Survivor的作用在于提高性能，避免内存碎片的出现。在任何时候，总有一个Survivor是empty的，在发生Minor GC时，会将Eden及另一个的Survivor的存活对象拷贝到该empty Survivor中，从而避免内存碎片的产生。<br>  新生代的内存结构大体为：<br>  <img src="/img/java/JVM/Memory/young-generation.png" alt=" 新生代的内存结构 "></p>
+<h2 id="3-3-老年代-Old-Generation"><a href="#3-3-老年代-Old-Generation" class="headerlink" title="3.3　老年代 (Old Generation)"></a>3.3　老年代 (Old Generation)</h2><p>  第三、老年代。老年代放置长生命周期的对象，通常是从Survivor区域拷贝过来的对象，不过当对象过大的时候，无法在新生代中用连续内存的存放，那么这个大对象就会被直接分配在老年代上。一般来说，普通的对象都是分配在TLAB上，较大的对象，直接分配在Eden区上的其他内存区域，而过大的对象，直接分配在老年代上。</p>
+<h2 id="3-4-永久代"><a href="#3-4-永久代" class="headerlink" title="3.4　永久代"></a>3.4　永久代</h2><p>  第四、永久代。如前面所说，在早起的Hotspot JVM中有老年代的概念，老年代用于存储Java类的元数据、常量池、Intern字符串等。<br>  在JDK8之后，就将老年代移除，而引入元数据区的概念。</p>
+<h2 id="3-5-Vritual空间"><a href="#3-5-Vritual空间" class="headerlink" title="3.5　Vritual空间"></a>3.5　Vritual空间</h2><p>  第五、Vritual空间。前面说过，可以使用Xms与Xmx来指定堆的最小与最大空间。如果Xms小于Xmx，堆的大小不会直接扩展到上限，而是留着一部分等待内存需求不断增长时，再分配给新生代。Vritual空间便是这部分保留的内存区域。</p>
+<h2 id="3-6-总结"><a href="#3-6-总结" class="headerlink" title="3.6　总结"></a>3.6　总结</h2><p>  综上所述，可以画出Java堆内的内存结构大体为：<br>  <img src="/img/java/JVM/Memory/java-heap-memory-model.png" alt=" Java堆内的内存结构 "></p>
+<h2 id="4-常用配置"><a href="#4-常用配置" class="headerlink" title="4.　常用配置"></a>4.　常用配置</h2><p><code>-Xms1024m</code> 设置初始的最小堆大小1024m</p>
+<p><code>-Xmx4096m</code> 设置最大的堆大小为4096m</p>
+<p><code>-Xmn1536m</code> 设置新生代大小为1536m。<br>　　持久代一般固定大小为64m，所以增大新生代后，将会减小年老代大小。<br>　　此值对系统性能影响较大，Sun官方推荐配置为整个堆的3/8。</p>
+<p><code>-Xss128k</code> 设置每个线程的堆栈大小。<br>　　JDK5.0以后每个线程堆栈大小为1M，以前每个线程堆栈大小为256K。更具应用的线程所需内存大小进行调整。<br>　　在相同物理内存下，减小这个值能生成更多的线程。但是操作系统对一个进程内的线程数还是有限制的，不能无限生成，经验值在3000~5000左右。</p>
+<p><code>-XX:NewSize=1024</code> 设置 新生代 Yong Generation的初始值大小</p>
+<p><code>-XX:MaxNewSize=1024m</code>  设置 新生代 Yong Generation的最大值大小</p>
+<p><code>-XX:NewRatio=4</code> 设置新生代(包括Eden和两个Survivor区)与年老代的比值(除去持久代)。默认为2，设置为4，则新生代与年老代所占比值为1：4，新生代占整个堆栈的1/5<br>    老年代过大的时候，Full GC的时间会很长；老年代过小，则很容易触发Full GC，Full GC频率过高，这就是这个参数会造成的影响。</p>
+<p><code>-XX:SurvivorRatio=4</code> 设置新生代中Eden区与Survivor区的大小比值。<br>　　设置为4，则两个Survivor区与一个Eden区的比值为2:4，一个Survivor区占整个新生代的1/6</p>
+<p><code>-XX:MaxPermSize=16m</code> 设置持久代大小为16m。</p>
+<p><code>-XX:MaxTenuringThreshold=0</code> 设置垃圾最大年龄。<br>　　如果设置为0的话，则新生代对象不经过Survivor区，直接进入年老代。对于年老代比较多的应用，可以提高效率。如果将此值设置为一个较大值，则新生代对象会在Survivor区进行多次复制，这样可以增加对象再新生代的存活时间，增加在新生代即被回收的概论。</p>
+<h2 id="4-1-JVM设置Young-Gen参数优先级"><a href="#4-1-JVM设置Young-Gen参数优先级" class="headerlink" title="4.1　JVM设置Young Gen参数优先级"></a>4.1　JVM设置Young Gen参数优先级</h2><p>  JVM设置Young Gen参数优先级<br>  (1) 最高优先级：  -XX:NewSize=1024m和-XX:MaxNewSize=1024m<br>  (2) 次高优先级：  -Xmn1024m  (默认等效效果是：-XX:NewSize==-XX:MaxNewSize==1024m)<br>  (3) 最低优先级：-XX:NewRatio=2 </p>
+<h1 id="5-常见配置汇总"><a href="#5-常见配置汇总" class="headerlink" title="5.　常见配置汇总"></a>5.　常见配置汇总</h1><h2 id="5-1-堆设置"><a href="#5-1-堆设置" class="headerlink" title="5.1　堆设置"></a>5.1　堆设置</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">-Xms:初始堆大小
+-Xmx:最大堆大小
+-XX:NewSize=n:设置年轻代大小
+-XX:NewRatio=n:设置年轻代和年老代的比值。如:为3，表示年轻代与年老代比值为1：3，年轻代占整个年轻代年老代和的1/4
+-XX:SurvivorRatio=n:年轻代中Eden区与两个Survivor区的比值。注意Survivor区有两个。如：3，表示Eden：Survivor=3：2，一个Survivor区占整个年轻代的1/5
+-XX:MaxPermSize=n:设置持久代大小<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="5-2-收集器设置"><a href="#5-2-收集器设置" class="headerlink" title="5.2　收集器设置"></a>5.2　收集器设置</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">-XX:+UseSerialGC:设置串行收集器
+-XX:+UseParallelGC:设置并行收集器
+-XX:+UseParalledlOldGC:设置并行年老代收集器
+-XX:+UseConcMarkSweepGC:设置并发收集器<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="5-3-垃圾回收统计信息"><a href="#5-3-垃圾回收统计信息" class="headerlink" title="5.3　垃圾回收统计信息"></a>5.3　垃圾回收统计信息</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">-XX:+PrintGC
+-XX:+PrintGCDetails
+-XX:+PrintGCTimeStamps
+-Xloggc:filename<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="5-4-并行收集器设置"><a href="#5-4-并行收集器设置" class="headerlink" title="5.4　并行收集器设置"></a>5.4　并行收集器设置</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">-XX:ParallelGCThreads=n:设置并行收集器收集时使用的CPU数。并行收集线程数。
+-XX:MaxGCPauseMillis=n:设置并行收集最大暂停时间
+-XX:GCTimeRatio=n:设置垃圾回收时间占程序运行时间的百分比。公式为1/(1+n)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="5-5-并发收集器设置"><a href="#5-5-并发收集器设置" class="headerlink" title="5.5　并发收集器设置"></a>5.5　并发收集器设置</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">-XX:+CMSIncrementalMode:设置为增量模式。适用于单CPU情况。
+-XX:ParallelGCThreads=n:设置并发收集器年轻代收集方式为并行收集时，使用的CPU数。并行收集线程数<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h1 id="6-调优总结"><a href="#6-调优总结" class="headerlink" title="6.　调优总结"></a>6.　调优总结</h1><h2 id="6-1-年轻代大小选择"><a href="#6-1-年轻代大小选择" class="headerlink" title="6.1　年轻代大小选择"></a>6.1　年轻代大小选择</h2><p>　响应时间优先的应用：尽可能设大，直到接近系统的最低响应时间限制(根据实际情况选择)。在此种情况下，年轻代收集发生的频率也是最小的。同时，减少到达年老代的对象。<br>  吞吐量优先的应用：尽可能的设置大，可能到达Gbit的程度。因为对响应时间没有要求，垃圾收集可以并行进行，一般适合8CPU以上的应用。</p>
+<h2 id="6-2-年老代大小选择"><a href="#6-2-年老代大小选择" class="headerlink" title="6.2　年老代大小选择"></a>6.2　年老代大小选择</h2><p>  响应时间优先的应用：年老代使用并发收集器，所以其大小需要小心设置，一般要考虑并发会话率和会话持续时间等一些参数。如果堆设置小了，可以会造成内存碎片、高回收频率以及应用暂停而使用传统的标记清除方式；如果堆大了，则需要较长的收集时间。最优化的方案，一般需要参考以下数据获得：<br>  并发垃圾收集信息<br>  持久代并发收集次数<br>  传统GC信息<br>  花在年轻代和年老代回收上的时间比例<br>  减少年轻代和年老代花费的时间，一般会提高应用的效率</p>
+<p>  吞吐量优先的应用：一般吞吐量优先的应用都有一个很大的年轻代和一个较小的年老代。原因是，这样可以尽可能回收掉大部分短期对象，减少中期的对象，而年老代尽存放长期存活对象。</p>
+<h2 id="6-3-较小堆引起的碎片问题"><a href="#6-3-较小堆引起的碎片问题" class="headerlink" title="6.3　较小堆引起的碎片问题"></a>6.3　较小堆引起的碎片问题</h2><p>  因为年老代的并发收集器使用标记、清除算法，所以不会对堆进行压缩。当收集器回收时，他会把相邻的空间进行合并，这样可以分配给较大的对象。但是，当堆空间较小时，运行一段时间以后，就会出现“碎片”，如果并发收集器找不到足够的空间，那么并发收集器将会停止，然后使用传统的标记、清除方式进行回收。如果出现“碎片”，可能需要进行如下配置：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">-XX:+UseCMSCompactAtFullCollection：使用并发收集器时，开启对年老代的压缩。
+-XX:CMSFullGCsBeforeCompaction=0：上面配置开启的情况下，这里设置多少次Full GC后，对年老代进行压缩<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-2.html">Chapter 2. The Structure of the Java Virtual Machine</a><br>[2] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/QG-whz/p/9636366.html">关于JVM内存的N个问题</a><br>[3] <a target="_blank" rel="noopener" href="http://www.importnew.com/17770.html">JVM内幕：Java虚拟机详解</a><br>[4] <a target="_blank" rel="noopener" href="https://blog.csdn.net/tonytfjing/article/details/44278233">JVM结构、GC工作机制详解</a><br>[5] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/smyhvae/p/4810168.html">Java虚拟机详解—-JVM常见问题总结</a><br>[6] <a target="_blank" rel="noopener" href="http://www.51gjie.com/java/549.html">Java中JVM原理详解</a><br>[7] <a target="_blank" rel="noopener" href="https://segmentfault.com/a/1190000002579346">JVM 的 工作原理，层次结构 以及 GC工作原理</a><br>[8] <a target="_blank" rel="noopener" href="https://blog.csdn.net/huachao1001/article/details/51533132">JVM理解其实并不难！</a><br>[9] <a target="_blank" rel="noopener" href="https://blog.csdn.net/suifeng3051/article/details/52611310">全面理解Java内存模型</a><br>[10] <a target="_blank" rel="noopener" href="https://blog.csdn.net/javazejian/article/details/72772461">全面理解Java内存模型(JMM)及volatile关键字</a><br>[11] <a target="_blank" rel="noopener" href="https://www.jianshu.com/p/1579aafac60b">JVM内存模型</a><br>[12] <a target="_blank" rel="noopener" href="http://unixboy.iteye.com/blog/174173">JVMM调优总结 -Xms -Xmx -Xmn -Xss</a><br>[13] <a target="_blank" rel="noopener" href="http://eyesmore.iteye.com/blog/1530996">JVM设置Young Gen大小</a><br>[14] <a target="_blank" rel="noopener" href="https://developer.aliyun.com/article/846878">JVM之内存结构图文详解</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/jvm/" rel="tag"># jvm</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2018/08/11/orientdb-download-install/" rel="prev" title="OrientDB 下载 安装">
+                  <i class="fa fa-chevron-left"></i> OrientDB 下载 安装
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2018/08/13/java-exception-performance/" rel="next" title="java异常-性能分析">
+                  java异常-性能分析 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

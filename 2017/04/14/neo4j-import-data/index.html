@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="Neo4j是一个比较新的数据库，ETL工具较少，公司一个项目需要导入上百亿数据，想找一个最合适的方案来导入数据。  于是就想测测各种导入方式的效率以及成本 常见数据插入方式概览目前主要有以下几种数据插入方式：  Cypher create 语句，为每一条数据写一个create Cypher load csv 语句，将数据转成CSV格式，通过LOAD CSV读取数据。 官方提供的neo4j-im">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Neo4j 批量 导入 数据 的 几种方式">
+<meta property="og:url" content="http://weikeqin.com/2017/04/14/neo4j-import-data/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Neo4j是一个比较新的数据库，ETL工具较少，公司一个项目需要导入上百亿数据，想找一个最合适的方案来导入数据。  于是就想测测各种导入方式的效率以及成本 常见数据插入方式概览目前主要有以下几种数据插入方式：  Cypher create 语句，为每一条数据写一个create Cypher load csv 语句，将数据转成CSV格式，通过LOAD CSV读取数据。 官方提供的neo4j-im">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-04-14T13:34:35.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.254Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="neo4j">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/04/14/neo4j-import-data/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/04/14/neo4j-import-data/","path":"2017/04/14/neo4j-import-data/","title":"Neo4j 批量 导入 数据 的 几种方式"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Neo4j 批量 导入 数据 的 几种方式 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E6%95%B0%E6%8D%AE%E6%8F%92%E5%85%A5%E6%96%B9%E5%BC%8F%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">常见数据插入方式概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%90%84%E7%A7%8D%E5%AF%BC%E5%85%A5%E6%95%B0%E6%8D%AE%E6%96%B9%E6%B3%95%E6%B5%8B%E8%AF%95"><span class="nav-number">2.</span> <span class="nav-text">各种导入数据方法测试</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-create%E8%AF%AD%E5%8F%A5"><span class="nav-number">2.1.</span> <span class="nav-text">(1)　create语句</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-load-csv-%E8%AF%AD%E5%8F%A5"><span class="nav-number">2.2.</span> <span class="nav-text">(2)　load csv 语句</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%AF%BC%E5%85%A510w%E6%95%B0%E6%8D%AE-%E4%BB%85%E8%8A%82%E7%82%B9"><span class="nav-number">2.2.1.</span> <span class="nav-text">(2.1) 导入10w数据(仅节点)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E5%AF%BC%E5%85%A51kw%E6%95%B0%E6%8D%AE-%E4%BB%85%E8%8A%82%E7%82%B9"><span class="nav-number">2.2.2.</span> <span class="nav-text">(2.2) 导入1kw数据(仅节点)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E5%AF%BC%E5%85%A5100w%E6%95%B0%E6%8D%AE-%E4%BB%85%E5%85%B3%E7%B3%BB"><span class="nav-number">2.2.3.</span> <span class="nav-text">(2.3) 导入100w数据(仅关系)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-neo4j-import-%E5%9C%A8%E4%BB%A5%E5%90%8E%E7%89%88%E6%9C%AC%E4%BC%9A%E8%A2%ABneo4j-admin-import%E6%9B%BF%E6%8E%89"><span class="nav-number">2.3.</span> <span class="nav-text">(3)　neo4j-import (在以后版本会被neo4j-admin import替掉)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%AF%BC%E5%85%A51000w%E6%95%B0%E6%8D%AE-1kw%E8%8A%82%E7%82%B9-1kw%E5%85%B3%E7%B3%BB-2kw%E5%B1%9E%E6%80%A7%EF%BC%8Cid%E4%BD%BF%E7%94%A8integer%EF%BC%8C%E5%B1%9E%E6%80%A7%E4%B8%AD%E5%8F%AA%E6%9C%89%E6%95%B0%E5%AD%97%E5%92%8C%E8%8B%B1%E6%96%87"><span class="nav-number">2.3.1.</span> <span class="nav-text">(3.1) 导入1000w数据(1kw节点 1kw关系 2kw属性，id使用integer，属性中只有数字和英文)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E5%AF%BC%E5%85%A51000w%E6%95%B0%E6%8D%AE-1kw%E8%8A%82%E7%82%B9-1kw%E5%85%B3%E7%B3%BB-2kw%E5%B1%9E%E6%80%A7%EF%BC%8C%E5%8C%85%E5%90%AB%E4%B8%AD%E6%96%87%E5%B1%9E%E6%80%A7"><span class="nav-number">2.3.2.</span> <span class="nav-text">(3.2) 导入1000w数据(1kw节点 1kw关系 2kw属性，包含中文属性)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E5%AF%BC%E5%85%A51-1%E4%BA%BF%E6%95%B0%E6%8D%AE-1-1%E4%BA%BF%E8%8A%82%E7%82%B9-1-1%E5%85%B3%E7%B3%BB-2-2%E4%BA%BF%E5%B1%9E%E6%80%A7"><span class="nav-number">2.3.3.</span> <span class="nav-text">(3.3) 导入1.1亿数据(1.1亿节点 1.1关系 2.2亿属性)</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-BatchInserter"><span class="nav-number">2.4.</span> <span class="nav-text">(4)　BatchInserter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-batch-import"><span class="nav-number">2.5.</span> <span class="nav-text">(5)　batch-import</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-apoc"><span class="nav-number">2.6.</span> <span class="nav-text">(6)　apoc</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E8%AE%BA"><span class="nav-number">2.7.</span> <span class="nav-text">结论</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">3.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/04/14/neo4j-import-data/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Neo4j 批量 导入 数据 的 几种方式
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-04-14 21:34:35" itemprop="dateCreated datePublished" datetime="2017-04-14T21:34:35+08:00">2017-04-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/neo4j/" itemprop="url" rel="index"><span itemprop="name">neo4j</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/04/14/neo4j-import-data/" class="post-meta-item leancloud_visitors" data-flag-title="Neo4j 批量 导入 数据 的 几种方式" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Neo4j是一个比较新的数据库，ETL工具较少，公司一个项目需要导入上百亿数据，想找一个最合适的方案来导入数据。<br>  于是就想测测各种导入方式的效率以及成本</p>
+<h1 id="常见数据插入方式概览"><a href="#常见数据插入方式概览" class="headerlink" title="常见数据插入方式概览"></a>常见数据插入方式概览</h1><p>目前主要有以下几种数据插入方式：</p>
+<ol>
+<li>Cypher create 语句，为每一条数据写一个create</li>
+<li>Cypher <a target="_blank" rel="noopener" href="https://neo4j.com/docs/developer-manual/current/cypher/clauses/load-csv/">load csv</a> 语句，将数据转成CSV格式，通过LOAD CSV读取数据。</li>
+<li>官方提供的<a target="_blank" rel="noopener" href="https://neo4j.com/developer/guide-import-csv/#_super_fast_batch_importer_for_huge_datasets">neo4j-import</a>工具，未来将被<a target="_blank" rel="noopener" href="https://neo4j.com/docs/operations-manual/current/tools/import/">neo4j-admin import</a>代替</li>
+<li>官方提供的Java API - <a target="_blank" rel="noopener" href="https://neo4j.com/docs/java-reference/current/javadocs/org/neo4j/unsafe/batchinsert/BatchInserter.html">BatchInserter</a></li>
+<li>大牛编写的 <a target="_blank" rel="noopener" href="https://github.com/jexp/batch-import">batch-import</a> 工具</li>
+<li><a target="_blank" rel="noopener" href="https://github.com/neo4j-contrib/neo4j-apoc-procedures">neo4j-apoc</a>　　load.csv + apoc.load.relationship</li>
+<li>针对实际业务场景，定制化开发</li>
+</ol>
+<p>  这些工具有什么不同呢？速度如何？适用的场景分别是什么？</p>
+<span id="more"></span>
+
+
+<table>
+<thead>
+<tr>
+<th align="left">just try</th>
+<th align="left">create语句</th>
+<th align="left">load csv语句</th>
+<th align="left">neo4j-import</th>
+<th align="left">BatchInserter</th>
+<th align="left">batch-import</th>
+<th align="left">apoc</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">适用场景</td>
+<td align="left">1 ~ 1w</td>
+<td align="left">0 ~ 1000w</td>
+<td align="left">千万以上</td>
+<td align="left">千万以上</td>
+<td align="left">千万以上</td>
+<td align="left">1 ~ 数千万</td>
+</tr>
+<tr>
+<td align="left">速度</td>
+<td align="left">很慢 1000/s</td>
+<td align="left">一般 5000/s</td>
+<td align="left">非常快  x w/s</td>
+<td align="left">很快  x w/s</td>
+<td align="left">很快x w/s</td>
+<td align="left">1w /s</td>
+</tr>
+<tr>
+<td align="left">实际测试</td>
+<td align="left">无</td>
+<td align="left">9.5k/s(节点+关系)<br> 用到了merge，数据量越大，速度越慢</td>
+<td align="left">12w/s(节点+关系)</td>
+<td align="left">1w/s(节点+关系)</td>
+<td align="left">1w/s(节点+关系)</td>
+<td align="left">4k/s(1亿数据上增量更新)<br> 1w/s(百万数据上更新)<br> 用到了merge，数据量越大，速度越慢</td>
+</tr>
+<tr>
+<td align="left">优点</td>
+<td align="left">1.使用方便 <br> 2.可实时插入</td>
+<td align="left">1.官方ETL工具<br> 2.可以加载本地/远程CSV <br> 3.可实时插入</td>
+<td align="left">1.官方工具<br> 2.占用资源少</td>
+<td align="left">1.官方API</td>
+<td align="left">1.可以增量更新<br> 2.基于BatchInserter</td>
+<td align="left">1.官方ETL工具<br> 2.可以增量更新<br> 3.支持在线导入<br> 4.支持动态传Label RelationShip</td>
+</tr>
+<tr>
+<td align="left">缺点</td>
+<td align="left">1.速度慢<br> 2.处理数据，拼CQL复杂，很少使用</td>
+<td align="left">1.导入速度较慢<br> 2.只能导入节点<br> 3.不能动态传Label RelationShip</td>
+<td align="left">1.需要脱机导入 停止Neo4j数据库<br> 2.只能用于初始化导入</td>
+<td align="left">1.只能在JAVA中使用<br> 2.需要脱机导入 停止Neo4j数据库</td>
+<td align="left">1.需要脱机导入 停止Neo4j数据库</td>
+<td align="left">1.速度一般</td>
+</tr>
+</tbody></table>
+<h1 id="各种导入数据方法测试"><a href="#各种导入数据方法测试" class="headerlink" title="各种导入数据方法测试"></a>各种导入数据方法测试</h1><h2 id="1-create语句"><a href="#1-create语句" class="headerlink" title="(1)　create语句"></a>(1)　create语句</h2><p>  个人认为，只有在学习neo4j的时候会用到create，在批量导入数据的时候，一般很少用create<br>  未测<br>  <code>./neo4j-shell -c &lt; /data/stale/data01/neo4j/neo4j_script.cypther</code></p>
+<p>  <code>./bin/neo4j-shell  -path ./data/databases/graph.db  -conf ./conf/neo4j.conf  -file create_index.cypther</code></p>
+<h2 id="2-load-csv-语句"><a href="#2-load-csv-语句" class="headerlink" title="(2)　load csv 语句"></a>(2)　load csv 语句</h2><p>   服务器配置 CPU 32核，256G内存，10T机械硬盘</p>
+<p>数据格式</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid,name,Label
+b6b0ea842890425588d4d3cfb38139a9,"文烁",Label1
+5099c4f943d94fa1873165e3f6f3c2fb,"齐贺喜",Label3
+c83ed0ae9fb34baa956a42ecf99c8f6e,"李雄",Label2
+e62d1142937f4de994854fa1b3f0670a,"房玄龄",Label<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下面是详细测试结果</p>
+<h3 id="2-1-导入10w数据-仅节点"><a href="#2-1-导入10w数据-仅节点" class="headerlink" title="(2.1) 导入10w数据(仅节点)"></a>(2.1) 导入10w数据(仅节点)</h3><pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ using periodic commit 10000 load csv with headers from "file:/data/stale/data01/neo4j/node_uuid_10w.csv" as line with line create (:Test &#123;uuid:line.uuid, name:line.name&#125;);
++-------------------+
+| No data returned. |
++-------------------+
+Nodes created: 100000
+Properties set: 200000
+Labels added: 100000
+3412 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  10万数据(只有节点，没有关系)导入用时3.412s</p>
+<h3 id="2-2-导入1kw数据-仅节点"><a href="#2-2-导入1kw数据-仅节点" class="headerlink" title="(2.2) 导入1kw数据(仅节点)"></a>(2.2) 导入1kw数据(仅节点)</h3><p>/data/stale/data01/neo4j/node_uuid_1kw.csv文件加上标题一共10000010条，有10000009条数据</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ load csv from "file:/data/stale/data01/neo4j/node_uuid_1kw.csv" as line return count(*);
++----------+
+| count(*) |
++----------+
+| 10000010 |
++----------+
+1 row
+7434 ms
+neo4j-sh (?)$ using periodic commit 10000 load csv with headers from "file:/data/stale/data01/neo4j/node_uuid_1kw.csv" as line with line create (:Test &#123;uuid:line.uuid, name:line.name&#125;);
++-------------------+
+| No data returned. |
++-------------------+
+Nodes created: 10000009
+Properties set: 20000018
+Labels added: 10000009
+151498 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  1千万数据(只有节点，没有关系)导入用时151.498s<br>  导入时CPU利用率在150%左右，RES Memory 5G左右，VIRT Memory 70G左右</p>
+<h3 id="2-3-导入100w数据-仅关系"><a href="#2-3-导入100w数据-仅关系" class="headerlink" title="(2.3) 导入100w数据(仅关系)"></a>(2.3) 导入100w数据(仅关系)</h3><pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ match (n) return count(n);
++----------+
+| count(n) |
++----------+
+| 18004002 |
++----------+
+1 row
+12 ms
+neo4j-sh (?)$ match ()-->() return count(*);
++----------+
+| count(*) |
++----------+
+| 15001999 |
++----------+
+1 row
+18 ms
+neo4j-sh (?)$ using periodic commit 100000 load csv with headers from "file:/data/stale/data01/neo4j/relathionship_uuid_100w.csv" as line with line merge (n1:Test &#123;uuid:line.uuid1&#125;) merge (n2:Test &#123;uuid:line.uuid2&#125;) with * create (n1)-[r:Relationship]->(n2);
++-------------------+
+| No data returned. |
++-------------------+
+Relationships created: 1000000
+75737 ms
+neo4j-sh (?)$ match (n) return count(n);
++----------+
+| count(n) |
++----------+
+| 18004002 |
++----------+
+1 row
+6 ms
+neo4j-sh (?)$ match ()-->() return count(*);
++----------+
+| count(*) |
++----------+
+| 16001999 |
++----------+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  创建100w关系用时75.737s<br>  因为我节点已经提前导入了，所以merge的时候节点全部存在，根据结果可以看到，只创建了100w关系，没有创建节点<br>  但是这种方式有一个弊端，关系要写死，在只有一种关系时试用，在有多种关系时，不适用。还有一个不好的地方就是用的merge，uuid是String类型，会随着数据的正常速度变慢。</p>
+<p>load  csv 的速度我用的是 导入节点时间+导入关系时间<br>导入100w 节点+数据 (Label写死，RelationShip写死，也就是只有一种Label和一种RelationShip) 共花费15.149 + 75.737 = 90.886 。load csv的速度大概在1.1w/s，但这种情况一般很少使用，仅供参考。</p>
+<h2 id="3-neo4j-import-在以后版本会被neo4j-admin-import替掉"><a href="#3-neo4j-import-在以后版本会被neo4j-admin-import替掉" class="headerlink" title="(3)　neo4j-import (在以后版本会被neo4j-admin import替掉)"></a>(3)　neo4j-import (在以后版本会被neo4j-admin import替掉)</h2><p>  服务器配置 CPU 32核，256G内存，10T机械硬盘<br>  空库初始化导入1千万数据(1kw节点 1kw关系 2kw属性，id使用integer，属性中只有数字和英文)花费27s 932ms<br>  空库初始化导入1千万数据(1kw节点 1kw关系 2kw属性，包含中文属性)花费1min 50s 9ms<br>  空库初始化导入1.1亿数据(1.1亿节点 1.1关系 2.2亿属性)花费15min 9s 37ms</p>
+<p>数据格式</p>
+<p>node.csv</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid:ID(users),name:String,:Label
+c63bc1e7dc594fd49fbe36dd664ff0a6,"维特",Label1
+b52fb5f2266b4edbadc82b5ec4c430b8,"廖二松",Label2
+d95d430cfeee47dd95f9bf5e0ec1ae93,"徐青偏",Label3
+b2d1fffc8173461fa603d4fbb601b3ee,"杨础维",Label2<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>relationship.csv</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid:START_ID(users),uuid:END_ID(users),:TYPE
+c63bc1e7dc594fd49fbe36dd664ff0a6,b2d1fffc8173461fa603d4fbb601b3ee,RelationShip1
+d95d430cfeee47dd95f9bf5e0ec1ae93,c63bc1e7dc594fd49fbe36dd664ff0a6,RelationShip2
+b2d1fffc8173461fa603d4fbb601b3ee,b52fb5f2266b4edbadc82b5ec4c430b8,RelationShip3
+b52fb5f2266b4edbadc82b5ec4c430b8,d95d430cfeee47dd95f9bf5e0ec1ae93,RelationShip1<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  部分详细日志如下</p>
+<h3 id="3-1-导入1000w数据-1kw节点-1kw关系-2kw属性，id使用integer，属性中只有数字和英文"><a href="#3-1-导入1000w数据-1kw节点-1kw关系-2kw属性，id使用integer，属性中只有数字和英文" class="headerlink" title="(3.1) 导入1000w数据(1kw节点 1kw关系 2kw属性，id使用integer，属性中只有数字和英文)"></a>(3.1) 导入1000w数据(1kw节点 1kw关系 2kw属性，id使用integer，属性中只有数字和英文)</h3><p>  空库初始化导入1千万数据(1kw节点 1kw关系 2kw属性，id使用integer，属性中只有数字和英文)花费27s 932ms<br>  部分日志如下：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">Done in 779ms
+
+IMPORT DONE in 27s 932ms.
+Imported:
+  10000000 nodes
+  10000000 relationships
+  20000000 properties
+Peak memory usage: 209.81 MB<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="3-2-导入1000w数据-1kw节点-1kw关系-2kw属性，包含中文属性"><a href="#3-2-导入1000w数据-1kw节点-1kw关系-2kw属性，包含中文属性" class="headerlink" title="(3.2) 导入1000w数据(1kw节点 1kw关系 2kw属性，包含中文属性)"></a>(3.2) 导入1000w数据(1kw节点 1kw关系 2kw属性，包含中文属性)</h3><p>  空库初始化导入1千万数据(1kw节点 1kw关系 2kw属性，包含中文属性)花费1min 50s 9ms<br>  部分日志如下：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">IMPORT DONE in 1m 50s 9ms.
+Imported:
+  10000000 nodes
+  10000000 relationships
+  20000000 properties
+Peak memory usage: 209.81 MB<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="3-3-导入1-1亿数据-1-1亿节点-1-1关系-2-2亿属性"><a href="#3-3-导入1-1亿数据-1-1亿节点-1-1关系-2-2亿属性" class="headerlink" title="(3.3) 导入1.1亿数据(1.1亿节点 1.1关系 2.2亿属性)"></a>(3.3) 导入1.1亿数据(1.1亿节点 1.1关系 2.2亿属性)</h3><p>  空库初始化导入1.1亿数据(1.1亿节点 1.1关系 2.2亿属性)花费15min 9s 37ms<br>  部分日志如下：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">IMPORT DONE in 15m 9s 37ms.
+Imported:
+  110000010 nodes
+  110000000 relationships
+  220000020 properties
+Peak memory usage: 2.27 GB
+There were bad entries which were skipped and logged into /data/stale/data01/neo4j/neo4j-community-3.1.0/data/databases/test_uuid_1y_graph.db/bad.log<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-BatchInserter"><a href="#4-BatchInserter" class="headerlink" title="(4)　BatchInserter"></a>(4)　BatchInserter</h2><p>  batch-import调的BatchInserter的代码，所以BatchInserter没测，可以认为BatchInster和batch-import速度一样</p>
+<h2 id="5-batch-import"><a href="#5-batch-import" class="headerlink" title="(5)　batch-import"></a>(5)　batch-import</h2><p>  在数据库中已有1kw数据的情况下，导入100w数据(100w节点 100w关系 200w属性，包含中文属性)花费92s</p>
+<p>node.csv</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid:string:users,name:String,:label    #官方的文件头
+uuid:ID(users),name:String,:Label	#修改程序后的文件头
+c63bc1e7dc594fd49fbe36dd664ff0a6,"维特",Label1
+b52fb5f2266b4edbadc82b5ec4c430b8,"廖二松",Label2
+d95d430cfeee47dd95f9bf5e0ec1ae93,"徐青偏",Label3
+b2d1fffc8173461fa603d4fbb601b3ee,"杨础维",Label2<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>relationship.csv</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid:string:users,uuid:string:users,type    #官方的文件头
+uuid:START_ID(users),uuid:END_ID(users),:TYPE	#修改程序后的文件头
+c63bc1e7dc594fd49fbe36dd664ff0a6,b2d1fffc8173461fa603d4fbb601b3ee,RelationShip1
+d95d430cfeee47dd95f9bf5e0ec1ae93,c63bc1e7dc594fd49fbe36dd664ff0a6,RelationShip2
+b2d1fffc8173461fa603d4fbb601b3ee,b52fb5f2266b4edbadc82b5ec4c430b8,RelationShip3
+b52fb5f2266b4edbadc82b5ec4c430b8,d95d430cfeee47dd95f9bf5e0ec1ae93,RelationShip1<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">Using: Importer batch.properties /data/stale/data01/neo4j/neo4j-community-3.1.0/data/databases/test_uuid_1000w_graph.db /data/stale/data01/neo4j/node_uuid_100w.csv /data/stale/data01/neo4j/relationship_uuid_100w.csv
+
+Using Existing Configuration File
+..........
+Importing 1000000 Nodes took 15 seconds
+..........
+Importing 1000000 Relationships took 16 seconds
+
+Total import time: 92 seconds<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="6-apoc"><a href="#6-apoc" class="headerlink" title="(6)　apoc"></a>(6)　apoc</h2><p>  load csv + merge + apoc.create.relationship</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ using periodic commit 1000000
+> load csv from 'file:/data/stale/data01/neo4j/relathionship_uuid_1kw.csv' as line fieldterminator ','
+> merge (n1:Test &#123;uuid: line[0]&#125;)
+> merge (n2:Test &#123;uuid: line[1]&#125;)
+> with n1, n2, line
+> CALL apoc.create.relationship(n1, line[2], &#123;&#125;, n2) YIELD rel
+> return count(rel) ;
++------------+
+| count(rel) |
++------------+
+| 10000010   |
++------------+
+1 row
+Nodes created: 8645143
+Properties set: 8645143
+Labels added: 8645143
+2395852 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在1.1亿数据上增量更新1kw数据花费2395.852s<br>VIRT Memory 90G  RES Memory 78G  </p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>  根据实际情况选用最好的方式</p>
+<ol>
+<li>neo4j-import导入速度快，但是要求是空库，导入时要停止neo4j，也就是脱机导入，而且你要提前处理好数据，数据最好不要有重复，如果有重复，可以导入时跳过，然后根据bad.log来查看或者修正这部分数据</li>
+<li>batch-import可以增量导入，但是要求导入时停止neo4j数据库(脱机导入)，而且增量更新的数据不会和库里存在的数据对比，所以要求数据全是新的，否则会出现重复数据</li>
+<li>load csv比较通用，而且可以在neo4j数据库运行时导入，但是导入速度相对较慢，要提前整理好数据，而且不能动态创建 Label RelationShip</li>
+<li>apoc挺好用的，可以动态创建RelationShip，但是不能动态创建Label  (动态创建Label只能在程序里通过拼接字符串的方法实现)</li>
+</ol>
+<p>  实际情况中，处理数据比导入数据更花费时间</p>
+<p> <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/45401120">Neo4j的查询速度为何这么慢？这能商用吗？</a> 这篇文章中 HackerWhite 写的那部分特别好，可以参考。</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/guide-importing-data-and-etl/">guide-importing-data-and-etl</a><br>[2] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/guide-import-csv/">guide-import-csv</a><br>[3] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/developer-manual/current/cypher/clauses/load-csv/">load-csv</a><br>[4] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/operations-manual/current/tools/import/">import</a><br>[5] <a target="_blank" rel="noopener" href="http://paradoxlife.me/how-to-insert-bulk-data-into-neo4j">how-to-insert-bulk-data-into-neo4j</a><br>[6] <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/45401120">Neo4j的查询速度为何这么慢？这能商用吗？</a><br>[7] <a target="_blank" rel="noopener" href="https://my.oschina.net/u/2538940/blog/883829">使用batch-import工具向neo4j中导入海量数据</a><br>[8] <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/22576492/answer/342385154">如何快速导入网络数据到图数据库Neo4j</a><br>[9] <a target="_blank" rel="noopener" href="https://neo4j.com/blog/bulk-data-import-neo4j-3-0/">bulk-data-import-neo4j-3-0</a><br>[10] <a target="_blank" rel="noopener" href="https://github.com/neo4j-contrib/neo4j-etl">neo4j-etl github</a><br>[11] <a target="_blank" rel="noopener" href="https://groups.google.com/forum/#!msg/neo4j/eZMogiu87nY/LJosQtWzAAAJ;context-place=forum/neo4j">neo4j google group</a><br>[12] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/operations-manual/current/tutorial/import-tool/">import-tool</a><br>[13] <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/263860208/answer/274349070">Neo4j在并发的load CSV文件的时候出现deadlock问题。怎么有效处理提高并发呢？</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/neo4j/" rel="tag"># neo4j</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/04/14/neo4j-apoc/" rel="prev" title="Neo4j APOC 初识">
+                  <i class="fa fa-chevron-left"></i> Neo4j APOC 初识
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/04/18/eclipse-install-config/" rel="next" title="Eclipse 安装 配置">
+                  Eclipse 安装 配置 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

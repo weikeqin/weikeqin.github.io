@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="在使用MySQL时，如果发现查询语句耗时，会进行排查及调优，其中常用的一个方法是用explain查看sql执行计划。  (1) explain示例mysql&gt; explain select * from user ; +----+-------------+-------+------------+------+---------------+------+---------+------+-">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql explain 详解">
+<meta property="og:url" content="http://weikeqin.com/2020/02/05/mysql-explain/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在使用MySQL时，如果发现查询语句耗时，会进行排查及调优，其中常用的一个方法是用explain查看sql执行计划。  (1) explain示例mysql&gt; explain select * from user ; +----+-------------+-------+------------+------+---------------+------+---------+------+-">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-02-05T02:50:15.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.248Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="mysql">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/02/05/mysql-explain/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/02/05/mysql-explain/","path":"2020/02/05/mysql-explain/","title":"mysql explain 详解"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>mysql explain 详解 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-explain%E7%A4%BA%E4%BE%8B"><span class="nav-number">1.</span> <span class="nav-text">(1) explain示例</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-explain%E5%8F%82%E6%95%B0%E8%AF%A6%E8%A7%A3"><span class="nav-number">2.</span> <span class="nav-text">(2) explain参数详解</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-id"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) id</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-select-type"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) select_type</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-table"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) table</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-partitions"><span class="nav-number">2.4.</span> <span class="nav-text">(2.4) partitions</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-type"><span class="nav-number">2.5.</span> <span class="nav-text">(2.5) type</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-6-possible-keys"><span class="nav-number">2.6.</span> <span class="nav-text">(2.6) possible_keys</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-7-key"><span class="nav-number">2.7.</span> <span class="nav-text">(2.7) key</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-8-key-len"><span class="nav-number">2.8.</span> <span class="nav-text">(2.8) key_len</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-9-ref"><span class="nav-number">2.9.</span> <span class="nav-text">(2.9) ref</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-10-rows"><span class="nav-number">2.10.</span> <span class="nav-text">(2.10) rows</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-11-filterrd"><span class="nav-number">2.11.</span> <span class="nav-text">(2.11)  filterrd</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-12-Extra"><span class="nav-number">2.12.</span> <span class="nav-text">(2.12) Extra</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Explain%E5%A6%99%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">(3) Explain妙用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">4.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/02/05/mysql-explain/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mysql explain 详解
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-02-05 10:50:15" itemprop="dateCreated datePublished" datetime="2020-02-05T10:50:15+08:00">2020-02-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/02/05/mysql-explain/" class="post-meta-item leancloud_visitors" data-flag-title="mysql explain 详解" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <blockquote>
+<p> 在使用MySQL时，如果发现查询语句耗时，会进行排查及调优，其中常用的一个方法是用explain查看sql执行计划。</p>
+</blockquote>
+<h1 id="1-explain示例"><a href="#1-explain示例" class="headerlink" title="(1) explain示例"></a>(1) explain示例</h1><pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">explain</span> <span class="token keyword">select</span> <span class="token operator">*</span> <span class="token keyword">from</span> <span class="token keyword">user</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------+</span>
+<span class="token operator">|</span> id <span class="token operator">|</span> select_type <span class="token operator">|</span> <span class="token keyword">table</span> <span class="token operator">|</span> partitions <span class="token operator">|</span> <span class="token keyword">type</span> <span class="token operator">|</span> possible_keys <span class="token operator">|</span> <span class="token keyword">key</span>  <span class="token operator">|</span> key_len <span class="token operator">|</span> ref  <span class="token operator">|</span> <span class="token keyword">rows</span> <span class="token operator">|</span> filtered <span class="token operator">|</span> Extra <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------+</span>
+<span class="token operator">|</span>  <span class="token number">1</span> <span class="token operator">|</span> <span class="token keyword">SIMPLE</span>      <span class="token operator">|</span> <span class="token keyword">user</span>  <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> <span class="token keyword">ALL</span>  <span class="token operator">|</span> <span class="token boolean">NULL</span>          <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token boolean">NULL</span>    <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span>    <span class="token number">5</span> <span class="token operator">|</span>   <span class="token number">100.00</span> <span class="token operator">|</span> <span class="token boolean">NULL</span>  <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.03</span> sec<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">explain</span>
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token keyword">select</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span>
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token keyword">from</span> table_c
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token keyword">where</span> l_id <span class="token operator">&lt;></span> <span class="token string">''</span>
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token operator">and</span> l_id <span class="token operator">is</span> <span class="token operator">not</span> <span class="token boolean">null</span>
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token operator">and</span> l_id <span class="token operator">not</span> <span class="token operator">in</span> <span class="token punctuation">(</span>
+    <span class="token operator">-</span><span class="token operator">></span>    <span class="token keyword">select</span> l_id <span class="token keyword">from</span> table_l
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token punctuation">)</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----+--------------------+---------------+------------+----------------+---------------+--------------+---------+------+-------+----------+------------------------------------+</span>
+<span class="token operator">|</span> id <span class="token operator">|</span> select_type        <span class="token operator">|</span> <span class="token keyword">table</span>         <span class="token operator">|</span> partitions <span class="token operator">|</span> <span class="token keyword">type</span>           <span class="token operator">|</span> possible_keys <span class="token operator">|</span> <span class="token keyword">key</span>          <span class="token operator">|</span> key_len <span class="token operator">|</span> ref  <span class="token operator">|</span> <span class="token keyword">rows</span>  <span class="token operator">|</span> filtered <span class="token operator">|</span> Extra                              <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+--------------------+---------------+------------+----------------+---------------+--------------+---------+------+-------+----------+------------------------------------+</span>
+<span class="token operator">|</span>  <span class="token number">1</span> <span class="token operator">|</span> <span class="token keyword">PRIMARY</span>            <span class="token operator">|</span> table_c       <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> range          <span class="token operator">|</span> idx_l_id      <span class="token operator">|</span> idx_l_id     <span class="token operator">|</span> <span class="token number">51</span>      <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token number">98519</span> <span class="token operator">|</span>   <span class="token number">100.00</span> <span class="token operator">|</span> <span class="token keyword">Using</span> <span class="token keyword">where</span><span class="token punctuation">;</span> <span class="token keyword">Using</span> <span class="token keyword">index</span>           <span class="token operator">|</span>
+<span class="token operator">|</span>  <span class="token number">2</span> <span class="token operator">|</span> DEPENDENT SUBQUERY <span class="token operator">|</span> table_l       <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> index_subquery <span class="token operator">|</span> idx_l_id      <span class="token operator">|</span> idx_l_id     <span class="token operator">|</span> <span class="token number">387</span>     <span class="token operator">|</span> func <span class="token operator">|</span>     <span class="token number">2</span> <span class="token operator">|</span>   <span class="token number">100.00</span> <span class="token operator">|</span> <span class="token keyword">Using</span> <span class="token keyword">index</span><span class="token punctuation">;</span> <span class="token keyword">Full</span> scan <span class="token keyword">on</span> <span class="token boolean">NULL</span> <span class="token keyword">key</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+--------------------+---------------+------------+----------------+---------------+--------------+---------+------+-------+----------+------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.01</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<span id="more"></span>
+
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">explain</span>
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token keyword">select</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span>
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token keyword">from</span> table_c
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token keyword">where</span> l_id <span class="token operator">not</span> <span class="token operator">in</span> <span class="token punctuation">(</span>
+    <span class="token operator">-</span><span class="token operator">></span>    <span class="token keyword">select</span> l_id <span class="token keyword">from</span> table_l
+    <span class="token operator">-</span><span class="token operator">></span>  <span class="token punctuation">)</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----+--------------------+---------------+------------+----------------+---------------+--------------+---------+------+--------+----------+------------------------------------+</span>
+<span class="token operator">|</span> id <span class="token operator">|</span> select_type        <span class="token operator">|</span> <span class="token keyword">table</span>         <span class="token operator">|</span> partitions <span class="token operator">|</span> <span class="token keyword">type</span>           <span class="token operator">|</span> possible_keys <span class="token operator">|</span> <span class="token keyword">key</span>          <span class="token operator">|</span> key_len <span class="token operator">|</span> ref  <span class="token operator">|</span> <span class="token keyword">rows</span>   <span class="token operator">|</span> filtered <span class="token operator">|</span> Extra                              <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+--------------------+---------------+------------+----------------+---------------+--------------+---------+------+--------+----------+------------------------------------+</span>
+<span class="token operator">|</span>  <span class="token number">1</span> <span class="token operator">|</span> <span class="token keyword">PRIMARY</span>            <span class="token operator">|</span> table_c       <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> <span class="token keyword">index</span>          <span class="token operator">|</span> <span class="token boolean">NULL</span>          <span class="token operator">|</span> idx_l_id     <span class="token operator">|</span> <span class="token number">51</span>      <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token number">197037</span> <span class="token operator">|</span>   <span class="token number">100.00</span> <span class="token operator">|</span> <span class="token keyword">Using</span> <span class="token keyword">where</span><span class="token punctuation">;</span> <span class="token keyword">Using</span> <span class="token keyword">index</span>           <span class="token operator">|</span>
+<span class="token operator">|</span>  <span class="token number">2</span> <span class="token operator">|</span> DEPENDENT SUBQUERY <span class="token operator">|</span> table_l       <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> index_subquery <span class="token operator">|</span> idx_l_id      <span class="token operator">|</span> idx_l_id     <span class="token operator">|</span> <span class="token number">387</span>     <span class="token operator">|</span> func <span class="token operator">|</span>      <span class="token number">2</span> <span class="token operator">|</span>   <span class="token number">100.00</span> <span class="token operator">|</span> <span class="token keyword">Using</span> <span class="token keyword">index</span><span class="token punctuation">;</span> <span class="token keyword">Full</span> scan <span class="token keyword">on</span> <span class="token boolean">NULL</span> <span class="token keyword">key</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+--------------------+---------------+------------+----------------+---------------+--------------+---------+------+--------+----------+------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<!--
+
+mysql> explain
+    -> select brand_id, brand_name, factory_id, factory_name, series_id, series_name
+    -> from car_brand_series
+    -> where series_id not in (
+    ->   select series_id from car_category where is_deleted = 'N' group by series_id
+    -> )
+    -> order by brand_id asc ;
++----+-------------+------------------+------------+------+---------------+------+---------+------+--------+----------+-----------------------------+
+| id | select_type | table            | partitions | type | possible_keys | key  | key_len | ref  | rows   | filtered | Extra                       |
++----+-------------+------------------+------------+------+---------------+------+---------+------+--------+----------+-----------------------------+
+|  1 | PRIMARY     | car_brand_series | NULL       | ALL  | NULL          | NULL | NULL    | NULL |   2426 |   100.00 | Using where; Using filesort |
+|  2 | SUBQUERY    | car_category     | NULL       | ALL  | NULL          | NULL | NULL    | NULL | 194815 |    10.00 | Using where                 |
++----+-------------+------------------+------------+------+---------------+------+---------+------+--------+----------+-----------------------------+
+2 rows in set, 1 warning (0.08 sec)
+
+mysql>
+
+mysql> explain
+    -> select count(*) from car_category
+    -> where ly_id is not null
+    -> and ly_id <> ''
+    -> and ly_id not in (
+    ->   select level_id from car_ly_origin
+    -> )
+    -> and ly_id not in (
+    ->   select ly_id from car_category_c
+    -> ) ;
++----+--------------------+----------------+------------+----------------+---------------+--------------+---------+------+-------+----------+------------------------------------+
+| id | select_type        | table          | partitions | type           | possible_keys | key          | key_len | ref  | rows  | filtered | Extra                              |
++----+--------------------+----------------+------------+----------------+---------------+--------------+---------+------+-------+----------+------------------------------------+
+|  1 | PRIMARY            | car_category   | NULL       | range          | idx_ly_id     | idx_ly_id    | 51      | NULL | 97408 |   100.00 | Using where; Using index           |
+|  3 | SUBQUERY           | car_category_c | NULL       | index          | idx_ly_id     | idx_ly_id    | 51      | NULL | 47918 |   100.00 | Using index                        |
+|  2 | DEPENDENT SUBQUERY | car_ly_origin  | NULL       | index_subquery | idx_level_id  | idx_level_id | 387     | func |     2 |   100.00 | Using index; Full scan on NULL key |
++----+--------------------+----------------+------------+----------------+---------------+--------------+---------+------+-------+----------+------------------------------------+
+3 rows in set, 1 warning (0.04 sec)
+
+mysql>
+
+-->
+
+
+<h1 id="2-explain参数详解"><a href="#2-explain参数详解" class="headerlink" title="(2) explain参数详解"></a>(2) explain参数详解</h1><table>
+<thead>
+<tr>
+<th align="left">id</th>
+<th align="left">Columns</th>
+<th align="left">JSON Name</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left">id</td>
+<td align="left">select_id</td>
+<td align="left">每个select子句的标识id</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">select_type</td>
+<td align="left">None</td>
+<td align="left">select语句的类型</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">table</td>
+<td align="left">table_name</td>
+<td align="left">当前表名</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">partitions</td>
+<td align="left">partitions</td>
+<td align="left">匹配的分区</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">type</td>
+<td align="left">access_type</td>
+<td align="left">当前表内访问方式  join type</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">possible_keys</td>
+<td align="left">possible_keys</td>
+<td align="left">可能使用到的索引</td>
+</tr>
+<tr>
+<td align="left">7</td>
+<td align="left">key</td>
+<td align="left">key</td>
+<td align="left">经过优化器评估最终使用的索引</td>
+</tr>
+<tr>
+<td align="left">8</td>
+<td align="left">key_len</td>
+<td align="left">key_length</td>
+<td align="left">使用到的索引长度</td>
+</tr>
+<tr>
+<td align="left">9</td>
+<td align="left">ref</td>
+<td align="left">ref</td>
+<td align="left">引用到的上一个表的列</td>
+</tr>
+<tr>
+<td align="left">10</td>
+<td align="left">rows</td>
+<td align="left">rows</td>
+<td align="left">rows_examined，要得到最终记录索要扫描经过的记录数</td>
+</tr>
+<tr>
+<td align="left">11</td>
+<td align="left">filtered</td>
+<td align="left">filtered</td>
+<td align="left">按表条件过滤行的百分比</td>
+</tr>
+<tr>
+<td align="left">12</td>
+<td align="left">Extra</td>
+<td align="left">None</td>
+<td align="left">额外的信息说明</td>
+</tr>
+</tbody></table>
+<h2 id="2-1-id"><a href="#2-1-id" class="headerlink" title="(2.1) id"></a>(2.1) id</h2><p>  SELECT识别符。这是SELECT查询序列号。这个不重要,查询序号即为sql语句执行的顺序。</p>
+<h2 id="2-2-select-type"><a href="#2-2-select-type" class="headerlink" title="(2.2) select_type"></a>(2.2) select_type</h2><p>  select_type语句类型有 </p>
+<p>select类型，它有以下几种:</p>
+<table>
+<thead>
+<tr>
+<th align="left">id</th>
+<th align="left">select_type value</th>
+<th align="left">JSON name</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left">SIMPLE</td>
+<td align="left">None</td>
+<td align="left">简单的SELECT语句（不包括UNION操作或子查询操作）</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">PRIMARY</td>
+<td align="left">None</td>
+<td align="left">PRIMARY：查询中最外层的SELECT（如两表做UNION或者存在子查询的外层的表操作为PRIMARY，内层的操作为UNION）</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">UNION</td>
+<td align="left">None</td>
+<td align="left">UNION：UNION操作中，查询中处于内层的SELECT（内层的SELECT语句与外层的SELECT语句没有依赖关系）</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">DEPENDENT UNION</td>
+<td align="left">dependent(true)</td>
+<td align="left">DEPENDENT UNION：UNION操作中，查询中处于内层的SELECT（内层的SELECT语句与外层的SELECT语句有依赖关系）</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">UNIOIN RESULT</td>
+<td align="left">union_result</td>
+<td align="left">UNION RESULT：UNION操作的结果，id值通常为NULL</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">SUBQUERY</td>
+<td align="left">None</td>
+<td align="left">SUBQUERY：子查询中首个SELECT（如果有多个子查询存在）</td>
+</tr>
+<tr>
+<td align="left">7</td>
+<td align="left">DEPENDENT SUBQUERY</td>
+<td align="left">dependent(true)</td>
+<td align="left">DEPENDENT SUBQUERY：子查询中首个SELECT，但依赖于外层的表（如果有多个子查询存在）</td>
+</tr>
+<tr>
+<td align="left">8</td>
+<td align="left">DERIVED</td>
+<td align="left">None</td>
+<td align="left">DERIVED：被驱动的SELECT子查询（子查询位于FROM子句）</td>
+</tr>
+<tr>
+<td align="left">9</td>
+<td align="left">MATERIALIZED</td>
+<td align="left">materialized_form_subquery</td>
+<td align="left">MATERIALIZED：被物化的子查询</td>
+</tr>
+<tr>
+<td align="left">10</td>
+<td align="left">UNCACHEABLE SUBQUERY</td>
+<td align="left">cacheable(false)</td>
+<td align="left">UNCACHEABLE SUBQUERY：对于外层的主表，子查询不可被物化，每次都需要计算（耗时操作）</td>
+</tr>
+<tr>
+<td align="left">11</td>
+<td align="left">UNCACHEABLE UNION</td>
+<td align="left">cacheable(false)</td>
+<td align="left">UNCACHEABLE UNION：UNION操作中，内层的不可被物化的子查询（类似于UNCACHEABLE SUBQUERY）</td>
+</tr>
+</tbody></table>
+<h2 id="2-3-table"><a href="#2-3-table" class="headerlink" title="(2.3) table"></a>(2.3) table</h2><p> 当前表名</p>
+<h2 id="2-4-partitions"><a href="#2-4-partitions" class="headerlink" title="(2.4) partitions"></a>(2.4) partitions</h2><p> 匹配的分区</p>
+<h2 id="2-5-type"><a href="#2-5-type" class="headerlink" title="(2.5) type"></a>(2.5) type</h2><p> 当前表内访问方式</p>
+<p>性能由好到坏排序：</p>
+<table>
+<thead>
+<tr>
+<th align="left">id</th>
+<th align="left">type value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left">system</td>
+<td align="left">表中只有一行</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">const</td>
+<td align="left">单表中最多有一个匹配行，primary key 或者 unique index的检索</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">eq_ref</td>
+<td align="left">多表连接中被驱动表的连接列上有primary key或者unique index的检索</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">ref</td>
+<td align="left">与eq_ref类似，但不是使用primary key或者unique index，而是普通索引。也可以是单表上non-unique索引检索</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">fulltext</td>
+<td align="left">使用FULLTEXT索引执行连接</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">ref_or_null</td>
+<td align="left">与ref类似，区别在于条件中包含对NULL的查询</td>
+</tr>
+<tr>
+<td align="left">7</td>
+<td align="left">index_merge</td>
+<td align="left">索引合并优化，利用一个表里的N个索引查询,key_len表示这些索引键的和最长长度。</td>
+</tr>
+<tr>
+<td align="left">8</td>
+<td align="left">unique_subquery</td>
+<td align="left">in的后面是一个查询primary key\unique字段的子查询</td>
+</tr>
+<tr>
+<td align="left">9</td>
+<td align="left">index_subquery</td>
+<td align="left">in的后面是一个查询普通index字段的子查询</td>
+</tr>
+<tr>
+<td align="left">10</td>
+<td align="left">range</td>
+<td align="left">单表索引中的范围查询,使用索引查询出单个表中的一些行数据。ref列会变为null</td>
+</tr>
+<tr>
+<td align="left">11</td>
+<td align="left">index</td>
+<td align="left">等于ALL。它有两种情况：(1)覆盖索引 (2)用索引的顺序做一个全表扫描。</td>
+</tr>
+<tr>
+<td align="left">12</td>
+<td align="left">all</td>
+<td align="left">全表扫描</td>
+</tr>
+</tbody></table>
+<h2 id="2-6-possible-keys"><a href="#2-6-possible-keys" class="headerlink" title="(2.6) possible_keys"></a>(2.6) possible_keys</h2><p>  提示使用哪个索引会在该表中找到行</p>
+<h2 id="2-7-key"><a href="#2-7-key" class="headerlink" title="(2.7) key"></a>(2.7) key</h2><p>  MYSQL使用的索引</p>
+<h2 id="2-8-key-len"><a href="#2-8-key-len" class="headerlink" title="(2.8) key_len"></a>(2.8) key_len</h2><p>key_len 说明<br>  key_len: 4 // INT NOT NULL<br>  key_len: 5 // INT DEFAULT NULL<br>  key_len: 30 // CHAR(30) NOT NULL<br>  key_len: 32 // VARCHAR(30) NOT NULL<br>  key_len: 92 // VARCHAR(30) NOT NULL CHARSET=utf8</p>
+<p>key_len大小的计算规则:<br>  a、一般地，key_len 等于索引列类型字节长度，例如int类型为4-bytes，bigint为8-bytes；<br>  b、如果是字符串类型，还需要同时考虑字符集因素，例如：CHAR(30) UTF8则key_len至少是90-bytes；<br>  c、若该列类型定义时允许NULL，其key_len还需要再加 1-bytes；<br>  d、若该列类型为变长类型，例如 VARCHAR（TEXT\BLOB不允许整列创建索引，如果创建部分索引，也被视为动态列类型），其key_len还需要再加 2-bytes;</p>
+<h2 id="2-9-ref"><a href="#2-9-ref" class="headerlink" title="(2.9) ref"></a>(2.9) ref</h2><p>  ref列显示使用哪个列或常数与key一起从表中选择行。</p>
+<h2 id="2-10-rows"><a href="#2-10-rows" class="headerlink" title="(2.10) rows"></a>(2.10) rows</h2><p>  rows_examined，要得到最终记录索要扫描经过的记录数，这个数越小越好。</p>
+<h2 id="2-11-filterrd"><a href="#2-11-filterrd" class="headerlink" title="(2.11)  filterrd"></a>(2.11)  filterrd</h2><p>  按表条件过滤行的百分比</p>
+<h2 id="2-12-Extra"><a href="#2-12-Extra" class="headerlink" title="(2.12) Extra"></a>(2.12) Extra</h2><p>  Extra是对执行计划的额外说明，包含重要信息。</p>
+<p>例如：</p>
+<table>
+<thead>
+<tr>
+<th align="left">id</th>
+<th align="left">type value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left">const row not found</td>
+<td align="left">所要查询的表为空</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">Distinct</td>
+<td align="left">mysql正在查询distinct值，因此当它每查到一个distinct值之后就会停止当前组的搜索，去查询下一个值</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">Impossible WHERE</td>
+<td align="left">where条件总为false，表里没有满足条件的记录</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">Impossible WHERE noticed after reading const tables</td>
+<td align="left">在优化器评估了const表之后，发现where条件均不满足</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">no matching row in const table</td>
+<td align="left">当前join的表为const表，不能匹配</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">Not exists</td>
+<td align="left">优化器发现内表记录不可能满足where条件</td>
+</tr>
+<tr>
+<td align="left">7</td>
+<td align="left">Select tables optimized away</td>
+<td align="left">在没有group by子句时，对于MyISAM的select count(*)操作，或者当对于min(),max()的操作可以利用索引优化，优化器发现只会返回一行。</td>
+</tr>
+<tr>
+<td align="left">8</td>
+<td align="left">Using filesort</td>
+<td align="left">使用filesort来进行order by操作</td>
+</tr>
+<tr>
+<td align="left">9</td>
+<td align="left">Using index</td>
+<td align="left">覆盖索引</td>
+</tr>
+<tr>
+<td align="left">10</td>
+<td align="left">Using index for group-by</td>
+<td align="left">对于group by列或者distinct列，可以利用索引检索出数据，而不需要去表里查数据、分组、排序、去重等等</td>
+</tr>
+<tr>
+<td align="left">11</td>
+<td align="left">Using join buffer</td>
+<td align="left">之前的表连接在nested loop之后放进join buffer，再来和本表进行join。适用于本表的访问type为range，index或all</td>
+</tr>
+<tr>
+<td align="left">12</td>
+<td align="left">Using sort_union,using union,using intersect</td>
+<td align="left">index_merge的三种情况</td>
+</tr>
+<tr>
+<td align="left">13</td>
+<td align="left">Using temporary</td>
+<td align="left">使用了临时表来存储中间结果集，适用于group by，distinct，或order by列为不同表的列。</td>
+</tr>
+<tr>
+<td align="left">14</td>
+<td align="left">Using where</td>
+<td align="left">在存储引擎层检索出记录后，在server利用where条件进行过滤，并返回给客户端</td>
+</tr>
+</tbody></table>
+<h1 id="3-Explain妙用"><a href="#3-Explain妙用" class="headerlink" title="(3) Explain妙用"></a>(3) Explain妙用</h1><p>  查询表的大概数据总数。<br>  EXPLAIN SELECT * FROM t1 ;<br>  查询表t1的大概总数。</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/5.7/en/explain.html">EXPLAIN Statement</a><br>[2] <a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/5.7/en/explain-output.html">explain-output</a><br>[3] <a target="_blank" rel="noopener" href="https://blog.csdn.net/zhuxineli/article/details/14455029">MYSQL explain详解</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/mysql/" rel="tag"># mysql</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/02/03/java-mermory-model/" rel="prev" title="Java内存模型">
+                  <i class="fa fa-chevron-left"></i> Java内存模型
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/02/23/github-search/" rel="next" title="github搜索">
+                  github搜索 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="代码工具：jmh  JMH是一个Java工具，用于构建、运行和分析nano&#x2F;micro&#x2F;mili&#x2F;macro基准，这些基准是用Java和其他针对JVM的语言编写的。 Code Tools: jmh  JMH is a Java harness for building, running, and analysing nano&#x2F;micro&#x2F;milli&#x2F;macro benchmarks writt">
+<meta property="og:type" content="article">
+<meta property="og:title" content="java jmh 使用">
+<meta property="og:url" content="http://weikeqin.com/2020/06/14/java-jmh-notes/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="代码工具：jmh  JMH是一个Java工具，用于构建、运行和分析nano&#x2F;micro&#x2F;mili&#x2F;macro基准，这些基准是用Java和其他针对JVM的语言编写的。 Code Tools: jmh  JMH is a Java harness for building, running, and analysing nano&#x2F;micro&#x2F;milli&#x2F;macro benchmarks writt">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-06-14T08:52:52.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.237Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/06/14/java-jmh-notes/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/06/14/java-jmh-notes/","path":"2020/06/14/java-jmh-notes/","title":"java jmh 使用"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>java jmh 使用 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#JMH%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98"><span class="nav-number">1.</span> <span class="nav-text">JMH解决了什么问题</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#JMH%E6%80%8E%E4%B9%88%E7%94%A8"><span class="nav-number">2.</span> <span class="nav-text">JMH怎么用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0%E4%BE%9D%E8%B5%96"><span class="nav-number">2.1.</span> <span class="nav-text">添加依赖</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E5%8F%82%E6%95%B0"><span class="nav-number">2.2.</span> <span class="nav-text">配置参数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E5%86%99%E4%BB%A3%E7%A0%81%E8%BF%90%E8%A1%8C"><span class="nav-number">2.3.</span> <span class="nav-text">编写代码运行</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%951"><span class="nav-number">2.3.1.</span> <span class="nav-text">测试1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%952"><span class="nav-number">2.3.2.</span> <span class="nav-text">测试2</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">3.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/14/java-jmh-notes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          java jmh 使用
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-14 16:52:52" itemprop="dateCreated datePublished" datetime="2020-06-14T16:52:52+08:00">2020-06-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/06/14/java-jmh-notes/" class="post-meta-item leancloud_visitors" data-flag-title="java jmh 使用" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <blockquote>
+<p> 代码工具：jmh  JMH是一个Java工具，用于构建、运行和分析nano/micro/mili/macro基准，这些基准是用Java和其他针对JVM的语言编写的。<br> Code Tools: jmh  JMH is a Java harness for building, running, and analysing nano/micro/milli/macro benchmarks written in Java and other languages targetting the JVM.</p>
+</blockquote>
+<h1 id="JMH解决了什么问题"><a href="#JMH解决了什么问题" class="headerlink" title="JMH解决了什么问题"></a>JMH解决了什么问题</h1><h1 id="JMH怎么用"><a href="#JMH怎么用" class="headerlink" title="JMH怎么用"></a>JMH怎么用</h1><ol>
+<li>添加对应jar包</li>
+<li>根据实际情况配置参数</li>
+<li>编写代码运行</li>
+</ol>
+<h2 id="添加依赖"><a href="#添加依赖" class="headerlink" title="添加依赖"></a>添加依赖</h2><pre class="line-numbers language-xml" data-language="xml"><code class="language-xml"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>dependency</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>groupId</span><span class="token punctuation">></span></span>org.openjdk.jmh<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>groupId</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>artifactId</span><span class="token punctuation">></span></span>jmh-core<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>artifactId</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>version</span><span class="token punctuation">></span></span>1.23<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>version</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>dependency</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>dependency</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>groupId</span><span class="token punctuation">></span></span>org.openjdk.jmh<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>groupId</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>artifactId</span><span class="token punctuation">></span></span>jmh-generator-annprocess<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>artifactId</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>version</span><span class="token punctuation">></span></span>1.23<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>version</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>dependency</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<span id="more"></span>
+
+
+<h2 id="配置参数"><a href="#配置参数" class="headerlink" title="配置参数"></a>配置参数</h2><p>@BenchmarkMode<br>用来配置 Mode 选项，可用于类或者方法上，这个注解的 value 是一个数组，可以把几种 Mode 集合在一起执行，如：@BenchmarkMode({Mode.SampleTime, Mode.AverageTime})，还可以设置为 Mode.All，即全部执行一遍。</p>
+<p>Throughput：整体吞吐量，每秒执行了多少次调用，单位为 ops/time<br>AverageTime：用的平均时间，每次操作的平均时间，单位为 time/op<br>SampleTime：随机取样，最后输出取样结果的分布<br>SingleShotTime：只运行一次，往往同时把 Warmup 次数设为 0，用于测试冷启动时的性能<br>All：上面的所有模式都执行一次<br>@State<br>通过 State 可以指定一个对象的作用范围，JMH 根据 scope 来进行实例化和共享操作。@State 可以被继承使用，如果父类定义了该注解，子类则无需定义。由于 JMH 允许多线程同时执行测试，不同的选项含义如下：</p>
+<p>Scope.Benchmark：所有测试线程共享一个实例，测试有状态实例在多线程共享下的性能<br>Scope.Group：同一个线程在同一个 group 里共享实例<br>Scope.Thread：默认的 State，每个测试线程分配一个实例<br>@OutputTimeUnit<br>为统计结果的时间单位，可用于类或者方法注解</p>
+<p>@Warmup<br>预热所需要配置的一些基本测试参数，可用于类或者方法上。一般前几次进行程序测试的时候都会比较慢，所以要让程序进行几轮预热，保证测试的准确性。参数如下所示：</p>
+<p>iterations：预热的次数<br>time：每次预热的时间<br>timeUnit：时间的单位，默认秒<br>batchSize：批处理大小，每次操作调用几次方法<br>为什么需要预热？</p>
+<p>因为 JVM 的 JIT 机制的存在，如果某个函数被调用多次之后，JVM 会尝试将其编译为机器码，从而提高执行速度，所以为了让 benchmark 的结果更加接近真实情况就需要进行预热。</p>
+<p>@Measurement<br>实际调用方法所需要配置的一些基本测试参数，可用于类或者方法上，参数和 @Warmup 相同。</p>
+<p>@Threads<br>每个进程中的测试线程，可用于类或者方法上。</p>
+<p>@Fork<br>进行 fork 的次数，可用于类或者方法上。如果 fork 数是 2 的话，则 JMH 会 fork 出两个进程来进行测试。</p>
+<p>@Param<br>指定某项参数的多种情况，特别适合用来测试一个函数在不同的参数输入的情况下的性能，只能作用在字段上，使用该注解必须定义 @State 注解。</p>
+<h2 id="编写代码运行"><a href="#编写代码运行" class="headerlink" title="编写代码运行"></a>编写代码运行</h2><blockquote>
+<p> 建议 代码里不要打日志</p>
+</blockquote>
+<h3 id="测试1"><a href="#测试1" class="headerlink" title="测试1"></a>测试1</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token namespace">cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>string<span class="token punctuation">.</span></span><span class="token class-name">StringInternTest</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>annotations<span class="token punctuation">.</span></span><span class="token operator">*</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>results<span class="token punctuation">.</span>format<span class="token punctuation">.</span></span><span class="token class-name">ResultFormatType</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span></span><span class="token class-name">Runner</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span></span><span class="token class-name">RunnerException</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span>options<span class="token punctuation">.</span></span><span class="token class-name">Options</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span>options<span class="token punctuation">.</span></span><span class="token class-name">OptionsBuilder</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>slf4j<span class="token punctuation">.</span></span><span class="token class-name">Logger</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>slf4j<span class="token punctuation">.</span></span><span class="token class-name">LoggerFactory</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * &lt;pre>
+ *
+ *     JMH使用样例
+ *         http://hg.openjdk.java.net/code-tools/jmh/file/tip/jmh-samples/src/main/java/org/openjdk/jmh/samples/
+ *
+ * &lt;/pre>
+ *
+ * @author weikeqin
+ * @date 2020-06-14 17:11
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">JmtTest</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">transient</span> <span class="token class-name">Logger</span> log <span class="token operator">=</span> <span class="token class-name">LoggerFactory</span><span class="token punctuation">.</span><span class="token function">getLogger</span><span class="token punctuation">(</span><span class="token class-name">StringInternTest</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token annotation punctuation">@Benchmark</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">print</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>log<span class="token punctuation">.</span><span class="token function">isDebugEnabled</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            log<span class="token punctuation">.</span><span class="token function">debug</span><span class="token punctuation">(</span><span class="token string">"hello JMH"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+
+    <span class="token comment">/**
+     * @param args
+     */</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">RunnerException</span> <span class="token punctuation">&#123;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"开始执行。"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Options</span> opt <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OptionsBuilder</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">include</span><span class="token punctuation">(</span><span class="token class-name">JmtTest</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">.</span><span class="token function">getSimpleName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">forks</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">result</span><span class="token punctuation">(</span><span class="token string">"jmh_result.json"</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">resultFormat</span><span class="token punctuation">(</span><span class="token class-name">ResultFormatType</span><span class="token punctuation">.</span>JSON<span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">build</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">new</span> <span class="token class-name">Runner</span><span class="token punctuation">(</span>opt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"执行完成。"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token level warning important">WARNING</span><span class="token operator">:</span> An illegal reflective access operation has occurred
+<span class="token level warning important">WARNING</span><span class="token operator">:</span> Illegal reflective access by org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>util<span class="token punctuation">.</span>Utils <span class="token operator">(</span>file<span class="token operator">:</span><span class="token file-path string">/Users/weikeqin1/.m2/repository/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar</span><span class="token operator">)</span> to field java<span class="token punctuation">.</span>io<span class="token punctuation">.</span>PrintStream<span class="token punctuation">.</span>charOut
+<span class="token level warning important">WARNING</span><span class="token operator">:</span> Please consider reporting this to the maintainers of org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>util<span class="token punctuation">.</span>Utils
+<span class="token level warning important">WARNING</span><span class="token operator">:</span> Use <span class="token operator">-</span><span class="token operator">-</span>illegal<span class="token operator">-</span>access<span class="token operator">=</span>warn to enable warnings of further illegal reflective access operations
+<span class="token level warning important">WARNING</span><span class="token operator">:</span> All illegal access operations will be denied in a future release
+<span class="token operator">#</span> JMH version<span class="token operator">:</span> <span class="token number">1.23</span>
+<span class="token operator">#</span> VM version<span class="token operator">:</span> JDK <span class="token number">14.0.1</span><span class="token punctuation">,</span> Java HotSpot<span class="token operator">(</span>TM<span class="token operator">)</span> <span class="token number">64</span><span class="token operator">-</span>Bit Server VM<span class="token punctuation">,</span> <span class="token number">14.0.1</span><span class="token operator">+</span><span class="token number">7</span>
+<span class="token operator">#</span> VM invoker<span class="token operator">:</span> <span class="token file-path string">/Library/Java/JavaVirtualMachines/jdk-14.0.1.jdk/Contents/Home/bin/java</span>
+<span class="token operator">#</span> VM options<span class="token operator">:</span> <span class="token operator">-</span>javaagent<span class="token operator">:</span><span class="token file-path string">/Applications/IntelliJ</span> IDEA<span class="token punctuation">.</span>app<span class="token operator">/</span>Contents<span class="token operator">/</span>lib<span class="token operator">/</span>idea_rt<span class="token punctuation">.</span>jar<span class="token operator">=</span><span class="token number">57492</span><span class="token operator">:</span><span class="token file-path string">/Applications/IntelliJ</span> IDEA<span class="token punctuation">.</span>app<span class="token operator">/</span>Contents<span class="token operator">/</span>bin <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span>
+<span class="token operator">#</span> Warmup<span class="token operator">:</span> <span class="token number">5</span> iterations<span class="token punctuation">,</span> <span class="token number">10</span> s each
+<span class="token operator">#</span> Measurement<span class="token operator">:</span> <span class="token number">5</span> iterations<span class="token punctuation">,</span> <span class="token number">10</span> s each
+<span class="token operator">#</span> Timeout<span class="token operator">:</span> <span class="token number">10</span> min per iteration
+<span class="token operator">#</span> Threads<span class="token operator">:</span> <span class="token number">1</span> thread<span class="token punctuation">,</span> will synchronize iterations
+<span class="token operator">#</span> Benchmark mode<span class="token operator">:</span> Throughput<span class="token punctuation">,</span> ops<span class="token operator">/</span>time
+<span class="token operator">#</span> Benchmark<span class="token operator">:</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>JmtTest<span class="token punctuation">.</span>print
+
+<span class="token operator">#</span> Run progress<span class="token operator">:</span> <span class="token number">0.00</span><span class="token operator">%</span> complete<span class="token punctuation">,</span> ETA <span class="token time number">00:01:40</span>
+<span class="token operator">#</span> Fork<span class="token operator">:</span> <span class="token number">1</span> of <span class="token number">1</span>
+<span class="token operator">#</span> Warmup Iteration   <span class="token number">1</span><span class="token operator">:</span> <span class="token number">660097134.157</span> ops<span class="token operator">/</span>s
+<span class="token operator">#</span> Warmup Iteration   <span class="token number">2</span><span class="token operator">:</span> <span class="token number">650765740.996</span> ops<span class="token operator">/</span>s
+<span class="token operator">#</span> Warmup Iteration   <span class="token number">3</span><span class="token operator">:</span> <span class="token number">661961002.718</span> ops<span class="token operator">/</span>s
+<span class="token operator">#</span> Warmup Iteration   <span class="token number">4</span><span class="token operator">:</span> <span class="token number">672329475.200</span> ops<span class="token operator">/</span>s
+<span class="token operator">#</span> Warmup Iteration   <span class="token number">5</span><span class="token operator">:</span> <span class="token number">611127628.164</span> ops<span class="token operator">/</span>s
+Iteration   <span class="token number">1</span><span class="token operator">:</span> <span class="token number">615120987.535</span> ops<span class="token operator">/</span>s
+Iteration   <span class="token number">2</span><span class="token operator">:</span> <span class="token number">645989044.177</span> ops<span class="token operator">/</span>s
+Iteration   <span class="token number">3</span><span class="token operator">:</span> <span class="token number">642876939.314</span> ops<span class="token operator">/</span>s
+Iteration   <span class="token number">4</span><span class="token operator">:</span> <span class="token number">640265656.368</span> ops<span class="token operator">/</span>s
+Iteration   <span class="token number">5</span><span class="token operator">:</span> <span class="token number">673185386.638</span> ops<span class="token operator">/</span>s
+
+
+Result <span class="token string">"cn.wkq.java.jmh.JmtTest.print"</span><span class="token operator">:</span>
+  <span class="token number">643487602.806</span> ±<span class="token operator">(</span><span class="token number">99.9</span><span class="token operator">%</span><span class="token operator">)</span> <span class="token number">79467866.034</span> ops<span class="token operator">/</span>s <span class="token punctuation">[</span>Average<span class="token punctuation">]</span>
+  <span class="token operator">(</span>min<span class="token punctuation">,</span> avg<span class="token punctuation">,</span> max<span class="token operator">)</span> <span class="token operator">=</span> <span class="token operator">(</span><span class="token number">615120987.535</span><span class="token punctuation">,</span> <span class="token number">643487602.806</span><span class="token punctuation">,</span> <span class="token number">673185386.638</span><span class="token operator">)</span><span class="token punctuation">,</span> stdev <span class="token operator">=</span> <span class="token number">20637552.448</span>
+  CI <span class="token operator">(</span><span class="token number">99.9</span><span class="token operator">%</span><span class="token operator">)</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token number">564019736.772</span><span class="token punctuation">,</span> <span class="token number">722955468.841</span><span class="token punctuation">]</span> <span class="token operator">(</span>assumes normal distribution<span class="token operator">)</span>
+
+
+<span class="token operator">#</span> Run complete<span class="token punctuation">.</span> Total time<span class="token operator">:</span> <span class="token time number">00:01:42</span>
+
+<span class="token property">REMEMBER:</span> The numbers below are just data<span class="token punctuation">.</span> To gain reusable insights<span class="token punctuation">,</span> you need to follow up on
+why the numbers are the way they are<span class="token punctuation">.</span> Use profilers <span class="token operator">(</span>see <span class="token operator">-</span>prof<span class="token punctuation">,</span> <span class="token operator">-</span>lprof<span class="token operator">)</span><span class="token punctuation">,</span> design factorial
+experiments<span class="token punctuation">,</span> perform baseline and negative tests that provide experimental control<span class="token punctuation">,</span> make sure
+the benchmarking environment is safe on JVM<span class="token operator">/</span>OS<span class="token operator">/</span>HW level<span class="token punctuation">,</span> ask for reviews from the domain experts<span class="token punctuation">.</span>
+Do not assume the numbers tell you what you want them to tell<span class="token punctuation">.</span>
+
+Benchmark       Mode  Cnt          Score          Error  Units
+JmtTest<span class="token punctuation">.</span>print  thrpt    <span class="token number">5</span>  <span class="token number">643487602.806</span> ± <span class="token number">79467866.034</span>  ops<span class="token operator">/</span>s
+
+Benchmark result is saved to jmh_result<span class="token punctuation">.</span>json<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">[</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"jmhVersion"</span> <span class="token operator">:</span> <span class="token string">"1.23"</span><span class="token punctuation">,</span>
+        <span class="token property">"benchmark"</span> <span class="token operator">:</span> <span class="token string">"cn.wkq.java.jmh.JmtTest.print"</span><span class="token punctuation">,</span>
+        <span class="token property">"mode"</span> <span class="token operator">:</span> <span class="token string">"thrpt"</span><span class="token punctuation">,</span>
+        <span class="token property">"threads"</span> <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"forks"</span> <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"jvm"</span> <span class="token operator">:</span> <span class="token string">"/Library/Java/JavaVirtualMachines/jdk-14.0.1.jdk/Contents/Home/bin/java"</span><span class="token punctuation">,</span>
+        <span class="token property">"jvmArgs"</span> <span class="token operator">:</span> <span class="token punctuation">[</span>
+            <span class="token string">"-javaagent:/Applications/IntelliJ IDEA.app/Contents/lib/idea_rt.jar=57492:/Applications/IntelliJ IDEA.app/Contents/bin"</span><span class="token punctuation">,</span>
+            <span class="token string">"-Dfile.encoding=UTF-8"</span>
+        <span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token property">"jdkVersion"</span> <span class="token operator">:</span> <span class="token string">"14.0.1"</span><span class="token punctuation">,</span>
+        <span class="token property">"vmName"</span> <span class="token operator">:</span> <span class="token string">"Java HotSpot(TM) 64-Bit Server VM"</span><span class="token punctuation">,</span>
+        <span class="token property">"vmVersion"</span> <span class="token operator">:</span> <span class="token string">"14.0.1+7"</span><span class="token punctuation">,</span>
+        <span class="token property">"warmupIterations"</span> <span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span>
+        <span class="token property">"warmupTime"</span> <span class="token operator">:</span> <span class="token string">"10 s"</span><span class="token punctuation">,</span>
+        <span class="token property">"warmupBatchSize"</span> <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"measurementIterations"</span> <span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span>
+        <span class="token property">"measurementTime"</span> <span class="token operator">:</span> <span class="token string">"10 s"</span><span class="token punctuation">,</span>
+        <span class="token property">"measurementBatchSize"</span> <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"primaryMetric"</span> <span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+            <span class="token property">"score"</span> <span class="token operator">:</span> <span class="token number">6.434876028063821E8</span><span class="token punctuation">,</span>
+            <span class="token property">"scoreError"</span> <span class="token operator">:</span> <span class="token number">7.946786603420861E7</span><span class="token punctuation">,</span>
+            <span class="token property">"scoreConfidence"</span> <span class="token operator">:</span> <span class="token punctuation">[</span>
+                <span class="token number">5.640197367721734E8</span><span class="token punctuation">,</span>
+                <span class="token number">7.229554688405907E8</span>
+            <span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"scorePercentiles"</span> <span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                <span class="token property">"0.0"</span> <span class="token operator">:</span> <span class="token number">6.151209875347286E8</span><span class="token punctuation">,</span>
+                <span class="token property">"50.0"</span> <span class="token operator">:</span> <span class="token number">6.428769393141737E8</span><span class="token punctuation">,</span>
+                <span class="token property">"90.0"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"95.0"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"99.0"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"99.9"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"99.99"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"99.999"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"99.9999"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span><span class="token punctuation">,</span>
+                <span class="token property">"100.0"</span> <span class="token operator">:</span> <span class="token number">6.731853866384177E8</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+            <span class="token property">"scoreUnit"</span> <span class="token operator">:</span> <span class="token string">"ops/s"</span><span class="token punctuation">,</span>
+            <span class="token property">"rawData"</span> <span class="token operator">:</span> <span class="token punctuation">[</span>
+                <span class="token punctuation">[</span>
+                    <span class="token number">6.151209875347286E8</span><span class="token punctuation">,</span>
+                    <span class="token number">6.459890441766258E8</span><span class="token punctuation">,</span>
+                    <span class="token number">6.428769393141737E8</span><span class="token punctuation">,</span>
+                    <span class="token number">6.402656563679644E8</span><span class="token punctuation">,</span>
+                    <span class="token number">6.731853866384177E8</span>
+                <span class="token punctuation">]</span>
+            <span class="token punctuation">]</span>
+        <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+        <span class="token property">"secondaryMetrics"</span> <span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="测试2"><a href="#测试2" class="headerlink" title="测试2"></a>测试2</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>junit<span class="token punctuation">.</span></span><span class="token class-name">Test</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>annotations<span class="token punctuation">.</span></span><span class="token operator">*</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>results<span class="token punctuation">.</span>format<span class="token punctuation">.</span></span><span class="token class-name">ResultFormatType</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span></span><span class="token class-name">Runner</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span></span><span class="token class-name">RunnerException</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span>options<span class="token punctuation">.</span></span><span class="token class-name">Options</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>openjdk<span class="token punctuation">.</span>jmh<span class="token punctuation">.</span>runner<span class="token punctuation">.</span>options<span class="token punctuation">.</span></span><span class="token class-name">OptionsBuilder</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>slf4j<span class="token punctuation">.</span></span><span class="token class-name">Logger</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>slf4j<span class="token punctuation">.</span></span><span class="token class-name">LoggerFactory</span><span class="token punctuation">;</span>
+
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span></span><span class="token class-name">ArrayList</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span></span><span class="token class-name">List</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span></span><span class="token class-name">TimeUnit</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * &lt;pre>
+ *
+ *     JMH使用样例
+ *         http://hg.openjdk.java.net/code-tools/jmh/file/tip/jmh-samples/src/main/java/org/openjdk/jmh/samples/
+ *
+ * &lt;/pre>
+ *
+ * @author weikeqin
+ * @date 2020-06-14 16:06
+ */</span>
+<span class="token annotation punctuation">@BenchmarkMode</span><span class="token punctuation">(</span><span class="token class-name">Mode<span class="token punctuation">.</span>AverageTime</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@Warmup</span><span class="token punctuation">(</span>iterations <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">,</span> time <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@Measurement</span><span class="token punctuation">(</span>iterations <span class="token operator">=</span> <span class="token number">5</span><span class="token punctuation">,</span> time <span class="token operator">=</span> <span class="token number">5</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@Threads</span><span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@Fork</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@State</span><span class="token punctuation">(</span>value <span class="token operator">=</span> <span class="token class-name">Scope<span class="token punctuation">.</span>Benchmark</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@OutputTimeUnit</span><span class="token punctuation">(</span><span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>NANOSECONDS<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">StringInternTest</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">transient</span> <span class="token class-name">Logger</span> log <span class="token operator">=</span> <span class="token class-name">LoggerFactory</span><span class="token punctuation">.</span><span class="token function">getLogger</span><span class="token punctuation">(</span><span class="token class-name">StringInternTest</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token annotation punctuation">@Param</span><span class="token punctuation">(</span>value <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token string">"10000"</span><span class="token punctuation">,</span> <span class="token string">"100000"</span><span class="token punctuation">,</span> <span class="token string">"1000000"</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+    <span class="token keyword">private</span> <span class="token keyword">int</span> count<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     *
+     */</span>
+    <span class="token annotation punctuation">@Benchmark</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">stringTestWithIntern</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">long</span> fm1 <span class="token operator">=</span> <span class="token class-name">Runtime</span><span class="token punctuation">.</span><span class="token function">getRuntime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">freeMemory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">SharedLocation</span><span class="token punctuation">></span></span> list <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">String</span> country <span class="token operator">=</span> <span class="token string">"中国"</span><span class="token punctuation">;</span>
+            <span class="token class-name">String</span> province <span class="token operator">=</span> <span class="token string">"山西"</span><span class="token punctuation">;</span>
+            <span class="token class-name">String</span> city <span class="token operator">=</span> <span class="token string">"运城"</span><span class="token punctuation">;</span>
+            <span class="token class-name">SharedLocation</span> sharedLocation <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SharedLocation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sharedLocation<span class="token punctuation">.</span><span class="token function">setCountry</span><span class="token punctuation">(</span>country<span class="token punctuation">.</span><span class="token function">intern</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sharedLocation<span class="token punctuation">.</span><span class="token function">setProvince</span><span class="token punctuation">(</span>province<span class="token punctuation">.</span><span class="token function">intern</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sharedLocation<span class="token punctuation">.</span><span class="token function">setCity</span><span class="token punctuation">(</span>city<span class="token punctuation">.</span><span class="token function">intern</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            list<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>sharedLocation<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+
+        <span class="token punctuation">&#125;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"个数：&#123;&#125;"</span><span class="token punctuation">,</span> list<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">long</span> fm2 <span class="token operator">=</span> <span class="token class-name">Runtime</span><span class="token punctuation">.</span><span class="token function">getRuntime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">freeMemory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"&#123;&#125;  &#123;&#125;    use &#123;&#125; bytes"</span><span class="token punctuation">,</span> fm1<span class="token punctuation">,</span> fm2<span class="token punctuation">,</span> fm1 <span class="token operator">-</span> fm2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     *
+     */</span>
+    <span class="token annotation punctuation">@Benchmark</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">stringTestWithOutIntern</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">long</span> fm1 <span class="token operator">=</span> <span class="token class-name">Runtime</span><span class="token punctuation">.</span><span class="token function">getRuntime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">freeMemory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">SharedLocation</span><span class="token punctuation">></span></span> list <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">String</span> country <span class="token operator">=</span> <span class="token string">"中国"</span><span class="token punctuation">;</span>
+            <span class="token class-name">String</span> province <span class="token operator">=</span> <span class="token string">"山西"</span><span class="token punctuation">;</span>
+            <span class="token class-name">String</span> city <span class="token operator">=</span> <span class="token string">"运城"</span><span class="token punctuation">;</span>
+            <span class="token class-name">SharedLocation</span> sharedLocation <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SharedLocation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sharedLocation<span class="token punctuation">.</span><span class="token function">setCountry</span><span class="token punctuation">(</span>country<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sharedLocation<span class="token punctuation">.</span><span class="token function">setProvince</span><span class="token punctuation">(</span>province<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sharedLocation<span class="token punctuation">.</span><span class="token function">setCity</span><span class="token punctuation">(</span>city<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            list<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>sharedLocation<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token punctuation">&#125;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"个数：&#123;&#125;"</span><span class="token punctuation">,</span> list<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">long</span> fm2 <span class="token operator">=</span> <span class="token class-name">Runtime</span><span class="token punctuation">.</span><span class="token function">getRuntime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">freeMemory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"&#123;&#125;  &#123;&#125;    use &#123;&#125; bytes"</span><span class="token punctuation">,</span> fm1<span class="token punctuation">,</span> fm2<span class="token punctuation">,</span> fm1 <span class="token operator">-</span> fm2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token punctuation">&#125;</span>
+
+
+    <span class="token comment">/**
+     * @param args
+     */</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"开始执行。"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Options</span> opt <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OptionsBuilder</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">include</span><span class="token punctuation">(</span><span class="token class-name">StringInternTest</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">.</span><span class="token function">getSimpleName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">result</span><span class="token punctuation">(</span><span class="token string">"result.json"</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">resultFormat</span><span class="token punctuation">(</span><span class="token class-name">ResultFormatType</span><span class="token punctuation">.</span>JSON<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">build</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">new</span> <span class="token class-name">Runner</span><span class="token punctuation">(</span>opt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">RunnerException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">""</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"执行完成。"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span>
+
+
+<span class="token comment">/**
+ *
+ */</span>
+<span class="token keyword">class</span> <span class="token class-name">SharedLocation</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 市
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> city<span class="token punctuation">;</span>
+    <span class="token comment">/**
+     * 省
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> province<span class="token punctuation">;</span>
+    <span class="token comment">/**
+     * 国家
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> country<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">getCity</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> city<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">setCity</span><span class="token punctuation">(</span><span class="token class-name">String</span> city<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>city <span class="token operator">=</span> city<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">getProvince</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> province<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">setProvince</span><span class="token punctuation">(</span><span class="token class-name">String</span> province<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>province <span class="token operator">=</span> province<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">getCountry</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> country<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">setCountry</span><span class="token punctuation">(</span><span class="token class-name">String</span> country<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>country <span class="token operator">=</span> country<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token number">900761252.400</span> ±<span class="token operator">(</span><span class="token number">99.9</span><span class="token operator">%</span><span class="token operator">)</span> <span class="token number">836615744.826</span> ns<span class="token operator">/</span>op
+
+
+Result <span class="token string">"cn.wkq.java.string.StringInternTest.stringTestWithOutIntern"</span><span class="token operator">:</span>
+  <span class="token number">763138737.923</span> ±<span class="token operator">(</span><span class="token number">99.9</span><span class="token operator">%</span><span class="token operator">)</span> <span class="token number">930573867.253</span> ns<span class="token operator">/</span>op <span class="token punctuation">[</span>Average<span class="token punctuation">]</span>
+  <span class="token operator">(</span>min<span class="token punctuation">,</span> avg<span class="token punctuation">,</span> max<span class="token operator">)</span> <span class="token operator">=</span> <span class="token operator">(</span><span class="token number">439268202.215</span><span class="token punctuation">,</span> <span class="token number">763138737.923</span><span class="token punctuation">,</span> <span class="token number">1017594855.563</span><span class="token operator">)</span><span class="token punctuation">,</span> stdev <span class="token operator">=</span> <span class="token number">241667078.162</span>
+  CI <span class="token operator">(</span><span class="token number">99.9</span><span class="token operator">%</span><span class="token operator">)</span><span class="token operator">:</span> <span class="token punctuation">[</span>≈ <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1693712605.176</span><span class="token punctuation">]</span> <span class="token operator">(</span>assumes normal distribution<span class="token operator">)</span>
+
+
+<span class="token operator">#</span> Run complete<span class="token punctuation">.</span> Total time<span class="token operator">:</span> <span class="token time number">00:03:34</span>
+
+<span class="token property">REMEMBER:</span> The numbers below are just data<span class="token punctuation">.</span> To gain reusable insights<span class="token punctuation">,</span> you need to follow up on
+why the numbers are the way they are<span class="token punctuation">.</span> Use profilers <span class="token operator">(</span>see <span class="token operator">-</span>prof<span class="token punctuation">,</span> <span class="token operator">-</span>lprof<span class="token operator">)</span><span class="token punctuation">,</span> design factorial
+experiments<span class="token punctuation">,</span> perform baseline and negative tests that provide experimental control<span class="token punctuation">,</span> make sure
+the benchmarking environment is safe on JVM<span class="token operator">/</span>OS<span class="token operator">/</span>HW level<span class="token punctuation">,</span> ask for reviews from the domain experts<span class="token punctuation">.</span>
+Do not assume the numbers tell you what you want them to tell<span class="token punctuation">.</span>
+
+Benchmark                                 <span class="token operator">(</span>count<span class="token operator">)</span>  Mode  Cnt           Score           Error  Units
+StringInternTest<span class="token punctuation">.</span>stringTestWithIntern       <span class="token number">10000</span>  avgt    <span class="token number">5</span>    <span class="token number">13128831.111</span> ±   <span class="token number">1999580.768</span>  ns<span class="token operator">/</span>op
+StringInternTest<span class="token punctuation">.</span>stringTestWithIntern      <span class="token number">100000</span>  avgt    <span class="token number">5</span>   <span class="token number">157188187.749</span> ±  <span class="token number">99748905.878</span>  ns<span class="token operator">/</span>op
+StringInternTest<span class="token punctuation">.</span>stringTestWithIntern     <span class="token number">1000000</span>  avgt    <span class="token number">5</span>  <span class="token number">1813072765.600</span> ± <span class="token number">619163864.504</span>  ns<span class="token operator">/</span>op
+StringInternTest<span class="token punctuation">.</span>stringTestWithOutIntern    <span class="token number">10000</span>  avgt    <span class="token number">5</span>     <span class="token number">1511080.000</span> ±    <span class="token number">872905.808</span>  ns<span class="token operator">/</span>op
+StringInternTest<span class="token punctuation">.</span>stringTestWithOutIntern   <span class="token number">100000</span>  avgt    <span class="token number">5</span>     <span class="token number">8238751.953</span> ±   <span class="token number">1401387.637</span>  ns<span class="token operator">/</span>op
+StringInternTest<span class="token punctuation">.</span>stringTestWithOutIntern  <span class="token number">1000000</span>  avgt    <span class="token number">5</span>   <span class="token number">763138737.923</span> ± <span class="token number">930573867.253</span>  ns<span class="token operator">/</span>op
+
+Benchmark result is saved to result<span class="token punctuation">.</span>json<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/_LHV1PNbbCV9_d9aWzKOyg">性能调优必备利器之JMH</a><br>[2] <a target="_blank" rel="noopener" href="http://hg.openjdk.java.net/code-tools/jmh/file/tip/jmh-samples/src/main/java/org/openjdk/jmh/samples/">openjdk/jmh/samples/</a><br>[3] <a target="_blank" rel="noopener" href="https://openjdk.java.net/projects/code-tools/jmh/">code-tools/jmh</a><br>[4] <a target="_blank" rel="noopener" href="https://javadoc.io/doc/org.openjdk.jmh/jmh-core/latest/index.html">jmh-core api</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/06/14/java-performance-tuning/" rel="prev" title="java-performance-tuning">
+                  <i class="fa fa-chevron-left"></i> java-performance-tuning
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/06/17/io-model/" rel="next" title="IO模型">
+                  IO模型 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

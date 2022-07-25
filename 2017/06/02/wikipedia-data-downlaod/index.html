@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="维基百科的数据有什么用  可以用来分词、做实体识别、word2vec、新词发现等 数据下载下载地址   https:&#x2F;&#x2F;dumps.wikimedia.org&#x2F;zhwiki&#x2F;  中文  ftp:&#x2F;&#x2F;ftpmirror.your.org&#x2F;pub&#x2F;wikimedia&#x2F;dumps&#x2F;  所有语言   镜像  https:&#x2F;&#x2F;dumps.wikimedia.org&#x2F;mirrors.html  https:&#x2F;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="wikipedia 数据 下载 使用">
+<meta property="og:url" content="http://weikeqin.com/2017/06/02/wikipedia-data-downlaod/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="维基百科的数据有什么用  可以用来分词、做实体识别、word2vec、新词发现等 数据下载下载地址   https:&#x2F;&#x2F;dumps.wikimedia.org&#x2F;zhwiki&#x2F;  中文  ftp:&#x2F;&#x2F;ftpmirror.your.org&#x2F;pub&#x2F;wikimedia&#x2F;dumps&#x2F;  所有语言   镜像  https:&#x2F;&#x2F;dumps.wikimedia.org&#x2F;mirrors.html  https:&#x2F;">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/data/wikipedia/MediaWiki_1_28_0_database_schema.png">
+<meta property="article:published_time" content="2017-06-02T03:39:34.000Z">
+<meta property="article:modified_time" content="2022-07-09T14:22:11.246Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="tech,Java,MySQL,Redis,ElasticSearch,DDD">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/data/wikipedia/MediaWiki_1_28_0_database_schema.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/06/02/wikipedia-data-downlaod/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/06/02/wikipedia-data-downlaod/","path":"2017/06/02/wikipedia-data-downlaod/","title":"wikipedia 数据 下载 使用"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>wikipedia 数据 下载 使用 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BB%B4%E5%9F%BA%E7%99%BE%E7%A7%91%E7%9A%84%E6%95%B0%E6%8D%AE%E6%9C%89%E4%BB%80%E4%B9%88%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">维基百科的数据有什么用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD"><span class="nav-number">2.</span> <span class="nav-text">数据下载</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93%E5%8F%8A%E8%A1%A8%E7%9A%84%E5%88%9B%E5%BB%BA"><span class="nav-number">3.</span> <span class="nav-text">数据库及表的创建</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%83%A8%E5%88%86%E8%A1%A8%E7%BB%93%E6%9E%84"><span class="nav-number">4.</span> <span class="nav-text">部分表结构</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%AF%BC%E5%85%A5"><span class="nav-number">5.</span> <span class="nav-text">数据导入</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E4%BD%BF%E7%94%A8%E6%BA%90%E4%BB%A3%E7%A0%81%E5%AF%BC%E5%85%A5"><span class="nav-number">5.1.</span> <span class="nav-text">直接使用源代码导入</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%8A-xml-bz2%E8%BD%AC%E5%8C%96%E6%88%90-sql%EF%BC%8C%E5%86%8D%E9%80%9A%E8%BF%87-sql%E5%AF%BC%E5%85%A5"><span class="nav-number">5.2.</span> <span class="nav-text">把.xml.bz2转化成.sql，再通过.sql导入</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8jar%E5%8C%85%E5%AF%BC%E5%85%A5"><span class="nav-number">5.3.</span> <span class="nav-text">使用jar包导入</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8"><span class="nav-number">6.</span> <span class="nav-text">使用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">7.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/06/02/wikipedia-data-downlaod/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          wikipedia 数据 下载 使用
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-06-02 11:39:34" itemprop="dateCreated datePublished" datetime="2017-06-02T11:39:34+08:00">2017-06-02</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-09 22:22:11" itemprop="dateModified" datetime="2022-07-09T22:22:11+08:00">2022-07-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/other/" itemprop="url" rel="index"><span itemprop="name">other</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/06/02/wikipedia-data-downlaod/" class="post-meta-item leancloud_visitors" data-flag-title="wikipedia 数据 下载 使用" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="维基百科的数据有什么用"><a href="#维基百科的数据有什么用" class="headerlink" title="维基百科的数据有什么用"></a>维基百科的数据有什么用</h1><p>  可以用来分词、做实体识别、word2vec、新词发现等</p>
+<h1 id="数据下载"><a href="#数据下载" class="headerlink" title="数据下载"></a>数据下载</h1><p><a target="_blank" rel="noopener" href="https://download.wikipedia.com/zhwiki/latest/zhwiki-latest-pages-articles.xml.bz2">下载地址</a></p>
+<p>  <a target="_blank" rel="noopener" href="https://dumps.wikimedia.org/zhwiki/">https://dumps.wikimedia.org/zhwiki/</a>  中文<br>  <a href="ftp://ftpmirror.your.org/pub/wikimedia/dumps/">ftp://ftpmirror.your.org/pub/wikimedia/dumps/</a>  所有语言</p>
+<p>  镜像<br>  <a target="_blank" rel="noopener" href="https://dumps.wikimedia.org/mirrors.html">https://dumps.wikimedia.org/mirrors.html</a><br>  <a target="_blank" rel="noopener" href="https://dumps.wikimedia.org/elwiktionary/">https://dumps.wikimedia.org/elwiktionary/</a><br>  <a target="_blank" rel="noopener" href="https://dumps.wikimedia.org/enwiki/latest/">https://dumps.wikimedia.org/enwiki/latest/</a></p>
+<p>  <a target="_blank" rel="noopener" href="https://meta.wikimedia.org/wiki/Mirroring_Wikimedia_project_XML_dumps">https://meta.wikimedia.org/wiki/Mirroring_Wikimedia_project_XML_dumps</a></p>
+<span id="more"></span>  
+<h1 id="数据库及表的创建"><a href="#数据库及表的创建" class="headerlink" title="数据库及表的创建"></a>数据库及表的创建</h1><p>维基百科数据库的结构<br><a target="_blank" rel="noopener" href="https://www.mediawiki.org/wiki/Manual:Database_layout">https://www.mediawiki.org/wiki/Manual:Database_layout</a><br><img src="/img/data/wikipedia/MediaWiki_1_28_0_database_schema.png" alt="MediaWiki_1_28_0_database_schema"></p>
+<p>创建数据库及表结构的语句<br><a target="_blank" rel="noopener" href="https://phabricator.wikimedia.org/source/mediawiki/browse/master/maintenance/tables.sql">https://phabricator.wikimedia.org/source/mediawiki/browse/master/maintenance/tables.sql</a>  (最新版，添加了很多字段，但是删除了一个旧字段)</p>
+<h1 id="部分表结构"><a href="#部分表结构" class="headerlink" title="部分表结构"></a>部分表结构</h1><pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/*
+Navicat MySQL Data Transfer
+
+Source Server         : localhost
+Source Server Version : 50505
+Source Host           : localhost:3306
+Source Database       : wikipedia_zh
+
+Target Server Type    : MYSQL
+Target Server Version : 50505
+File Encoding         : 65001
+
+Date: 2018-07-11 17:16:22
+*/</span>
+
+<span class="token keyword">SET</span> FOREIGN_KEY_CHECKS<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- ----------------------------</span>
+<span class="token comment">-- Table structure for `page`</span>
+<span class="token comment">-- ----------------------------</span>
+<span class="token keyword">DROP</span> <span class="token keyword">TABLE</span> <span class="token keyword">IF</span> <span class="token keyword">EXISTS</span> <span class="token identifier"><span class="token punctuation">`</span>page<span class="token punctuation">`</span></span><span class="token punctuation">;</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>page<span class="token punctuation">`</span></span> <span class="token punctuation">(</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_id<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">AUTO_INCREMENT</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_namespace<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_title<span class="token punctuation">`</span></span>  <span class="token keyword">varchar</span><span class="token punctuation">(</span><span class="token number">255</span><span class="token punctuation">)</span> <span class="token keyword">CHARACTER</span> <span class="token keyword">SET</span> utf8mb4 <span class="token keyword">COLLATE</span> utf8mb4_bin <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_restrictions<span class="token punctuation">`</span></span>  <span class="token keyword">tinyblob</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_counter<span class="token punctuation">`</span></span>  <span class="token keyword">bigint</span><span class="token punctuation">(</span><span class="token number">20</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token number">0</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_is_redirect<span class="token punctuation">`</span></span>  <span class="token keyword">tinyint</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token number">0</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_is_new<span class="token punctuation">`</span></span>  <span class="token keyword">tinyint</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token number">0</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_random<span class="token punctuation">`</span></span>  <span class="token keyword">double</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_touched<span class="token punctuation">`</span></span>  <span class="token keyword">binary</span><span class="token punctuation">(</span><span class="token number">14</span><span class="token punctuation">)</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token string">'\0\0\0\0\0\0\0\0\0\0\0\0'</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_latest<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>page_len<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span><span class="token identifier"><span class="token punctuation">`</span>page_id<span class="token punctuation">`</span></span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span>
+<span class="token keyword">ENGINE</span><span class="token operator">=</span><span class="token keyword">InnoDB</span>
+<span class="token keyword">DEFAULT</span> <span class="token keyword">CHARACTER</span> <span class="token keyword">SET</span><span class="token operator">=</span>utf8mb4 <span class="token keyword">COLLATE</span><span class="token operator">=</span>utf8mb4_general_ci
+<span class="token keyword">AUTO_INCREMENT</span><span class="token operator">=</span><span class="token number">1</span>
+
+<span class="token punctuation">;</span>
+
+<span class="token comment">-- ----------------------------</span>
+<span class="token comment">-- Table structure for `revision`</span>
+<span class="token comment">-- ----------------------------</span>
+<span class="token keyword">DROP</span> <span class="token keyword">TABLE</span> <span class="token keyword">IF</span> <span class="token keyword">EXISTS</span> <span class="token identifier"><span class="token punctuation">`</span>revision<span class="token punctuation">`</span></span><span class="token punctuation">;</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>revision<span class="token punctuation">`</span></span> <span class="token punctuation">(</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_id<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">AUTO_INCREMENT</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_page<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_text_id<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_comment<span class="token punctuation">`</span></span>  <span class="token keyword">blob</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_user<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token number">0</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_user_text<span class="token punctuation">`</span></span>  <span class="token keyword">varchar</span><span class="token punctuation">(</span><span class="token number">255</span><span class="token punctuation">)</span> <span class="token keyword">CHARACTER</span> <span class="token keyword">SET</span> utf8 <span class="token keyword">COLLATE</span> utf8_bin <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token string">''</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_timestamp<span class="token punctuation">`</span></span>  <span class="token keyword">binary</span><span class="token punctuation">(</span><span class="token number">14</span><span class="token punctuation">)</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token string">'\0\0\0\0\0\0\0\0\0\0\0\0'</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_minor_edit<span class="token punctuation">`</span></span>  <span class="token keyword">tinyint</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token number">0</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_deleted<span class="token punctuation">`</span></span>  <span class="token keyword">tinyint</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token number">0</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_len<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token string">''</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_parent_id<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token string">''</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>rev_sha1<span class="token punctuation">`</span></span>  <span class="token keyword">varbinary</span><span class="token punctuation">(</span><span class="token number">32</span><span class="token punctuation">)</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">DEFAULT</span> <span class="token string">''</span> <span class="token punctuation">,</span>
+<span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span><span class="token identifier"><span class="token punctuation">`</span>rev_id<span class="token punctuation">`</span></span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span>
+<span class="token keyword">ENGINE</span><span class="token operator">=</span><span class="token keyword">InnoDB</span>
+<span class="token keyword">DEFAULT</span> <span class="token keyword">CHARACTER</span> <span class="token keyword">SET</span><span class="token operator">=</span>utf8mb4 <span class="token keyword">COLLATE</span><span class="token operator">=</span>utf8mb4_general_ci
+<span class="token keyword">AUTO_INCREMENT</span><span class="token operator">=</span><span class="token number">1</span>
+
+<span class="token punctuation">;</span>
+
+
+<span class="token comment">-- ----------------------------</span>
+<span class="token comment">-- Table structure for `text`</span>
+<span class="token comment">-- ----------------------------</span>
+<span class="token keyword">DROP</span> <span class="token keyword">TABLE</span> <span class="token keyword">IF</span> <span class="token keyword">EXISTS</span> <span class="token identifier"><span class="token punctuation">`</span>text<span class="token punctuation">`</span></span><span class="token punctuation">;</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>text<span class="token punctuation">`</span></span> <span class="token punctuation">(</span>
+<span class="token identifier"><span class="token punctuation">`</span>old_id<span class="token punctuation">`</span></span>  <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token keyword">UNSIGNED</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token keyword">AUTO_INCREMENT</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>old_text<span class="token punctuation">`</span></span>  <span class="token keyword">mediumblob</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token identifier"><span class="token punctuation">`</span>old_flags<span class="token punctuation">`</span></span>  <span class="token keyword">tinyblob</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span> <span class="token punctuation">,</span>
+<span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span><span class="token identifier"><span class="token punctuation">`</span>old_id<span class="token punctuation">`</span></span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span>
+<span class="token keyword">ENGINE</span><span class="token operator">=</span><span class="token keyword">InnoDB</span>
+<span class="token keyword">DEFAULT</span> <span class="token keyword">CHARACTER</span> <span class="token keyword">SET</span><span class="token operator">=</span>utf8mb4 <span class="token keyword">COLLATE</span><span class="token operator">=</span>utf8mb4_general_ci
+<span class="token keyword">AUTO_INCREMENT</span><span class="token operator">=</span><span class="token number">1</span>
+
+<span class="token punctuation">;</span>
+
+<span class="token comment">-- ----------------------------</span>
+<span class="token comment">-- Auto increment value for `page`</span>
+<span class="token comment">-- ----------------------------</span>
+<span class="token keyword">ALTER</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>page<span class="token punctuation">`</span></span> <span class="token keyword">AUTO_INCREMENT</span><span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- ----------------------------</span>
+<span class="token comment">-- Auto increment value for `revision`</span>
+<span class="token comment">-- ----------------------------</span>
+<span class="token keyword">ALTER</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>revision<span class="token punctuation">`</span></span> <span class="token keyword">AUTO_INCREMENT</span><span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- ----------------------------</span>
+<span class="token comment">-- Auto increment value for `text`</span>
+<span class="token comment">-- ----------------------------</span>
+<span class="token keyword">ALTER</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>text<span class="token punctuation">`</span></span> <span class="token keyword">AUTO_INCREMENT</span><span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="数据导入"><a href="#数据导入" class="headerlink" title="数据导入"></a>数据导入</h1><p>  <a target="_blank" rel="noopener" href="https://gerrit.wikimedia.org/r/p/mediawiki/tools/mwdumper">mwdumper源代码</a><br>  <code>git clone https://phabricator.wikimedia.org/diffusion/MWDU/mwdumper.git</code></p>
+<p>  <a target="_blank" rel="noopener" href="https://github.com/wikimedia/mediawiki-tools-mwdumper">mediawiki-tools-mwdumper github地址</a><br>  <code>git clone https://github.com/wikimedia/mediawiki-tools-mwdumper.git</code></p>
+<h2 id="直接使用源代码导入"><a href="#直接使用源代码导入" class="headerlink" title="直接使用源代码导入"></a>直接使用源代码导入</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">用eclipse导入mwdumper工程，运行Dumper类  (windows下可能会报各种错)
+run configuration:
+program argument:
+    --output=mysql://localhost/wikipedia_zh?user=root&amp;password=root&amp;characterEncoding=utf8
+	--format=sql:1.5  
+	C:/workspace/data/zhwiki-latest-pages-articles.xml.bz2
+vm argument:
+    -Xms128m -Xmx2048<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="把-xml-bz2转化成-sql，再通过-sql导入"><a href="#把-xml-bz2转化成-sql，再通过-sql导入" class="headerlink" title="把.xml.bz2转化成.sql，再通过.sql导入"></a>把.xml.bz2转化成.sql，再通过.sql导入</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">program argument:
+  --output=mysql://localhost/wikipedia_zh?user=root&amp;password=root&amp;characterEncoding=utf8
+  --format=mysql:1.5
+  C:/WorkSpaces/data/zhwiki-latest-pages-articles.xml.bz2
+vm argument:
+    -Xms128m -Xmx2048m<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="使用jar包导入"><a href="#使用jar包导入" class="headerlink" title="使用jar包导入"></a>使用jar包导入</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">// 推荐在linux下运行   
+// windows下可能会报各种错
+ java -jar mwdumper.jar   --format=mysql:1.5   zhwiki-latest-pages-articles.xml.bz2 |
+    mysql -u &lt;username> -p &lt;databasename> 
+
+java -jar mwdumper-1.25.jar --format=sql:1.5 zhwiki-latest-pages-articles.xml.bz2  |   mysql -u user01 -p wikipedia_zh  // 然后会提示你输入mysql数据库的密码
+  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h1><p>  用于word2vec</p>
+<p>三种不同格式的离线文档，这个演示xml.bz2<br>wiki离线文档介绍<br><a target="_blank" rel="noopener" href="https://www.wikidata.org/wiki/Wikidata:Database_download/zh">https://www.wikidata.org/wiki/Wikidata:Database_download/zh</a><br>xowa介绍<br><a target="_blank" rel="noopener" href="http://xowa.org/home/wiki/Help/Download_XOWA.html">http://xowa.org/home/wiki/Help/Download_XOWA.html</a><br>中文数据库的下载介绍<br><a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/Wikipedia:%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%8B%E8%BD%BD">https://zh.wikipedia.org/wiki/Wikipedia:%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%8B%E8%BD%BD</a><br>中文数据库源<br><a target="_blank" rel="noopener" href="https://dumps.wikimedia.org/zhwiki/">https://dumps.wikimedia.org/zhwiki/</a></p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://meta.wikimedia.org/wiki/Data_dumps">Data_dumps</a><br>[2] <a target="_blank" rel="noopener" href="https://meta.wikimedia.org/wiki/Data_dumps/Tools_for_importing">Tools_for_importing</a><br>[3] <a target="_blank" rel="noopener" href="https://www.mediawiki.org/wiki/Manual:MWDumper">Manual:MWDumper</a><br>[4] <a target="_blank" rel="noopener" href="https://meta.wikimedia.org/wiki/Data_dumps/Import_examples">Import_examples</a><br>[5] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/altya/archive/2012/11/23/2784537.html">把wikipedia中文数据库导入mysql</a><br>[6] <a target="_blank" rel="noopener" href="https://licstar.net/archives/262">维基百科简体中文语料的获取</a><br>[7] <a target="_blank" rel="noopener" href="https://github.com/wikimedia/mediawiki">mediawiki - github</a><br>[8] <a target="_blank" rel="noopener" href="http://www.ituring.com.cn/article/1188">网上可供下载的数据集合大整理</a><br>[9] <a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/Wikipedia:%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%8B%E8%BD%BD">Wikipedia:数据库下载</a><br>[10] <a target="_blank" rel="noopener" href="http://licstar.net/archives/262">维基百科简体中文语料的获取</a><br>[11] <a target="_blank" rel="noopener" href="https://dumps.wikimedia.org/backup-index.html">backup</a><br>[12] <a target="_blank" rel="noopener" href="http://blog.csdn.net/lyblyblyblin/article/details/69790820">linux，windows下如何使用XOWA查看离线的维基百科 XOWA 导入离线wiki</a><br>[13] <a target="_blank" rel="noopener" href="https://flystarhe.github.io/2016/08/31/wiki-corpus-zh/">维基百科中文语料的获取</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/06/01/neo4j-error-notes/" rel="prev" title="Neo4j error 笔记">
+                  <i class="fa fa-chevron-left"></i> Neo4j error 笔记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/06/09/cypher/" rel="next" title="Neo4j Cypher 笔记">
+                  Neo4j Cypher 笔记 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

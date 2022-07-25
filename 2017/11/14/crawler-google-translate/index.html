@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="领导交给我一个任务，有一些英文的文章，翻译成中文，用谷歌翻译试试。那就试试呗。   F12 经过多次测试，发现请求 https:&#x2F;&#x2F;translate.google.cn&#x2F;translate_a&#x2F;single 带一些参数就可以爬取谷歌翻译  第一步 访问 https:&#x2F;&#x2F;translate.google.cn&#x2F; 获取TKK  第二步 根据TKK和文本算出tk值，然后访问 https:&#x2F;&#x2F;tra">
+<meta property="og:type" content="article">
+<meta property="og:title" content="爬取 谷歌翻译">
+<meta property="og:url" content="http://weikeqin.com/2017/11/14/crawler-google-translate/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="领导交给我一个任务，有一些英文的文章，翻译成中文，用谷歌翻译试试。那就试试呗。   F12 经过多次测试，发现请求 https:&#x2F;&#x2F;translate.google.cn&#x2F;translate_a&#x2F;single 带一些参数就可以爬取谷歌翻译  第一步 访问 https:&#x2F;&#x2F;translate.google.cn&#x2F; 获取TKK  第二步 根据TKK和文本算出tk值，然后访问 https:&#x2F;&#x2F;tra">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-11-14T02:12:54.000Z">
+<meta property="article:modified_time" content="2022-07-09T14:22:11.212Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="tech,Java,MySQL,Redis,ElasticSearch,DDD">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/11/14/crawler-google-translate/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/11/14/crawler-google-translate/","path":"2017/11/14/crawler-google-translate/","title":"爬取 谷歌翻译"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>爬取 谷歌翻译 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E8%8E%B7%E5%8F%96TKK"><span class="nav-number">1.</span> <span class="nav-text">(1)　获取TKK</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E8%8E%B7%E5%8F%96tk%E5%80%BC"><span class="nav-number">2.</span> <span class="nav-text">(2)　获取tk值</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%8F%AF%E8%83%BD%E9%81%87%E5%88%B0%E7%9A%84%E9%94%99%E8%AF%AF"><span class="nav-number">3.</span> <span class="nav-text">(3)　可能遇到的错误</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">4.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/11/14/crawler-google-translate/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          爬取 谷歌翻译
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-11-14 10:12:54" itemprop="dateCreated datePublished" datetime="2017-11-14T10:12:54+08:00">2017-11-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-09 22:22:11" itemprop="dateModified" datetime="2022-07-09T22:22:11+08:00">2022-07-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/other/" itemprop="url" rel="index"><span itemprop="name">other</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/11/14/crawler-google-translate/" class="post-meta-item leancloud_visitors" data-flag-title="爬取 谷歌翻译" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  领导交给我一个任务，有一些英文的文章，翻译成中文，用谷歌翻译试试。那就试试呗。</p>
+<p>  F12 经过多次测试，发现请求 <a target="_blank" rel="noopener" href="https://translate.google.cn/translate_a/single">https://translate.google.cn/translate_a/single</a> 带一些参数就可以爬取谷歌翻译<br>  第一步 访问 <a target="_blank" rel="noopener" href="https://translate.google.cn/">https://translate.google.cn/</a> 获取TKK<br>  第二步 根据TKK和文本算出tk值，然后访问 <a target="_blank" rel="noopener" href="https://translate.google.cn/translate_a/single">https://translate.google.cn/translate_a/single</a> 时加上参数，就可以爬取到翻译后的内容了。</p>
+<p>  步骤如下:</p>
+<p>Get方式<br><a target="_blank" rel="noopener" href="https://translate.google.cn/translate_a/single?client=t&amp;sl=en&amp;tl=zh-CN&amp;hl=zh-CN&amp;dt=at&amp;dt=bd&amp;dt=ex&amp;dt=ld&amp;dt=md&amp;dt=qca&amp;dt=rw&amp;dt=rm&amp;dt=ss&amp;dt=t&amp;ie=UTF-8&amp;oe=UTF-8&amp;source=btn&amp;ssel=3&amp;tsel=0&amp;kc=2&amp;tk=750300.857549&amp;q=test">https://translate.google.cn/translate_a/single?client=t&amp;sl=en&amp;tl=zh-CN&amp;hl=zh-CN&amp;dt=at&amp;dt=bd&amp;dt=ex&amp;dt=ld&amp;dt=md&amp;dt=qca&amp;dt=rw&amp;dt=rm&amp;dt=ss&amp;dt=t&amp;ie=UTF-8&amp;oe=UTF-8&amp;source=btn&amp;ssel=3&amp;tsel=0&amp;kc=2&amp;tk=750300.857549&amp;q=test</a></p>
+<p>Post方式<br><a target="_blank" rel="noopener" href="https://translate.google.cn/translate_a/single?client=t&amp;sl=en&amp;tl=zh-CN&amp;hl=zh-CN&amp;dt=at&amp;dt=bd&amp;dt=ex&amp;dt=ld&amp;dt=md&amp;dt=qca&amp;dt=rw&amp;dt=rm&amp;dt=ss&amp;dt=t&amp;ie=UTF-8&amp;oe=UTF-8&amp;pc=1&amp;otf=1&amp;ssel=3&amp;tsel=0&amp;kc=1&amp;tk=280278.139719">https://translate.google.cn/translate_a/single?client=t&amp;sl=en&amp;tl=zh-CN&amp;hl=zh-CN&amp;dt=at&amp;dt=bd&amp;dt=ex&amp;dt=ld&amp;dt=md&amp;dt=qca&amp;dt=rw&amp;dt=rm&amp;dt=ss&amp;dt=t&amp;ie=UTF-8&amp;oe=UTF-8&amp;pc=1&amp;otf=1&amp;ssel=3&amp;tsel=0&amp;kc=1&amp;tk=280278.139719</a></p>
+<span id="more"></span>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">https://translate.google.cn/translate_a/single
+?client=t
+&amp;sl=en
+&amp;tl=zh-CN
+&amp;hl=zh-CN
+&amp;dt=at
+&amp;dt=bd
+&amp;dt=ex
+&amp;dt=ld
+&amp;dt=md
+&amp;dt=qca
+&amp;dt=rw
+&amp;dt=rm
+&amp;dt=ss
+&amp;dt=t
+&amp;ie=UTF-8
+&amp;oe=UTF-8
+&amp;pc=1
+&amp;otf=1
+&amp;ssel=3
+&amp;tsel=0
+&amp;kc=1
+&amp;tk=280278.139719<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">sl=en：source language为en，即需要翻译的文字是英文 
+tl=zh-CN：to language，目标语言为zh-CN，即要翻译为中文简体
+
+ie=UTF-8：input encoding，输入的文字的编码为UTF-8  
+oe=UTF-8：output encoding，输出，翻译后，的文字的编码为UTF-8
+
+tk是用JavaScript根据TKK和输入的文字算出来的<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<!--
+NID=117=uJzy2elJnPyj1aIPbKrE-QdAmT4WYyRbAvZFraLi0pNWwfl93AAXYpu-qC_8_-SNDDmzOMRzbqKof7k0H-hAPQBkMEg4Qs505_AGGr2rLpRbj8DI9NBqyM0_Y7i5tvxb; _ga=GA1.3.2122773009.1506756769; _gid=GA1.3.135101131.1510566089; 1P_JAR=2017-11-14-3
+NID=117=G_0Mxsl11jmOd5wbWg9F8RtX1-MFzqVma9dYnMMPyg8OFuGvg2WWvV6mbacRqJT4rTp1ItqvR1ycFBM373owdTwIhD7gEt618hYXjKfZgNj9jpyJJJdDY-KV_CVxhITG; _ga=GA1.3.2122773009.1506756769; _gid=GA1.3.135101131.1510566089; 1P_JAR=2017-11-14-2
+NID=117=PzyLc9wQwvD43wuGUZQsBkbs1eIqd6bNSnRFlu4Uup5gYq5L2u1xUrf9PtWEfqIpyFpswKojhBsO3SnecVyUVshojTBXXHmIKh_U643ZBYpsRV38H0wsbtUYEpor9fjE; _ga=GA1.3.2122773009.1506756769; _gid=GA1.3.135101131.1510566089; 1P_JAR=2017-11-14-6
+
+_ga=GA1.3.2122773009.1506756769; _gid=GA1.3.135101131.1510566089; NID=117=PzyLc9wQwvD43wuGUZQsBkbs1eIqd6bNSnRFlu4Uup5gYq5L2u1xUrf9PtWEfqIpyFpswKojhBsO3SnecVyUVshojTBXXHmIKh_U643ZBYpsRV38H0wsbtUYEpor9fjE; 1P_JAR=2017-11-14-6        
+_ga=GA1.3.2122773009.1506756769; _gid=GA1.3.135101131.1510566089; 1P_JAR=2017-11-14-6; NID=117=e35IFLfgjYAEnKjURz1Yq-cIma7pb1Tu2HKnSajdwmYlnCES3GK7YDgrxyfJwB1AC5GfbeFr7U_kPY2IvLBa52GHDu2kakrMBQo3ST4_gWfG9AiMiyQ5RrspSzJw8lBG
+-->
+
+
+<h1 id="1-获取TKK"><a href="#1-获取TKK" class="headerlink" title="(1)　获取TKK"></a>(1)　获取TKK</h1><p>请求 <a target="_blank" rel="noopener" href="https://translate.google.cn/">https://translate.google.cn/</a> 后，响应的内容里搜索TKK，可以找见下面这行代码，每次TKK都不一样</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">TKK=eval('((function()&#123;var a\x3d3412621750;var b\x3d-891074424;return 419654+\x27.\x27+(a+b)&#125;)())');
+
+\x3d 是 =
+\x27 是 '
+
+上面这行代码翻译过来就是
+TKK=eval('((function()&#123;var a=3412621750;var b=-891074424;return 419654+'.'+(a+b)&#125;)())');<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="2-获取tk值"><a href="#2-获取tk值" class="headerlink" title="(2)　获取tk值"></a>(2)　获取tk值</h1><p>根据TKK和文本算出tk值</p>
+<pre class="line-numbers language-js" data-language="js"><code class="language-js"><span class="token keyword">var</span> <span class="token function-variable function">b</span> <span class="token operator">=</span> <span class="token keyword">function</span> <span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">var</span> d <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> d <span class="token operator">&lt;</span> b<span class="token punctuation">.</span>length <span class="token operator">-</span> <span class="token number">2</span><span class="token punctuation">;</span> d <span class="token operator">+=</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">var</span> c <span class="token operator">=</span> b<span class="token punctuation">.</span><span class="token function">charAt</span><span class="token punctuation">(</span>d <span class="token operator">+</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            c <span class="token operator">=</span> <span class="token string">"a"</span> <span class="token operator">&lt;=</span> c <span class="token operator">?</span> c<span class="token punctuation">.</span><span class="token function">charCodeAt</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">87</span> <span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            c <span class="token operator">=</span> <span class="token string">"+"</span> <span class="token operator">==</span> b<span class="token punctuation">.</span><span class="token function">charAt</span><span class="token punctuation">(</span>d <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">?</span> a <span class="token operator">>>></span> c <span class="token operator">:</span> a <span class="token operator">&lt;&lt;</span> c<span class="token punctuation">;</span>
+        a <span class="token operator">=</span> <span class="token string">"+"</span> <span class="token operator">==</span> b<span class="token punctuation">.</span><span class="token function">charAt</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span> <span class="token operator">?</span> a <span class="token operator">+</span> c <span class="token operator">&amp;</span> <span class="token number">4294967295</span> <span class="token operator">:</span> a <span class="token operator">^</span> c
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> a
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">var</span> <span class="token function-variable function">tk</span> <span class="token operator">=</span> <span class="token keyword">function</span> <span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> <span class="token constant">TKK</span></span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">var</span> e <span class="token operator">=</span> <span class="token constant">TKK</span><span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">"."</span><span class="token punctuation">)</span><span class="token punctuation">,</span> h <span class="token operator">=</span> <span class="token function">Number</span><span class="token punctuation">(</span>e<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">||</span> <span class="token number">0</span><span class="token punctuation">,</span> g <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> d <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> f <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> f <span class="token operator">&lt;</span> a<span class="token punctuation">.</span>length<span class="token punctuation">;</span> f<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">var</span> c <span class="token operator">=</span> a<span class="token punctuation">.</span><span class="token function">charCodeAt</span><span class="token punctuation">(</span>f<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token number">128</span> <span class="token operator">></span> c <span class="token operator">?</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">:</span> <span class="token punctuation">(</span><span class="token number">2048</span> <span class="token operator">></span> c <span class="token operator">?</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">>></span> <span class="token number">6</span> <span class="token operator">|</span> <span class="token number">192</span> <span class="token operator">:</span> <span class="token punctuation">(</span><span class="token number">55296</span> <span class="token operator">==</span> <span class="token punctuation">(</span>c <span class="token operator">&amp;</span> <span class="token number">64512</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> f <span class="token operator">+</span> <span class="token number">1</span> <span class="token operator">&lt;</span> a<span class="token punctuation">.</span>length <span class="token operator">&amp;&amp;</span> <span class="token number">56320</span> <span class="token operator">==</span> <span class="token punctuation">(</span>a<span class="token punctuation">.</span><span class="token function">charCodeAt</span><span class="token punctuation">(</span>f <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">64512</span><span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token punctuation">(</span>c <span class="token operator">=</span> <span class="token number">65536</span> <span class="token operator">+</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>c <span class="token operator">&amp;</span> <span class="token number">1023</span><span class="token punctuation">)</span> <span class="token operator">&lt;&lt;</span> <span class="token number">10</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span>a<span class="token punctuation">.</span><span class="token function">charCodeAt</span><span class="token punctuation">(</span><span class="token operator">++</span>f<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">1023</span><span class="token punctuation">)</span><span class="token punctuation">,</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">>></span> <span class="token number">18</span> <span class="token operator">|</span> <span class="token number">240</span><span class="token punctuation">,</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">>></span> <span class="token number">12</span> <span class="token operator">&amp;</span> <span class="token number">63</span> <span class="token operator">|</span> <span class="token number">128</span><span class="token punctuation">)</span> <span class="token operator">:</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">>></span> <span class="token number">12</span> <span class="token operator">|</span> <span class="token number">224</span><span class="token punctuation">,</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">>></span> <span class="token number">6</span> <span class="token operator">&amp;</span> <span class="token number">63</span> <span class="token operator">|</span> <span class="token number">128</span><span class="token punctuation">)</span><span class="token punctuation">,</span> g<span class="token punctuation">[</span>d<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> c <span class="token operator">&amp;</span> <span class="token number">63</span> <span class="token operator">|</span> <span class="token number">128</span><span class="token punctuation">)</span>
+    <span class="token punctuation">&#125;</span>
+    a <span class="token operator">=</span> h<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>d <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> d <span class="token operator">&lt;</span> g<span class="token punctuation">.</span>length<span class="token punctuation">;</span> d<span class="token operator">++</span><span class="token punctuation">)</span> a <span class="token operator">+=</span> g<span class="token punctuation">[</span>d<span class="token punctuation">]</span><span class="token punctuation">,</span> a <span class="token operator">=</span> <span class="token function">b</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> <span class="token string">"+-a^+6"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    a <span class="token operator">=</span> <span class="token function">b</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> <span class="token string">"+-3^+b+-f"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    a <span class="token operator">^=</span> <span class="token function">Number</span><span class="token punctuation">(</span>e<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">||</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token number">0</span> <span class="token operator">></span> a <span class="token operator">&amp;&amp;</span> <span class="token punctuation">(</span>a <span class="token operator">=</span> <span class="token punctuation">(</span>a <span class="token operator">&amp;</span> <span class="token number">2147483647</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">2147483648</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    a <span class="token operator">%=</span> <span class="token number">1E6</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> a<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">"."</span> <span class="token operator">+</span> <span class="token punctuation">(</span>a <span class="token operator">^</span> h<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>得到tk以后就可以爬取谷歌翻译了</p>
+<h1 id="3-可能遇到的错误"><a href="#3-可能遇到的错误" class="headerlink" title="(3)　可能遇到的错误"></a>(3)　可能遇到的错误</h1><pre class="line-numbers language-html" data-language="html"><code class="language-html"><span class="token doctype"><span class="token punctuation">&lt;!</span><span class="token doctype-tag">DOCTYPE</span> <span class="token name">html</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>html</span> <span class="token attr-name">lang</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span>en</span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>meta</span> <span class="token attr-name">charset</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span>utf-8</span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>meta</span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span>viewport</span> <span class="token attr-name">content</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>initial-scale=1, minimum-scale=1, width=device-width<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>title</span><span class="token punctuation">></span></span>Error 413 (Request Entity Too Large)!!1<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>title</span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>style</span><span class="token punctuation">></span></span><span class="token style"><span class="token language-css">
+    <span class="token selector">*</span><span class="token punctuation">&#123;</span><span class="token property">margin</span><span class="token punctuation">:</span>0<span class="token punctuation">;</span><span class="token property">padding</span><span class="token punctuation">:</span>0<span class="token punctuation">&#125;</span><span class="token selector">html,code</span><span class="token punctuation">&#123;</span><span class="token property">font</span><span class="token punctuation">:</span>15px/22px arial<span class="token punctuation">,</span>sans-serif<span class="token punctuation">&#125;</span><span class="token selector">html</span><span class="token punctuation">&#123;</span><span class="token property">background</span><span class="token punctuation">:</span>#fff<span class="token punctuation">;</span><span class="token property">color</span><span class="token punctuation">:</span>#222<span class="token punctuation">;</span><span class="token property">padding</span><span class="token punctuation">:</span>15px<span class="token punctuation">&#125;</span><span class="token selector">body</span><span class="token punctuation">&#123;</span><span class="token property">margin</span><span class="token punctuation">:</span>7% auto 0<span class="token punctuation">;</span><span class="token property">max-width</span><span class="token punctuation">:</span>390px<span class="token punctuation">;</span><span class="token property">min-height</span><span class="token punctuation">:</span>180px<span class="token punctuation">;</span><span class="token property">padding</span><span class="token punctuation">:</span>30px 0 15px<span class="token punctuation">&#125;</span><span class="token selector">* > body</span><span class="token punctuation">&#123;</span><span class="token property">background</span><span class="token punctuation">:</span><span class="token url"><span class="token function">url</span><span class="token punctuation">(</span>//www.google.com/images/errors/robot.png<span class="token punctuation">)</span></span> 100% 5px no-repeat<span class="token punctuation">;</span><span class="token property">padding-right</span><span class="token punctuation">:</span>205px<span class="token punctuation">&#125;</span><span class="token selector">p</span><span class="token punctuation">&#123;</span><span class="token property">margin</span><span class="token punctuation">:</span>11px 0 22px<span class="token punctuation">;</span><span class="token property">overflow</span><span class="token punctuation">:</span>hidden<span class="token punctuation">&#125;</span><span class="token selector">ins</span><span class="token punctuation">&#123;</span><span class="token property">color</span><span class="token punctuation">:</span>#777<span class="token punctuation">;</span><span class="token property">text-decoration</span><span class="token punctuation">:</span>none<span class="token punctuation">&#125;</span><span class="token selector">a img</span><span class="token punctuation">&#123;</span><span class="token property">border</span><span class="token punctuation">:</span>0<span class="token punctuation">&#125;</span><span class="token atrule"><span class="token rule">@media</span> screen <span class="token keyword">and</span> <span class="token punctuation">(</span><span class="token property">max-width</span><span class="token punctuation">:</span>772px<span class="token punctuation">)</span></span><span class="token punctuation">&#123;</span><span class="token selector">body</span><span class="token punctuation">&#123;</span><span class="token property">background</span><span class="token punctuation">:</span>none<span class="token punctuation">;</span><span class="token property">margin-top</span><span class="token punctuation">:</span>0<span class="token punctuation">;</span><span class="token property">max-width</span><span class="token punctuation">:</span>none<span class="token punctuation">;</span><span class="token property">padding-right</span><span class="token punctuation">:</span>0<span class="token punctuation">&#125;</span><span class="token punctuation">&#125;</span><span class="token selector">#logo</span><span class="token punctuation">&#123;</span><span class="token property">background</span><span class="token punctuation">:</span><span class="token url"><span class="token function">url</span><span class="token punctuation">(</span>//www.google.com/images/branding/googlelogo/1x/googlelogo_color_150x54dp.png<span class="token punctuation">)</span></span> no-repeat<span class="token punctuation">;</span><span class="token property">margin-left</span><span class="token punctuation">:</span>-5px<span class="token punctuation">&#125;</span><span class="token atrule"><span class="token rule">@media</span> <span class="token keyword">only</span> screen <span class="token keyword">and</span> <span class="token punctuation">(</span><span class="token property">min-resolution</span><span class="token punctuation">:</span>192dpi<span class="token punctuation">)</span></span><span class="token punctuation">&#123;</span><span class="token selector">#logo</span><span class="token punctuation">&#123;</span><span class="token property">background</span><span class="token punctuation">:</span><span class="token url"><span class="token function">url</span><span class="token punctuation">(</span>//www.google.com/images/branding/googlelogo/2x/googlelogo_color_150x54dp.png<span class="token punctuation">)</span></span> no-repeat 0% 0%/100% 100%<span class="token punctuation">;</span><span class="token property">-moz-border-image</span><span class="token punctuation">:</span><span class="token url"><span class="token function">url</span><span class="token punctuation">(</span>//www.google.com/images/branding/googlelogo/2x/googlelogo_color_150x54dp.png<span class="token punctuation">)</span></span> 0<span class="token punctuation">&#125;</span><span class="token punctuation">&#125;</span><span class="token atrule"><span class="token rule">@media</span> <span class="token keyword">only</span> screen <span class="token keyword">and</span> <span class="token punctuation">(</span><span class="token property">-webkit-min-device-pixel-ratio</span><span class="token punctuation">:</span>2<span class="token punctuation">)</span></span><span class="token punctuation">&#123;</span><span class="token selector">#logo</span><span class="token punctuation">&#123;</span><span class="token property">background</span><span class="token punctuation">:</span><span class="token url"><span class="token function">url</span><span class="token punctuation">(</span>//www.google.com/images/branding/googlelogo/2x/googlelogo_color_150x54dp.png<span class="token punctuation">)</span></span> no-repeat<span class="token punctuation">;</span><span class="token property">-webkit-background-size</span><span class="token punctuation">:</span>100% 100%<span class="token punctuation">&#125;</span><span class="token punctuation">&#125;</span><span class="token selector">#logo</span><span class="token punctuation">&#123;</span><span class="token property">display</span><span class="token punctuation">:</span>inline-block<span class="token punctuation">;</span><span class="token property">height</span><span class="token punctuation">:</span>54px<span class="token punctuation">;</span><span class="token property">width</span><span class="token punctuation">:</span>150px<span class="token punctuation">&#125;</span>
+  </span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>style</span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>a</span> <span class="token attr-name">href</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span>//www.google.com/</span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>span</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span>logo</span> <span class="token attr-name">aria-label</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span>Google</span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>span</span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>a</span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>p</span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>b</span><span class="token punctuation">></span></span>413.<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>b</span><span class="token punctuation">></span></span> <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>ins</span><span class="token punctuation">></span></span>That’s an error.<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>ins</span><span class="token punctuation">></span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>p</span><span class="token punctuation">></span></span>Your client issued a request that was too large.
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>ins</span><span class="token punctuation">></span></span>That’s all we know.<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>ins</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>html</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>文件太大，字数超过5000字</p>
+<p>  总体来说，谷歌还是比较给面子的，爬了几万条也没有封我ip。<br>  换句话说，假如谷歌封我ip，我可能会为了翻译这几万条用代理+策略访问几十万次，反而会对它的服务器造成压力。<br>  这一点我是非常敬佩的。<br>  毕竟，程序员何苦为难程序员。</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/by-dream/p/6554340.html">http://www.cnblogs.com/by-dream/p/6554340.html</a>　　破解google翻译API全过程<br>[2] <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/47239748">https://www.zhihu.com/question/47239748</a>　　请问如何调用谷歌翻译API?<br>[3] <a target="_blank" rel="noopener" href="https://github.com/yixianle/google-translate">https://github.com/yixianle/google-translate</a>　　翻译工具 支持网页翻译和文本翻译<br>[4] <a target="_blank" rel="noopener" href="https://cnodejs.org/topic/58c94ea659017af119c1d31b">https://cnodejs.org/topic/58c94ea659017af119c1d31b</a>　　给大家分享一个免费的谷歌翻译api<br>[5] <a target="_blank" rel="noopener" href="https://www.crifan.com/teach_you_how_to_find_free_google_translate_api/">https://www.crifan.com/teach_you_how_to_find_free_google_translate_api/</a><br>[6] <a target="_blank" rel="noopener" href="http://blog.sina.com.cn/s/blog_8af106960102vci1.html">http://blog.sina.com.cn/s/blog_8af106960102vci1.html</a>　　调用Google翻译 api测试  2015-01-20<br>[7] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/wcymiss/p/6264847.html">http://www.cnblogs.com/wcymiss/p/6264847.html</a>　　VBA：Google翻译（含tk算法）</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/11/13/knowledge-graph/" rel="prev" title="知识图谱">
+                  <i class="fa fa-chevron-left"></i> 知识图谱
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/11/15/java-interview/" rel="next" title="Java">
+                  Java <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

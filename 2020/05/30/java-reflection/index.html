@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="在提高代码的抽象性、可扩展性时，经常需要动态地获取一些类、方法或者属性。这个时候往往需要通过反射去获取。  比如 加载数据库驱动、打印日志获取类、Spring IOC加载Bean 等。  Class.forName(&quot;com.mysql.jdbc.Driver&quot;);  private final Logger log &#x3D; LoggerFactory.getLogger(getClass());">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java 反射 笔记">
+<meta property="og:url" content="http://weikeqin.com/2020/05/30/java-reflection/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在提高代码的抽象性、可扩展性时，经常需要动态地获取一些类、方法或者属性。这个时候往往需要通过反射去获取。  比如 加载数据库驱动、打印日志获取类、Spring IOC加载Bean 等。  Class.forName(&quot;com.mysql.jdbc.Driver&quot;);  private final Logger log &#x3D; LoggerFactory.getLogger(getClass());">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/file/jvm/class/java-class-life-cycle.png">
+<meta property="og:image" content="http://weikeqin.com/img/java/reflection/java-basic-reflection-flow.png">
+<meta property="article:published_time" content="2020-05-30T08:46:52.000Z">
+<meta property="article:modified_time" content="2022-06-04T04:58:32.334Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="basic">
+<meta property="article:tag" content="reflection">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/file/jvm/class/java-class-life-cycle.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/05/30/java-reflection/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/05/30/java-reflection/","path":"2020/05/30/java-reflection/","title":"Java 反射 笔记"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Java 反射 笔记 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%8F%8D%E5%B0%84"><span class="nav-number">1.</span> <span class="nav-text">(1) 反射</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E5%8F%8D%E5%B0%84%E4%BD%BF%E7%94%A8"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 反射使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E5%8F%8D%E5%B0%84%E7%9A%84%E4%BC%98%E7%BC%BA%E7%82%B9"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 反射的优缺点</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%8F%8D%E5%B0%84%E5%9F%BA%E7%A1%80"><span class="nav-number">2.</span> <span class="nav-text">(2) 反射基础</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-Class%E7%B1%BB"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) Class类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-%E7%B1%BB%E5%8A%A0%E8%BD%BD"><span class="nav-number">2.1.1.</span> <span class="nav-text">(2.2.1) 类加载</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-2-Class%E5%AF%B9%E8%B1%A1%E5%B8%B8%E7%94%A8%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.2.</span> <span class="nav-text">(2.2.2) Class对象常用方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-Constructor%E7%B1%BB%E5%8F%8A%E5%85%B6%E7%94%A8%E6%B3%95"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) Constructor类及其用法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-Method%E7%B1%BB%E5%8F%8A%E5%85%B6%E7%94%A8%E6%B3%95"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) Method类及其用法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-Field%E7%B1%BB%E5%8F%8A%E5%85%B6%E7%94%A8%E6%B3%95"><span class="nav-number">2.4.</span> <span class="nav-text">(2.4) Field类及其用法</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%8F%8D%E5%B0%84%E4%BD%BF%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">(3) 反射使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-Class%E5%AF%B9%E8%B1%A1%E8%8E%B7%E5%8F%96"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) Class对象获取</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E9%80%9A%E8%BF%87%E5%8F%8D%E5%B0%84%E5%88%9B%E5%BB%BA%E7%B1%BB%E5%AF%B9%E8%B1%A1"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 通过反射创建类对象</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E9%80%9A%E8%BF%87%E5%8F%8D%E5%B0%84%E8%8E%B7%E5%8F%96%E7%B1%BB%E7%9A%84%E6%9E%84%E9%80%A0%E5%99%A8"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 通过反射获取类的构造器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E9%80%9A%E8%BF%87%E5%8F%8D%E5%B0%84%E8%8E%B7%E5%8F%96%E7%B1%BB%E5%B1%9E%E6%80%A7"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 通过反射获取类属性</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-%E9%80%9A%E8%BF%87%E5%8F%8D%E5%B0%84%E8%8E%B7%E5%8F%96%E7%B1%BB%E7%9A%84%E6%96%B9%E6%B3%95"><span class="nav-number">3.5.</span> <span class="nav-text">(3.5) 通过反射获取类的方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-6-%E8%8E%B7%E5%8F%96%E7%B1%BB%E5%90%8D"><span class="nav-number">3.6.</span> <span class="nav-text">(3.6) 获取类名</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%8F%8D%E5%B0%84%E6%9C%BA%E5%88%B6%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B"><span class="nav-number">4.</span> <span class="nav-text">(4) 反射机制执行流程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E5%8F%8D%E5%B0%84%E8%8E%B7%E5%8F%96%E7%B1%BB%E5%AE%9E%E4%BE%8B-Class-forName"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 反射获取类实例 Class.forName()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E5%8F%8D%E5%B0%84%E8%8E%B7%E5%8F%96%E6%9E%84%E9%80%A0%E6%96%B9%E6%B3%95-clz-getConstructor"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 反射获取构造方法  clz.getConstructor()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E4%BD%BF%E7%94%A8Constructor%E5%AF%B9%E8%B1%A1%E7%9A%84newInstance%E6%96%B9%E6%B3%95%E8%8E%B7%E5%8F%96%E5%8F%8D%E5%B0%84%E7%B1%BB%E5%AF%B9%E8%B1%A1-constructor-newInstance"><span class="nav-number">4.3.</span> <span class="nav-text">(4.3) 使用Constructor对象的newInstance方法获取反射类对象 constructor.newInstance()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E5%8F%8D%E5%B0%84%E8%8E%B7%E5%8F%96%E6%96%B9%E6%B3%95-clz-getMethod"><span class="nav-number">4.4.</span> <span class="nav-text">(4.4) 反射获取方法 clz.getMethod()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-5-%E8%B0%83%E7%94%A8%E6%96%B9%E6%B3%95-method-invoke"><span class="nav-number">4.5.</span> <span class="nav-text">(4.5) 调用方法 method.invoke()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E4%BB%96"><span class="nav-number">4.6.</span> <span class="nav-text">其他</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">参考</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/30/java-reflection/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Java 反射 笔记
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-05-30 16:46:52" itemprop="dateCreated datePublished" datetime="2020-05-30T16:46:52+08:00">2020-05-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-06-04 12:58:32" itemprop="dateModified" datetime="2022-06-04T12:58:32+08:00">2022-06-04</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/05/30/java-reflection/" class="post-meta-item leancloud_visitors" data-flag-title="Java 反射 笔记" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  在提高代码的抽象性、可扩展性时，经常需要动态地获取一些类、方法或者属性。这个时候往往需要通过反射去获取。<br>  比如 加载数据库驱动、打印日志获取类、Spring IOC加载Bean 等。 </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span><span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span><span class="token string">"com.mysql.jdbc.Driver"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Logger</span> log <span class="token operator">=</span> <span class="token class-name">LoggerFactory</span><span class="token punctuation">.</span><span class="token function">getLogger</span><span class="token punctuation">(</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<span id="more"></span>
+
+
+<h1 id="1-反射"><a href="#1-反射" class="headerlink" title="(1) 反射"></a>(1) 反射</h1><p>  Java的反射(reflection)机制是指在程序的运行状态中，可以构造任意一个类的对象，可以构造任意一个对象所属的类，可以构造任意一个类的成员变量和方法，可以调用任意一个对象的属性和方法。这种动态获取程序信息以及动态调用对象的功能称为Java语言的反射机制。</p>
+<p>  反射被视为动态语言的关键。</p>
+<h2 id="1-1-反射使用"><a href="#1-1-反射使用" class="headerlink" title="(1.1) 反射使用"></a>(1.1) 反射使用</h2><p>  对比一下日常创建对象和用反射创建对象</p>
+<p><strong>日常创建一个UserModel类</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 正常使用</span>
+    <span class="token class-name">UserModel</span> userModel <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">UserModel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    userModel<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span><span class="token number">1L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    userModel<span class="token punctuation">.</span><span class="token function">setUserName</span><span class="token punctuation">(</span><span class="token string">"张三"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>userModel<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// UserModel&#123;id=1, userName='张三'&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　<br><strong>通过反射创建UserModel类</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span>  <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 通过反射获取类的 Class 对象实例</span>
+        <span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">Class</span><span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span><span class="token string">"cn.wkq.java.reflection.UserModel"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 根据 Class 对象实例获取 Constructor 对象</span>
+        <span class="token class-name">Constructor</span> constructor <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 使用 Constructor 对象的 newInstance 方法获取反射类对象</span>
+        <span class="token class-name">Object</span> object <span class="token operator">=</span> constructor<span class="token punctuation">.</span><span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>object<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// UserModel&#123;id=null, userName='null'&#125;</span>
+        <span class="token comment">// 获取方法的 Method 对象 </span>
+        <span class="token class-name">Method</span> method <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getMethod</span><span class="token punctuation">(</span><span class="token string">"setId"</span><span class="token punctuation">,</span> <span class="token class-name">Long</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 利用 invoke 方法调用方法</span>
+        method<span class="token punctuation">.</span><span class="token function">invoke</span><span class="token punctuation">(</span>object<span class="token punctuation">,</span> <span class="token number">4L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>object<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// UserModel&#123;id=4, userName='null'&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>reflection</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * @author weikeqin
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">UserModel</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 用户ID
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">Long</span> id<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 用户名
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> userName<span class="token punctuation">;</span>
+
+    <span class="token comment">// 省略 getter setter</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token string">"UserModel&#123;"</span> <span class="token operator">+</span>
+                <span class="token string">"id="</span> <span class="token operator">+</span> id <span class="token operator">+</span>
+                <span class="token string">", userName='"</span> <span class="token operator">+</span> userName <span class="token operator">+</span> <span class="token char">'\''</span> <span class="token operator">+</span>
+                <span class="token char">'&#125;'</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h2 id="1-2-反射的优缺点"><a href="#1-2-反射的优缺点" class="headerlink" title="(1.2) 反射的优缺点"></a>(1.2) 反射的优缺点</h2><p><strong>优点</strong></p>
+<blockquote>
+<p>在运行时获得类的各种内容，能够让我们很方便的创建灵活的代码，这些代码可以在运行时装配，无需在组件之间进行源代码的链接，更加容易实现面向对象。</p>
+</blockquote>
+<p><strong>缺点</strong></p>
+<blockquote>
+<p>反射会消耗一定的系统资源，频繁调用性能较差<br>反射调用方法时可以忽略权限检查，因此可能会破坏封装性而导致安全问题。</p>
+</blockquote>
+<p>　<br><br></p>
+<h1 id="2-反射基础"><a href="#2-反射基础" class="headerlink" title="(2) 反射基础"></a>(2) 反射基础</h1><p>  Class 和 java.lang.reflect 一起对反射提供了支持。<br>  java.lang.reflect 类库主要包含了以下三个类: </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// Constructor : 可以用 Constructor 创建新的对象。</span>
+<span class="token class-name">Java</span><span class="token punctuation">.</span>lang<span class="token punctuation">.</span>reflect<span class="token punctuation">.</span>Constructor<span class="token punctuation">;</span>  
+
+<span class="token comment">// Field : 可以使用 get() 和 set() 方法读取和修改 Field 对象关联的字段； </span>
+<span class="token class-name">Java</span><span class="token punctuation">.</span>lang<span class="token punctuation">.</span>reflect<span class="token punctuation">.</span>Field<span class="token punctuation">;</span>        
+
+<span class="token comment">// Method : 可以使用 invoke() 方法调用与 Method 对象关联的方法； </span>
+<span class="token class-name">Java</span><span class="token punctuation">.</span>lang<span class="token punctuation">.</span>reflect<span class="token punctuation">.</span>Method<span class="token punctuation">;</span>       <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>　</p>
+<h2 id="2-1-Class类"><a href="#2-1-Class类" class="headerlink" title="(2.1) Class类"></a>(2.1) Class类</h2><blockquote>
+<p>Class类，Class类也是一个实实在在的类，存在于JDK的java.lang包中。<br>Class类的实例表示java应用运行时的类(class、enum)或接口(interface、annotation)。<br>数组同样也被映射为class 对象的一个类，所有具有相同元素类型和维数的数组都共享该 Class 对象。<br>基本类型boolean，byte，char，short，int，long，float，double和关键字void同样表现为 class 对象。</p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * Instances of the class &#123;@code Class&#125; represent classes and
+ * interfaces in a running Java application.  An enum is a kind of
+ * class and an annotation is a kind of interface.  Every array also
+ * belongs to a class that is reflected as a &#123;@code Class&#125; object
+ * that is shared by all arrays with the same element type and number
+ * of dimensions.  The primitive Java types (&#123;@code boolean&#125;,
+ * &#123;@code byte&#125;, &#123;@code char&#125;, &#123;@code short&#125;,
+ * &#123;@code int&#125;, &#123;@code long&#125;, &#123;@code float&#125;, and
+ * &#123;@code double&#125;), and the keyword &#123;@code void&#125; are also
+ * represented as &#123;@code Class&#125; objects.
+ *
+ * &lt;p> &#123;@code Class&#125; has no public constructor. Instead &#123;@code Class&#125;
+ * objects are constructed automatically by the Java Virtual Machine as classes
+ * are loaded and by calls to the &#123;@code defineClass&#125; method in the class
+ * loader.
+ *
+ * &lt;p> The following example uses a &#123;@code Class&#125; object to print the
+ * class name of an object:
+ *
+ * &lt;blockquote>&lt;pre>
+ *     void printClassName(Object obj) &#123;
+ *         System.out.println("The class of " + obj +
+ *                            " is " + obj.getClass().getName());
+ *     &#125;
+ * &lt;/pre>&lt;/blockquote>
+ *
+ * &lt;p> It is also possible to get the &#123;@code Class&#125; object for a named
+ * type (or for void) using a class literal.  See Section 15.8.2 of
+ * &lt;cite>The Java&amp;trade; Language Specification&lt;/cite>.
+ * For example:
+ *
+ * &lt;blockquote>
+ *     &#123;@code System.out.println("The name of class Foo is: "+Foo.class.getName());&#125;
+ * &lt;/blockquote>
+ *
+ * @param &lt;T> the type of the class modeled by this &#123;@code Class&#125;
+ * object.  For example, the type of &#123;@code String.class&#125; is &#123;@code
+ * Class&lt;String>&#125;.  Use &#123;@code Class&lt;?>&#125; if the class being modeled is
+ * unknown.
+ *
+ * @author  unascribed
+ * @see     java.lang.ClassLoader#defineClass(byte[], int, int)
+ * @since   JDK1.0
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">implements</span> <span class="token class-name"><span class="token namespace">java<span class="token punctuation">.</span>io<span class="token punctuation">.</span></span>Serializable</span><span class="token punctuation">,</span>
+                              <span class="token class-name">GenericDeclaration</span><span class="token punctuation">,</span>
+                              <span class="token class-name">Type</span><span class="token punctuation">,</span>
+                              <span class="token class-name">AnnotatedElement</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> ANNOTATION<span class="token operator">=</span> <span class="token number">0x00002000</span><span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> ENUM      <span class="token operator">=</span> <span class="token number">0x00004000</span><span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> SYNTHETIC <span class="token operator">=</span> <span class="token number">0x00001000</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">native</span> <span class="token keyword">void</span> <span class="token function">registerNatives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">static</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">registerNatives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/*
+     * Private constructor. Only the Java Virtual Machine creates Class objects.
+     * This constructor is not used and prevents the default constructor being
+     * generated.
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">Class</span><span class="token punctuation">(</span><span class="token class-name">ClassLoader</span> loader<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Initialize final field for classLoader.  The initialization value of non-null</span>
+        <span class="token comment">// prevents future JIT optimizations from assuming this final field is null.</span>
+        classLoader <span class="token operator">=</span> loader<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     * Returns the &#123;@code Class&#125; object associated with the class or
+     * interface with the given string name.  Invoking this method is
+     * equivalent to:
+     *
+     * &lt;blockquote>
+     *  &#123;@code Class.forName(className, true, currentLoader)&#125;
+     * &lt;/blockquote>
+     *
+     * where &#123;@code currentLoader&#125; denotes the defining class loader of
+     * the current class.
+     *
+     * &lt;p> For example, the following code fragment returns the
+     * runtime &#123;@code Class&#125; descriptor for the class named
+     * &#123;@code java.lang.Thread&#125;:
+     *
+     * &lt;blockquote>
+     *   &#123;@code Class t = Class.forName("java.lang.Thread")&#125;
+     * &lt;/blockquote>
+     * &lt;p>
+     * A call to &#123;@code forName("X")&#125; causes the class named
+     * &#123;@code X&#125; to be initialized.
+     *
+     * @param      className   the fully qualified name of the desired class.
+     * @return     the &#123;@code Class&#125; object for the class with the
+     *             specified name.
+     * @exception LinkageError if the linkage fails
+     * @exception ExceptionInInitializerError if the initialization provoked
+     *            by this method fails
+     * @exception ClassNotFoundException if the class cannot be located
+     */</span>
+    <span class="token annotation punctuation">@CallerSensitive</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> <span class="token function">forName</span><span class="token punctuation">(</span><span class="token class-name">String</span> className<span class="token punctuation">)</span>
+                <span class="token keyword">throws</span> <span class="token class-name">ClassNotFoundException</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> caller <span class="token operator">=</span> <span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">getCallerClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token function">forName0</span><span class="token punctuation">(</span>className<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token class-name">ClassLoader</span><span class="token punctuation">.</span><span class="token function">getClassLoader</span><span class="token punctuation">(</span>caller<span class="token punctuation">)</span><span class="token punctuation">,</span> caller<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>到这我们也就可以得出以下几点信息： </p>
+<blockquote>
+<ol>
+<li>Class类也是类的一种，与class关键字是不一样的。 </li>
+<li>手动编写的类被编译后会产生一个Class对象，其表示的是创建的类的类型信息，而且这个Class对象保存在同名.class的文件中(字节码文件) 。</li>
+<li>每个通过关键字class标识的类，在内存中有且只有一个与之对应的Class对象来描述其类型信息，无论创建多少个实例对象，其依据的都是用一个Class对象。 </li>
+<li>Class类只存私有构造函数，因此对应Class对象只能由JVM创建和加载。 </li>
+<li>Class类的对象作用是运行时提供或获得某个对象的类型信息，这点对于反射技术很重要(关于反射稍后分析)。</li>
+</ol>
+</blockquote>
+<h3 id="2-2-1-类加载"><a href="#2-2-1-类加载" class="headerlink" title="(2.2.1) 类加载"></a>(2.2.1) 类加载</h3><p>　<a href="./2019/06/01/jvm-class-loader/">Java类加载机制</a></p>
+<p>　<a href="">Java类字节码详解</a></p>
+<p> <img src="/file/jvm/class/java-class-life-cycle.png" alt="Java类生命周期"></p>
+<h3 id="2-2-2-Class对象常用方法"><a href="#2-2-2-Class对象常用方法" class="headerlink" title="(2.2.2) Class对象常用方法"></a>(2.2.2) Class对象常用方法</h3><table>
+<thead>
+<tr>
+<th align="left">方法名</th>
+<th align="left">说明</th>
+<th align="left">用例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">forName()</td>
+<td align="left">1.获取Class对象的一个引用，但引用的类还没有加载(该类的第一个对象没有生成)就加载了这个类。 <br> 2. 为了产生Class引用，forName()立即就进行了初始化。</td>
+<td align="left"><code>Class.forName(&quot;com.mysql.jdbc.Driver&quot;);</code></td>
+</tr>
+<tr>
+<td align="left">getClass()</td>
+<td align="left">获取Class对象的一个引用，返回表示该对象的实际类型的Class引用。</td>
+<td align="left"><code>LoggerFactory.getLogger(getClass());</code></td>
+</tr>
+<tr>
+<td align="left">getName()</td>
+<td align="left">取全限定的类名(包括包名)，即类的完整名字。</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">isInterface()</td>
+<td align="left">判断Class对象是否是表示一个接口</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">getInterfaces()</td>
+<td align="left">获取接口</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">getSupercalss()</td>
+<td align="left">获取父类</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">newInstance()</td>
+<td align="left">创建实例</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">getFields()</td>
+<td align="left">获取公有方法</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">getDeclaredFields()</td>
+<td align="left">获取所有方法(包括私有方法)</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">getConstructor()</td>
+<td align="left">获取构造函数</td>
+<td align="left"></td>
+</tr>
+</tbody></table>
+<h2 id="2-2-Constructor类及其用法"><a href="#2-2-Constructor类及其用法" class="headerlink" title="(2.2) Constructor类及其用法"></a>(2.2) Constructor类及其用法</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * &#123;@code Constructor&#125; provides information about, and access to, a single
+ * constructor for a class.
+ *
+ * &lt;p>&#123;@code Constructor&#125; permits widening conversions to occur when matching the
+ * actual parameters to newInstance() with the underlying
+ * constructor's formal parameters, but throws an
+ * &#123;@code IllegalArgumentException&#125; if a narrowing conversion would occur.
+ *
+ * @param &lt;T> the class in which the constructor is declared
+ *
+ * @see Member
+ * @see java.lang.Class
+ * @see java.lang.Class#getConstructors()
+ * @see java.lang.Class#getConstructor(Class[])
+ * @see java.lang.Class#getDeclaredConstructors()
+ *
+ * @author      Kenneth Russell
+ * @author      Nakul Saraiya
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">Executable</span> <span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="2-3-Method类及其用法"><a href="#2-3-Method类及其用法" class="headerlink" title="(2.3) Method类及其用法"></a>(2.3) Method类及其用法</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * A &#123;@code Method&#125; provides information about, and access to, a single method
+ * on a class or interface.  The reflected method may be a class method
+ * or an instance method (including an abstract method).
+ *
+ * &lt;p>A &#123;@code Method&#125; permits widening conversions to occur when matching the
+ * actual parameters to invoke with the underlying method's formal
+ * parameters, but it throws an &#123;@code IllegalArgumentException&#125; if a
+ * narrowing conversion would occur.
+ *
+ * @see Member
+ * @see java.lang.Class
+ * @see java.lang.Class#getMethods()
+ * @see java.lang.Class#getMethod(String, Class[])
+ * @see java.lang.Class#getDeclaredMethods()
+ * @see java.lang.Class#getDeclaredMethod(String, Class[])
+ *
+ * @author Kenneth Russell
+ * @author Nakul Saraiya
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">Method</span> <span class="token keyword">extends</span> <span class="token class-name">Executable</span> <span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="2-4-Field类及其用法"><a href="#2-4-Field类及其用法" class="headerlink" title="(2.4) Field类及其用法"></a>(2.4) Field类及其用法</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * A &#123;@code Field&#125; provides information about, and dynamic access to, a
+ * single field of a class or an interface.  The reflected field may
+ * be a class (static) field or an instance field.
+ *
+ * &lt;p>A &#123;@code Field&#125; permits widening conversions to occur during a get or
+ * set access operation, but throws an &#123;@code IllegalArgumentException&#125; if a
+ * narrowing conversion would occur.
+ *
+ * @see Member
+ * @see java.lang.Class
+ * @see java.lang.Class#getFields()
+ * @see java.lang.Class#getField(String)
+ * @see java.lang.Class#getDeclaredFields()
+ * @see java.lang.Class#getDeclaredField(String)
+ *
+ * @author Kenneth Russell
+ * @author Nakul Saraiya
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span>
+<span class="token keyword">class</span> <span class="token class-name">Field</span> <span class="token keyword">extends</span> <span class="token class-name">AccessibleObject</span> <span class="token keyword">implements</span> <span class="token class-name">Member</span> <span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="3-反射使用"><a href="#3-反射使用" class="headerlink" title="(3) 反射使用"></a>(3) 反射使用</h1><p>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/8/docs/api/">https://docs.oracle.com/javase/8/docs/api/</a></p>
+<p>反射机制常用的类</p>
+<p>  Class 和 java.lang.reflect 一起对反射提供了支持<br>  java.lang.reflect 类库主要包含了以下三个类: </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// Constructor : 可以用 Constructor 创建新的对象。</span>
+<span class="token class-name">Java</span><span class="token punctuation">.</span>lang<span class="token punctuation">.</span>reflect<span class="token punctuation">.</span>Constructor<span class="token punctuation">;</span>  
+
+<span class="token comment">// Field : 可以使用 get() 和 set() 方法读取和修改 Field 对象关联的字段； </span>
+<span class="token class-name">Java</span><span class="token punctuation">.</span>lang<span class="token punctuation">.</span>reflect<span class="token punctuation">.</span>Field<span class="token punctuation">;</span>        
+
+<span class="token comment">// Method : 可以使用 invoke() 方法调用与 Method 对象关联的方法； </span>
+<span class="token class-name">Java</span><span class="token punctuation">.</span>lang<span class="token punctuation">.</span>reflect<span class="token punctuation">.</span>Method<span class="token punctuation">;</span>       <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-1-Class对象获取"><a href="#3-1-Class对象获取" class="headerlink" title="(3.1) Class对象获取"></a>(3.1) Class对象获取</h2><p>  获取反射中的Class对象有3种方法</p>
+<p><strong>1. 使用 Class.forName 静态方法</strong><br>  当你知道该类的全路径名时，你可以使用该方法获取 Class 类对象。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span><span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span><span class="token string">"com.mysql.jdbc.Driver"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>　<br><strong>2. 使用 .class 方法</strong><br>  这种方法只适合在编译前就知道操作的 Class。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>　<br><strong>3. 使用类对象的 getClass() 方法</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Logger</span> log <span class="token operator">=</span> <span class="token class-name">LoggerFactory</span><span class="token punctuation">.</span><span class="token function">getLogger</span><span class="token punctuation">(</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+<h2 id="3-2-通过反射创建类对象"><a href="#3-2-通过反射创建类对象" class="headerlink" title="(3.2) 通过反射创建类对象"></a>(3.2) 通过反射创建类对象</h2><p><strong>1. 通过<code>Class</code>对象的<code>newInstance()</code>方法创建类对象</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 通过`Class`对象的`newInstance()`方法创建类对象</span>
+<span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">UserModel</span> userModel <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">UserModel</span><span class="token punctuation">)</span> clz<span class="token punctuation">.</span><span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<p>　<br><strong>2. 通过<code>Constructor</code>对象的<code>newInstance()</code>方法创建类对象</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 通过`Constructor`对象的`newInstance()`方法创建类对象</span>
+<span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">Constructor</span> constructor <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">UserModel</span> userModel <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">UserModel</span><span class="token punctuation">)</span> constructor<span class="token punctuation">.</span><span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h2 id="3-3-通过反射获取类的构造器"><a href="#3-3-通过反射获取类的构造器" class="headerlink" title="(3.3) 通过反射获取类的构造器"></a>(3.3) 通过反射获取类的构造器</h2><p> <strong>1. 获取类的构造器</strong></p>
+<p> 通过 getConstructor() 方法获取类的构造器  入参选填(入参不同，获取的构造器不同)</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">Constructor</span> c <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// public cn.wkq.java.reflection.UserModel()</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>对应的构造方法是</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">UserModel</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<p>　</p>
+<p> <strong>2. 获取类的指定构造器</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">Constructor</span> c2 <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>c2<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// public cn.wkq.java.reflection.UserModel(java.lang.String)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p> 对应的构造方法是</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">UserModel</span><span class="token punctuation">(</span><span class="token class-name">String</span> userName<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>userName <span class="token operator">=</span> userName<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h2 id="3-4-通过反射获取类属性"><a href="#3-4-通过反射获取类属性" class="headerlink" title="(3.4) 通过反射获取类属性"></a>(3.4) 通过反射获取类属性</h2><p> <strong>1. 获取类的属性</strong></p>
+<p>通过 Class 对象的 getFields() 方法可以获取 Class 类的属性<br>备注: 无法获取私有属性。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">Field</span><span class="token punctuation">[</span><span class="token punctuation">]</span> fields <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getFields</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Field</span> field <span class="token operator">:</span> fields<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>field<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// remark</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p> <strong>2. 获取类的所有属性(包括私有属性)</strong><br>使用 Class 对象的 getDeclaredFields() 方法则可以获取包括私有属性在内的所有属性</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">Field</span><span class="token punctuation">[</span><span class="token punctuation">]</span> fields <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getDeclaredFields</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Field</span> field <span class="token operator">:</span> fields<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>field<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// id</span>
+    <span class="token comment">// userName</span>
+    <span class="token comment">// remark</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="3-5-通过反射获取类的方法"><a href="#3-5-通过反射获取类的方法" class="headerlink" title="(3.5) 通过反射获取类的方法"></a>(3.5) 通过反射获取类的方法</h2><p> <strong>获取类的方法</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">UserModel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">;</span>
+<span class="token class-name">Method</span> method <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getMethod</span><span class="token punctuation">(</span><span class="token string">"setId"</span><span class="token punctuation">,</span> <span class="token class-name">Long</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>method<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// public void cn.wkq.java.reflection.UserModel.setId(java.lang.Long)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h2 id="3-6-获取类名"><a href="#3-6-获取类名" class="headerlink" title="(3.6) 获取类名"></a>(3.6) 获取类名</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">String</span> name <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">String</span> simpleName <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getSimpleName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>simpleName<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// UserModel</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>　</p>
+<h1 id="4-反射机制执行流程"><a href="#4-反射机制执行流程" class="headerlink" title="(4) 反射机制执行流程"></a>(4) 反射机制执行流程</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span>  <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 通过反射获取类的 Class 对象实例</span>
+        <span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">Class</span><span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span><span class="token string">"cn.wkq.java.reflection.UserModel"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 根据 Class 对象实例获取 Constructor 对象</span>
+        <span class="token class-name">Constructor</span> constructor <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 使用 Constructor 对象的 newInstance 方法获取反射类对象</span>
+        <span class="token class-name">Object</span> object <span class="token operator">=</span> constructor<span class="token punctuation">.</span><span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>object<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// UserModel&#123;id=null, userName='null'&#125;</span>
+        <span class="token comment">// 获取方法的 Method 对象 </span>
+        <span class="token class-name">Method</span> method <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getMethod</span><span class="token punctuation">(</span><span class="token string">"setId"</span><span class="token punctuation">,</span> <span class="token class-name">Long</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 利用 invoke 方法调用方法</span>
+        method<span class="token punctuation">.</span><span class="token function">invoke</span><span class="token punctuation">(</span>object<span class="token punctuation">,</span> <span class="token number">4L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>object<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// UserModel&#123;id=4, userName='null'&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　<br> <img src="/img/java/reflection/java-basic-reflection-flow.png" alt="反射机制执行流程"></p>
+<h2 id="4-1-反射获取类实例-Class-forName"><a href="#4-1-反射获取类实例-Class-forName" class="headerlink" title="(4.1) 反射获取类实例 Class.forName()"></a>(4.1) 反射获取类实例 Class.forName()</h2><blockquote>
+<p>Class.forName()反射获取类信息，实现是一个native方法 。</p>
+</blockquote>
+<p> 源码位置：java.lang.Class</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@CallerSensitive</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> <span class="token function">forName</span><span class="token punctuation">(</span><span class="token class-name">String</span> className<span class="token punctuation">)</span>
+            <span class="token keyword">throws</span> <span class="token class-name">ClassNotFoundException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 通过反射获取调用进来的类信息，从而获取当前的 ClassLoader</span>
+    <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> caller <span class="token operator">=</span> <span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">getCallerClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 调用native方法进行获取Class信息</span>
+    <span class="token keyword">return</span> <span class="token function">forName0</span><span class="token punctuation">(</span>className<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token class-name">ClassLoader</span><span class="token punctuation">.</span><span class="token function">getClassLoader</span><span class="token punctuation">(</span>caller<span class="token punctuation">)</span><span class="token punctuation">,</span> caller<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/** Called after security check for system loader access checks have been made. */</span>
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">native</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> <span class="token function">forName0</span><span class="token punctuation">(</span><span class="token class-name">String</span> name<span class="token punctuation">,</span> <span class="token keyword">boolean</span> initialize<span class="token punctuation">,</span>
+                                        <span class="token class-name">ClassLoader</span> loader<span class="token punctuation">,</span>
+                                        <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> caller<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">ClassNotFoundException</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p> 源码位置： java.lang.ClassLoader</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// Returns the class's class loader, or null if none.</span>
+<span class="token keyword">static</span> <span class="token class-name">ClassLoader</span> <span class="token function">getClassLoader</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> caller<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// This can be null if the VM is requesting it</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>caller <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// Circumvent security check since this is package-private</span>
+    <span class="token keyword">return</span> caller<span class="token punctuation">.</span><span class="token function">getClassLoader0</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="4-2-反射获取构造方法-clz-getConstructor"><a href="#4-2-反射获取构造方法-clz-getConstructor" class="headerlink" title="(4.2) 反射获取构造方法  clz.getConstructor()"></a>(4.2) 反射获取构造方法  clz.getConstructor()</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@CallerSensitive</span>
+<span class="token keyword">public</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> parameterTypes<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">NoSuchMethodException</span><span class="token punctuation">,</span> <span class="token class-name">SecurityException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 检查访问权限是否是public</span>
+    <span class="token function">checkMemberAccess</span><span class="token punctuation">(</span><span class="token class-name">Member</span><span class="token punctuation">.</span>PUBLIC<span class="token punctuation">,</span> <span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">getCallerClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 获取public权限的构造方法</span>
+    <span class="token keyword">return</span> <span class="token function">getConstructor0</span><span class="token punctuation">(</span>parameterTypes<span class="token punctuation">,</span> <span class="token class-name">Member</span><span class="token punctuation">.</span>PUBLIC<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">getConstructor0</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> parameterTypes<span class="token punctuation">,</span>
+                                    <span class="token keyword">int</span> which<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">NoSuchMethodException</span>
+<span class="token punctuation">&#123;</span>
+    <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> constructors <span class="token operator">=</span> <span class="token function">privateGetDeclaredConstructors</span><span class="token punctuation">(</span><span class="token punctuation">(</span>which <span class="token operator">==</span> <span class="token class-name">Member</span><span class="token punctuation">.</span>PUBLIC<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> constructor <span class="token operator">:</span> constructors<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">arrayContentsEq</span><span class="token punctuation">(</span>parameterTypes<span class="token punctuation">,</span>
+                            constructor<span class="token punctuation">.</span><span class="token function">getParameterTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token function">getReflectionFactory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">copyConstructor</span><span class="token punctuation">(</span>constructor<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">NoSuchMethodException</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">".&lt;init>"</span> <span class="token operator">+</span> <span class="token function">argumentTypesToString</span><span class="token punctuation">(</span>parameterTypes<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//</span>
+<span class="token comment">//</span>
+<span class="token comment">// java.lang.reflect.Constructor handling</span>
+<span class="token comment">//</span>
+<span class="token comment">//</span>
+
+<span class="token comment">// Returns an array of "root" constructors. These Constructor</span>
+<span class="token comment">// objects must NOT be propagated to the outside world, but must</span>
+<span class="token comment">// instead be copied via ReflectionFactory.copyConstructor.</span>
+<span class="token keyword">private</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token function">privateGetDeclaredConstructors</span><span class="token punctuation">(</span><span class="token keyword">boolean</span> publicOnly<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">checkInitted</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> res<span class="token punctuation">;</span>
+    <span class="token comment">// 反射数据</span>
+    <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> rd <span class="token operator">=</span> <span class="token function">reflectionData</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rd <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 判断返回 public构造方法 还是 声明的构造方法 </span>
+        res <span class="token operator">=</span> publicOnly <span class="token operator">?</span> rd<span class="token punctuation">.</span>publicConstructors <span class="token operator">:</span> rd<span class="token punctuation">.</span>declaredConstructors<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>res <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token keyword">return</span> res<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// No cached value available; request value from VM</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">isInterface</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"unchecked"</span><span class="token punctuation">)</span>
+        <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> temporaryRes <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">new</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+        res <span class="token operator">=</span> temporaryRes<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// </span>
+        res <span class="token operator">=</span> <span class="token function">getDeclaredConstructors0</span><span class="token punctuation">(</span>publicOnly<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rd <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>publicOnly<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            rd<span class="token punctuation">.</span>publicConstructors <span class="token operator">=</span> res<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            rd<span class="token punctuation">.</span>declaredConstructors <span class="token operator">=</span> res<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> res<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// reflection data that might get invalidated when JVM TI RedefineClasses() is called</span>
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Field</span><span class="token punctuation">[</span><span class="token punctuation">]</span> declaredFields<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Field</span><span class="token punctuation">[</span><span class="token punctuation">]</span> publicFields<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Method</span><span class="token punctuation">[</span><span class="token punctuation">]</span> declaredMethods<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Method</span><span class="token punctuation">[</span><span class="token punctuation">]</span> publicMethods<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> declaredConstructors<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Constructor</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> publicConstructors<span class="token punctuation">;</span>
+    <span class="token comment">// Intermediate results for getFields and getMethods</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Field</span><span class="token punctuation">[</span><span class="token punctuation">]</span> declaredPublicFields<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Method</span><span class="token punctuation">[</span><span class="token punctuation">]</span> declaredPublicMethods<span class="token punctuation">;</span>
+    <span class="token keyword">volatile</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> interfaces<span class="token punctuation">;</span>
+
+    <span class="token comment">// Value of classRedefinedCount when we created this ReflectionData instance</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> redefinedCount<span class="token punctuation">;</span>
+
+    <span class="token class-name">ReflectionData</span><span class="token punctuation">(</span><span class="token keyword">int</span> redefinedCount<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>redefinedCount <span class="token operator">=</span> redefinedCount<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// Lazily create and cache ReflectionData</span>
+<span class="token keyword">private</span> <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">reflectionData</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">SoftReference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ReflectionData</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span><span class="token punctuation">></span></span> reflectionData <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>reflectionData<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> classRedefinedCount <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>classRedefinedCount<span class="token punctuation">;</span>
+    <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> rd<span class="token punctuation">;</span>
+    <span class="token comment">// 使用缓存的信息</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>useCaches <span class="token operator">&amp;&amp;</span>
+        reflectionData <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span>
+        <span class="token punctuation">(</span>rd <span class="token operator">=</span> reflectionData<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span>
+        rd<span class="token punctuation">.</span>redefinedCount <span class="token operator">==</span> classRedefinedCount<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> rd<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// </span>
+    <span class="token comment">// else no SoftReference or cleared SoftReference or stale ReflectionData</span>
+    <span class="token comment">// -> create and replace new instance</span>
+    <span class="token keyword">return</span> <span class="token function">newReflectionData</span><span class="token punctuation">(</span>reflectionData<span class="token punctuation">,</span> classRedefinedCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">newReflectionData</span><span class="token punctuation">(</span><span class="token class-name">SoftReference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ReflectionData</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span><span class="token punctuation">></span></span> oldReflectionData<span class="token punctuation">,</span>
+                                            <span class="token keyword">int</span> classRedefinedCount<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>useCaches<span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> rd <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ReflectionData</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>classRedefinedCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// try to CAS it...</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">Atomic</span><span class="token punctuation">.</span><span class="token function">casReflectionData</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> oldReflectionData<span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">SoftReference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>rd<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> rd<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// else retry</span>
+        oldReflectionData <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>reflectionData<span class="token punctuation">;</span>
+        classRedefinedCount <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>classRedefinedCount<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>oldReflectionData <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span>
+            <span class="token punctuation">(</span>rd <span class="token operator">=</span> oldReflectionData<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span>
+            rd<span class="token punctuation">.</span>redefinedCount <span class="token operator">==</span> classRedefinedCount<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> rd<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h2 id="4-3-使用Constructor对象的newInstance方法获取反射类对象-constructor-newInstance"><a href="#4-3-使用Constructor对象的newInstance方法获取反射类对象-constructor-newInstance" class="headerlink" title="(4.3) 使用Constructor对象的newInstance方法获取反射类对象 constructor.newInstance()"></a>(4.3) 使用Constructor对象的newInstance方法获取反射类对象 constructor.newInstance()</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@CallerSensitive</span>
+<span class="token keyword">public</span> <span class="token class-name">T</span> <span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token class-name">Object</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> initargs<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">InstantiationException</span><span class="token punctuation">,</span> <span class="token class-name">IllegalAccessException</span><span class="token punctuation">,</span>
+           <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">,</span> <span class="token class-name">InvocationTargetException</span>
+<span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>override<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">quickCheckMemberAccess</span><span class="token punctuation">(</span>clazz<span class="token punctuation">,</span> modifiers<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> caller <span class="token operator">=</span> <span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">getCallerClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">checkAccess</span><span class="token punctuation">(</span>caller<span class="token punctuation">,</span> clazz<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> modifiers<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>clazz<span class="token punctuation">.</span><span class="token function">getModifiers</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token class-name">Modifier</span><span class="token punctuation">.</span>ENUM<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"Cannot reflectively create enum objects"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">ConstructorAccessor</span> ca <span class="token operator">=</span> constructorAccessor<span class="token punctuation">;</span>   <span class="token comment">// read volatile</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>ca <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        ca <span class="token operator">=</span> <span class="token function">acquireConstructorAccessor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"unchecked"</span><span class="token punctuation">)</span>
+    <span class="token class-name">T</span> inst <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">T</span><span class="token punctuation">)</span> ca<span class="token punctuation">.</span><span class="token function">newInstance</span><span class="token punctuation">(</span>initargs<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> inst<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-4-反射获取方法-clz-getMethod"><a href="#4-4-反射获取方法-clz-getMethod" class="headerlink" title="(4.4) 反射获取方法 clz.getMethod()"></a>(4.4) 反射获取方法 clz.getMethod()</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@CallerSensitive</span>
+<span class="token keyword">public</span> <span class="token class-name">Method</span> <span class="token function">getMethod</span><span class="token punctuation">(</span><span class="token class-name">String</span> name<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> parameterTypes<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">NoSuchMethodException</span><span class="token punctuation">,</span> <span class="token class-name">SecurityException</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">checkMemberAccess</span><span class="token punctuation">(</span><span class="token class-name">Member</span><span class="token punctuation">.</span>PUBLIC<span class="token punctuation">,</span> <span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">getCallerClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">Method</span> method <span class="token operator">=</span> <span class="token function">getMethod0</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> parameterTypes<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>method <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">NoSuchMethodException</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">"."</span> <span class="token operator">+</span> name <span class="token operator">+</span> <span class="token function">argumentTypesToString</span><span class="token punctuation">(</span>parameterTypes<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> method<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">Method</span> <span class="token function">getMethod0</span><span class="token punctuation">(</span><span class="token class-name">String</span> name<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> parameterTypes<span class="token punctuation">,</span> <span class="token keyword">boolean</span> includeStaticMethods<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">MethodArray</span> interfaceCandidates <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MethodArray</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">Method</span> res <span class="token operator">=</span>  <span class="token function">privateGetMethodRecursive</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> parameterTypes<span class="token punctuation">,</span> includeStaticMethods<span class="token punctuation">,</span> interfaceCandidates<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>res <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> res<span class="token punctuation">;</span>
+
+    <span class="token comment">// Not found on class or superclass directly</span>
+    interfaceCandidates<span class="token punctuation">.</span><span class="token function">removeLessSpecifics</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> interfaceCandidates<span class="token punctuation">.</span><span class="token function">getFirst</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// may be null</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="4-5-调用方法-method-invoke"><a href="#4-5-调用方法-method-invoke" class="headerlink" title="(4.5) 调用方法 method.invoke()"></a>(4.5) 调用方法 method.invoke()</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@CallerSensitive</span>
+<span class="token keyword">public</span> <span class="token class-name">Object</span> <span class="token function">invoke</span><span class="token punctuation">(</span><span class="token class-name">Object</span> obj<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> args<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">IllegalAccessException</span><span class="token punctuation">,</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">,</span>
+       <span class="token class-name">InvocationTargetException</span>
+<span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>override<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">quickCheckMemberAccess</span><span class="token punctuation">(</span>clazz<span class="token punctuation">,</span> modifiers<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> caller <span class="token operator">=</span> <span class="token class-name">Reflection</span><span class="token punctuation">.</span><span class="token function">getCallerClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">checkAccess</span><span class="token punctuation">(</span>caller<span class="token punctuation">,</span> clazz<span class="token punctuation">,</span> obj<span class="token punctuation">,</span> modifiers<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token class-name">MethodAccessor</span> ma <span class="token operator">=</span> methodAccessor<span class="token punctuation">;</span>             <span class="token comment">// read volatile</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>ma <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        ma <span class="token operator">=</span> <span class="token function">acquireMethodAccessor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> ma<span class="token punctuation">.</span><span class="token function">invoke</span><span class="token punctuation">(</span>obj<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　 </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// NOTE that there is no synchronization used here. It is correct</span>
+<span class="token comment">// (though not efficient) to generate more than one MethodAccessor</span>
+<span class="token comment">// for a given Method. However, avoiding synchronization will</span>
+<span class="token comment">// probably make the implementation more scalable.</span>
+<span class="token keyword">private</span> <span class="token class-name">MethodAccessor</span> <span class="token function">acquireMethodAccessor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// First check to see if one has been created yet, and take it</span>
+    <span class="token comment">// if so</span>
+    <span class="token class-name">MethodAccessor</span> tmp <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>root <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> tmp <span class="token operator">=</span> root<span class="token punctuation">.</span><span class="token function">getMethodAccessor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>tmp <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        methodAccessor <span class="token operator">=</span> tmp<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Otherwise fabricate one and propagate it up to the root</span>
+        tmp <span class="token operator">=</span> reflectionFactory<span class="token punctuation">.</span><span class="token function">newMethodAccessor</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">setMethodAccessor</span><span class="token punctuation">(</span>tmp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> tmp<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">MethodAccessor</span> <span class="token function">newMethodAccessor</span><span class="token punctuation">(</span><span class="token class-name">Method</span> var1<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">checkInitted</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>noInflation <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token class-name">ReflectUtil</span><span class="token punctuation">.</span><span class="token function">isVMAnonymousClass</span><span class="token punctuation">(</span>var1<span class="token punctuation">.</span><span class="token function">getDeclaringClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">MethodAccessorGenerator</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">generateMethod</span><span class="token punctuation">(</span>var1<span class="token punctuation">.</span><span class="token function">getDeclaringClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> var1<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> var1<span class="token punctuation">.</span><span class="token function">getParameterTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> var1<span class="token punctuation">.</span><span class="token function">getReturnType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> var1<span class="token punctuation">.</span><span class="token function">getExceptionTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> var1<span class="token punctuation">.</span><span class="token function">getModifiers</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">NativeMethodAccessorImpl</span> var2 <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NativeMethodAccessorImpl</span><span class="token punctuation">(</span>var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">DelegatingMethodAccessorImpl</span> var3 <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DelegatingMethodAccessorImpl</span><span class="token punctuation">(</span>var2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        var2<span class="token punctuation">.</span><span class="token function">setParent</span><span class="token punctuation">(</span>var3<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> var3<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h2><p><strong>使用反射会遇到的问题</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// java.lang.ClassNotFoundException: cn.wkq.java.reflection.UserModel2</span>
+<span class="token class-name">Class</span> clz <span class="token operator">=</span> <span class="token class-name">Class</span><span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span><span class="token string">"cn.wkq.java.reflection.UserModel2"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// java.lang.NoSuchMethodException: cn.wkq.java.reflection.UserModel.setId(long)</span>
+<span class="token class-name">Method</span> method <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getMethod</span><span class="token punctuation">(</span><span class="token string">"setId"</span><span class="token punctuation">,</span> <span class="token keyword">long</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token class-name">Constructor</span> constructor <span class="token operator">=</span> clz<span class="token punctuation">.</span><span class="token function">getConstructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">Object</span> object <span class="token operator">=</span> constructor<span class="token punctuation">.</span><span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+ 
+<span class="token comment">// Exception in thread "main" java.lang.IllegalArgumentException: argument type mismatch</span>
+method<span class="token punctuation">.</span><span class="token function">invoke</span><span class="token punctuation">(</span>object<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h1><p>[1] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/chanshuyi/p/head_first_of_reflection.html">大白话说Java反射：入门、使用、原理</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.csdn.net/a745233700/article/details/82893076">Java基础篇：反射机制详解</a><br>[3] <a target="_blank" rel="noopener" href="https://pdai.tech/md/java/basic/java-basic-x-reflection.html">Java 基础 - 反射机制详解</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/basic/" rel="tag"># basic</a>
+              <a href="/tags/reflection/" rel="tag"># reflection</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/05/28/redis-high-performance-analysis/" rel="prev" title="redis高性能分析">
+                  <i class="fa fa-chevron-left"></i> redis高性能分析
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/06/06/read-write-lock/" rel="next" title="读写锁">
+                  读写锁 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

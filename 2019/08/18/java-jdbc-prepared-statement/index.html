@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="在写neo4j和orientdb的通用方法时，忽然想到jdbc，然后就想试试mysql neo4j orientdb几个数据库jdbc连接方式里的 prepartdStatement一不一样。   问题的来源来自以下代码 List&lt;Map&lt;String, Object&gt;&gt; list &#x3D; new ArrayList(); try (PreparedStatement pst &#x3D; co">
+<meta property="og:type" content="article">
+<meta property="og:title" content="java-jdbc-prepared-statement">
+<meta property="og:url" content="http://weikeqin.com/2019/08/18/java-jdbc-prepared-statement/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在写neo4j和orientdb的通用方法时，忽然想到jdbc，然后就想试试mysql neo4j orientdb几个数据库jdbc连接方式里的 prepartdStatement一不一样。   问题的来源来自以下代码 List&lt;Map&lt;String, Object&gt;&gt; list &#x3D; new ArrayList(); try (PreparedStatement pst &#x3D; co">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2019-08-18T02:59:41.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.237Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="jdbc">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2019/08/18/java-jdbc-prepared-statement/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2019/08/18/java-jdbc-prepared-statement/","path":"2019/08/18/java-jdbc-prepared-statement/","title":"java-jdbc-prepared-statement"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>java-jdbc-prepared-statement | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#MySQL-prepart-%E6%B5%8B%E8%AF%95"><span class="nav-number">1.</span> <span class="nav-text">MySQL prepart 测试</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#MySQL-client-server-prepart-%E6%B5%8B%E8%AF%95"><span class="nav-number">1.1.</span> <span class="nav-text">MySQL client server prepart 测试</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Neo4j"><span class="nav-number">2.</span> <span class="nav-text">Neo4j</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Orientdb"><span class="nav-number">3.</span> <span class="nav-text">Orientdb</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">4.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/08/18/java-jdbc-prepared-statement/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          java-jdbc-prepared-statement
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-08-18 10:59:41" itemprop="dateCreated datePublished" datetime="2019-08-18T10:59:41+08:00">2019-08-18</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2019/08/18/java-jdbc-prepared-statement/" class="post-meta-item leancloud_visitors" data-flag-title="java-jdbc-prepared-statement" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  在写neo4j和orientdb的通用方法时，忽然想到jdbc，然后就想试试mysql neo4j orientdb几个数据库jdbc连接方式里的 prepartdStatement一不一样。</p>
+<p>  问题的来源来自以下代码</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Map</span><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span><span class="token punctuation">></span></span> list <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">try</span> <span class="token punctuation">(</span><span class="token class-name">PreparedStatement</span> pst <span class="token operator">=</span> conn<span class="token punctuation">.</span><span class="token function">prepareStatement</span><span class="token punctuation">(</span>sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+     <span class="token class-name">ResultSet</span> rs <span class="token operator">=</span> pst<span class="token punctuation">.</span><span class="token function">executeQuery</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> fields <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>rs<span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>fields<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">ResultSetMetaData</span> metaData <span class="token operator">=</span> rs<span class="token punctuation">.</span><span class="token function">getMetaData</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 查询出的字段</span>
+            <span class="token keyword">int</span> count <span class="token operator">=</span> metaData<span class="token punctuation">.</span><span class="token function">getColumnCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> i <span class="token operator">&lt;=</span> count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                fields<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>metaData<span class="token punctuation">.</span><span class="token function">getColumnName</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> map <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">String</span> field <span class="token operator">:</span> fields<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            map<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>field<span class="token punctuation">,</span> rs<span class="token punctuation">.</span><span class="token function">getObject</span><span class="token punctuation">(</span>field<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// T r =  JSONObject.parseObject(JSON.toString(map), Object.class);</span>
+        list<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>map<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">SQLException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">SQLException</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<span id="more"></span> 
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * @param sql    查询语句
+ * @param params 占位符 参数
+ * @param conn   连接
+ * @return
+ */</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Iterator</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Map</span><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token function">query</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">,</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> params<span class="token punctuation">,</span>
+                                           <span class="token class-name">Connection</span> conn<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//</span>
+    <span class="token keyword">final</span> <span class="token class-name">PreparedStatement</span> statement <span class="token operator">=</span> conn<span class="token punctuation">.</span><span class="token function">prepareStatement</span><span class="token punctuation">(</span>sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置参数</span>
+    <span class="token function">setParameters</span><span class="token punctuation">(</span>statement<span class="token punctuation">,</span> params<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 执行查询并获得结果</span>
+    <span class="token keyword">final</span> <span class="token class-name">ResultSet</span> result <span class="token operator">=</span> statement<span class="token punctuation">.</span><span class="token function">executeQuery</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 封装返回</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Iterator</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Map</span><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">boolean</span> hasNext <span class="token operator">=</span> result<span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 所有字段</span>
+        <span class="token keyword">public</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> columns<span class="token punctuation">;</span>
+        <span class="token comment">// 字段个数</span>
+        <span class="token keyword">public</span> <span class="token keyword">int</span> columnsCount<span class="token punctuation">;</span>
+
+        <span class="token comment">/**
+         *
+         *
+         * @return
+         */</span>
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">hasNext</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> hasNext<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">/**
+         * 获得所有字段&lt;br>
+         *     第一次会查询出所有字段，第二 第三次 直接用columns
+         *
+         * @return
+         * @throws SQLException
+         */</span>
+        <span class="token keyword">private</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> <span class="token function">getColumns</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>columns <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">return</span> columns<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token class-name">ResultSetMetaData</span> metaData <span class="token operator">=</span> result<span class="token punctuation">.</span><span class="token function">getMetaData</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 查询出的字段</span>
+            <span class="token keyword">int</span> count <span class="token operator">=</span> metaData<span class="token punctuation">.</span><span class="token function">getColumnCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> cols <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> i <span class="token operator">&lt;=</span> count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                cols<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>metaData<span class="token punctuation">.</span><span class="token function">getColumnName</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            columnsCount <span class="token operator">=</span> cols<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span> columns <span class="token operator">=</span> cols<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">/**
+         *
+         * @return
+         */</span>
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> <span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>hasNext<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">//</span>
+                    <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> map <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LinkedHashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>columnsCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">String</span> col <span class="token operator">:</span> <span class="token function">getColumns</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        map<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>col<span class="token punctuation">,</span> result<span class="token punctuation">.</span><span class="token function">getObject</span><span class="token punctuation">(</span>col<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                    hasNext <span class="token operator">=</span> result<span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>hasNext<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        result<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        statement<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                    <span class="token keyword">return</span> map<span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">NoSuchElementException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+
+            <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">SQLException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">RuntimeException</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">/**
+         *
+         */</span>
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">remove</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<p>  然后查看对应的源代码<br>mysql-connector-java-5.1.40.jar<br>neo4j-jdbc-3.4.0.jar<br>orientdb-jdbc-3.0.22.jar</p>
+<h1 id="MySQL-prepart-测试"><a href="#MySQL-prepart-测试" class="headerlink" title="MySQL prepart 测试"></a>MySQL prepart 测试</h1><h2 id="MySQL-client-server-prepart-测试"><a href="#MySQL-client-server-prepart-测试" class="headerlink" title="MySQL client server prepart 测试"></a>MySQL client server prepart 测试</h2><p>  MySQL server 配置开启 all_query log</p>
+<p>  在命令行执行以下语句</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">PREPARE</span> stmt1 <span class="token keyword">FROM</span> <span class="token string">'SELECT SQRT(POW(?,2) + POW(?,2)) AS hypotenuse'</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@a</span> <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@b</span> <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+<span class="token keyword">EXECUTE</span> stmt1 <span class="token keyword">USING</span> <span class="token variable">@a</span><span class="token punctuation">,</span> <span class="token variable">@b</span><span class="token punctuation">;</span>
+<span class="token keyword">EXECUTE</span> stmt1 <span class="token keyword">USING</span> <span class="token variable">@a</span><span class="token punctuation">,</span> <span class="token variable">@b</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@a</span> <span class="token operator">=</span> <span class="token number">6</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@b</span> <span class="token operator">=</span> <span class="token number">8</span><span class="token punctuation">;</span>
+<span class="token keyword">EXECUTE</span> stmt1 <span class="token keyword">USING</span> <span class="token variable">@a</span><span class="token punctuation">,</span> <span class="token variable">@b</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@s</span> <span class="token operator">=</span> <span class="token string">'SELECT SQRT(POW(?,2) + POW(?,2)) AS hypotenuse'</span><span class="token punctuation">;</span>
+<span class="token keyword">PREPARE</span> stmt2 <span class="token keyword">FROM</span> <span class="token variable">@s</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@a</span> <span class="token operator">=</span> <span class="token number">6</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> <span class="token variable">@b</span> <span class="token operator">=</span> <span class="token number">8</span><span class="token punctuation">;</span>
+<span class="token keyword">EXECUTE</span> stmt2 <span class="token keyword">USING</span> <span class="token variable">@a</span><span class="token punctuation">,</span> <span class="token variable">@b</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  all_query.log输出如下</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.934322Z</span>	 <span class="token number">1042</span> Query	PREPARE stmt1 FROM <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.934412Z</span>	 <span class="token number">1042</span> Prepare	SELECT SQRT<span class="token operator">(</span>POW<span class="token operator">(</span><span class="token operator">?</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span> <span class="token operator">+</span> POW<span class="token operator">(</span><span class="token operator">?</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span><span class="token operator">)</span> AS hypotenuse
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.934762Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>a <span class="token operator">=</span> <span class="token number">3</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.935089Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>b <span class="token operator">=</span> <span class="token number">4</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.935404Z</span>	 <span class="token number">1042</span> Query	EXECUTE stmt1 USING <span class="token operator">@</span>a<span class="token punctuation">,</span> <span class="token operator">@</span>b
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.935449Z</span>	 <span class="token number">1042</span> Execute	SELECT SQRT<span class="token operator">(</span>POW<span class="token operator">(</span><span class="token number">3</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span> <span class="token operator">+</span> POW<span class="token operator">(</span><span class="token number">4</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span><span class="token operator">)</span> AS hypotenuse
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.935949Z</span>	 <span class="token number">1042</span> Query	EXECUTE stmt1 USING <span class="token operator">@</span>a<span class="token punctuation">,</span> <span class="token operator">@</span>b
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.935994Z</span>	 <span class="token number">1042</span> Execute	SELECT SQRT<span class="token operator">(</span>POW<span class="token operator">(</span><span class="token number">3</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span> <span class="token operator">+</span> POW<span class="token operator">(</span><span class="token number">4</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span><span class="token operator">)</span> AS hypotenuse
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.936388Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>a <span class="token operator">=</span> <span class="token number">6</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.936938Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>b <span class="token operator">=</span> <span class="token number">8</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.937319Z</span>	 <span class="token number">1042</span> Query	EXECUTE stmt1 USING <span class="token operator">@</span>a<span class="token punctuation">,</span> <span class="token operator">@</span>b
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.937358Z</span>	 <span class="token number">1042</span> Execute	SELECT SQRT<span class="token operator">(</span>POW<span class="token operator">(</span><span class="token number">6</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span> <span class="token operator">+</span> POW<span class="token operator">(</span><span class="token number">8</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span><span class="token operator">)</span> AS hypotenuse
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.937791Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>s <span class="token operator">=</span> <span class="token string">'SELECT SQRT(POW(?,2) + POW(?,2)) AS hypotenuse'</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.938083Z</span>	 <span class="token number">1042</span> Query	PREPARE stmt2 FROM <span class="token operator">@</span>s
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.938187Z</span>	 <span class="token number">1042</span> Prepare	SELECT SQRT<span class="token operator">(</span>POW<span class="token operator">(</span><span class="token operator">?</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span> <span class="token operator">+</span> POW<span class="token operator">(</span><span class="token operator">?</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span><span class="token operator">)</span> AS hypotenuse
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.938518Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>a <span class="token operator">=</span> <span class="token number">6</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.938804Z</span>	 <span class="token number">1042</span> Query	SET <span class="token operator">@</span>b <span class="token operator">=</span> <span class="token number">8</span>
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.939095Z</span>	 <span class="token number">1042</span> Query	EXECUTE stmt2 USING <span class="token operator">@</span>a<span class="token punctuation">,</span> <span class="token operator">@</span>b
+<span class="token date number">2019-08-14T</span><span class="token time number">12:24:02.939130Z</span>	 <span class="token number">1042</span> Execute	SELECT SQRT<span class="token operator">(</span>POW<span class="token operator">(</span><span class="token number">6</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span> <span class="token operator">+</span> POW<span class="token operator">(</span><span class="token number">8</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token operator">)</span><span class="token operator">)</span> AS hypotenuse<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  确实是使用了Prepare<br>  不过从这个结果看不出Prepare提高了多少性能<br>  通过程序测试Prepare大概提高了30%的性能，语句不同，参数不通，测试结果会有差异。</p>
+<p>  <code>jdbc:mysql://127.0.0.1:3306/test?useUnicode=true&amp;characterEncoding=UTF-8&amp;autoReconnect=true&amp;useSSL=false&amp;useServerPrepStmts=true</code></p>
+<p> com.mysql.jdbc.ConnectionImpl.java</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token keyword">public</span> <span class="token class-name">PreparedStatement</span> <span class="token function">prepareStatement</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">prepareStatement</span><span class="token punctuation">(</span>sql<span class="token punctuation">,</span> <span class="token number">1003</span><span class="token punctuation">,</span> <span class="token number">1007</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token class-name">PreparedStatement</span> <span class="token function">prepareStatement</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">,</span> <span class="token keyword">int</span> autoGenKeyIndex<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">PreparedStatement</span> pStmt <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">prepareStatement</span><span class="token punctuation">(</span>sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setRetrieveGeneratedKeys</span><span class="token punctuation">(</span>autoGenKeyIndex <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> pStmt<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token class-name">PreparedStatement</span> <span class="token function">prepareStatement</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetType<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetConcurrency<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">synchronized</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConnectionMutex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">checkClosed</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span> pStmt <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+        <span class="token keyword">boolean</span> canServerPrepare <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+        <span class="token class-name">String</span> nativeSql <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getProcessEscapeCodesForPrepStmts</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">nativeSQL</span><span class="token punctuation">(</span>sql<span class="token punctuation">)</span> <span class="token operator">:</span> sql<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>useServerPreparedStmts <span class="token operator">&amp;&amp;</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getEmulateUnsupportedPstmts</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            canServerPrepare <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">canHandleAsServerPreparedStatement</span><span class="token punctuation">(</span>nativeSql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>useServerPreparedStmts <span class="token operator">&amp;&amp;</span> canServerPrepare<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// // 从缓存中获取 pst</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getCachePreparedStatements</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">synchronized</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>serverSideStatementCache<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    pStmt <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">ServerPreparedStatement</span><span class="token punctuation">)</span><span class="token keyword">this</span><span class="token punctuation">.</span>serverSideStatementCache<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span>pStmt <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">ServerPreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setClosed</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        <span class="token comment">// 清理上次留下的参数</span>
+                        <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">clearParameters</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span>pStmt <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token comment">// 向 Server 提交 SQL 预编译</span>
+                        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                            pStmt <span class="token operator">=</span> <span class="token class-name">ServerPreparedStatement</span><span class="token punctuation">.</span><span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getMultiHostSafeProxy</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> nativeSql<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>database<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                            <span class="token keyword">if</span> <span class="token punctuation">(</span>sql<span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getPreparedStatementCacheSqlLimit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                                <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">ServerPreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span>isCached <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+                            <span class="token punctuation">&#125;</span>
+
+                            <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setResultSetType</span><span class="token punctuation">(</span>resultSetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                            <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setResultSetConcurrency</span><span class="token punctuation">(</span>resultSetConcurrency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">SQLException</span> var13<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getEmulateUnsupportedPstmts</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                                <span class="token keyword">throw</span> var13<span class="token punctuation">;</span>
+                            <span class="token punctuation">&#125;</span>
+
+                            pStmt <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">clientPrepareStatement</span><span class="token punctuation">(</span>nativeSql<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                            <span class="token keyword">if</span> <span class="token punctuation">(</span>sql<span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getPreparedStatementCacheSqlLimit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                                <span class="token keyword">this</span><span class="token punctuation">.</span>serverSideStatementCheckCache<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>sql<span class="token punctuation">,</span> <span class="token class-name">Boolean</span><span class="token punctuation">.</span>FALSE<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                            <span class="token punctuation">&#125;</span>
+                        <span class="token punctuation">&#125;</span>
+                    <span class="token punctuation">&#125;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// // 向 Server 提交 SQL 预编译</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    pStmt <span class="token operator">=</span> <span class="token class-name">ServerPreparedStatement</span><span class="token punctuation">.</span><span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getMultiHostSafeProxy</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> nativeSql<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>database<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setResultSetType</span><span class="token punctuation">(</span>resultSetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setResultSetConcurrency</span><span class="token punctuation">(</span>resultSetConcurrency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">SQLException</span> var12<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getEmulateUnsupportedPstmts</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token keyword">throw</span> var12<span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+
+                    pStmt <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">clientPrepareStatement</span><span class="token punctuation">(</span>nativeSql<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            pStmt <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name"><span class="token namespace">com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span></span>PreparedStatement</span><span class="token punctuation">)</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">clientPrepareStatement</span><span class="token punctuation">(</span>nativeSql<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token class-name">PreparedStatement</span><span class="token punctuation">)</span>pStmt<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  从代码里可以看到，服务(代码里)缓存了解析编译的语句，如果有直接拿来用。</p>
+<!--
+  jdbc的代码里有解析sql并且编译，然后把编译好的发给服务端，以后每次发送对应的id以及占位符的参数，这样免得服务器每次解析sql，而且不用每次把整个语句以及后面的参数发送给服务端，只需要发送预编译后的预计的id以及占位参数即可，减少了服务端编译，减少了网络传输，提高了效率。
+-->
+
+<h1 id="Neo4j"><a href="#Neo4j" class="headerlink" title="Neo4j"></a>Neo4j</h1><p>  Neo4j 连接方式 有 neo4j-jdbc-driver  neo4j-jdbc-bolt  neo4j-jdbc-http </p>
+<p>  org.neo4j.jdbc.Neo4jPreparedStatement.java</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * Default constructor with connection and statement.
+ *
+ * @param connection   The JDBC connection
+ * @param rawStatement The prepared statement
+ */</span>
+<span class="token keyword">protected</span> <span class="token class-name">Neo4jPreparedStatement</span><span class="token punctuation">(</span><span class="token class-name">Neo4jConnection</span> connection<span class="token punctuation">,</span> <span class="token class-name">String</span> rawStatement<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">super</span><span class="token punctuation">(</span>connection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">this</span><span class="token punctuation">.</span>statement <span class="token operator">=</span> <span class="token class-name">PreparedStatementBuilder</span><span class="token punctuation">.</span><span class="token function">replacePlaceholders</span><span class="token punctuation">(</span>rawStatement<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">this</span><span class="token punctuation">.</span>parametersNumber <span class="token operator">=</span> <span class="token class-name">PreparedStatementBuilder</span><span class="token punctuation">.</span><span class="token function">namedParameterCount</span><span class="token punctuation">(</span>statement<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">this</span><span class="token punctuation">.</span>parameters <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>parametersNumber<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">this</span><span class="token punctuation">.</span>batchParameters <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  org.neo4j.jdbc.utils.PreparedStatementBuilder</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * This method return a String that is the original raw string with all valid placeholders replaced with neo4j curly brackets notation for parameters.
+ * &lt;br>
+ * i.e. MATCH n RETURN n WHERE n.name = ? is transformed in MATCH n RETURN n WHERE n.name = &#123;1&#125;
+ *
+ * @param raw The string to be translated.
+ * @return The string with the placeholders replaced.
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">String</span> <span class="token function">replacePlaceholders</span><span class="token punctuation">(</span><span class="token class-name">String</span> raw<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">int</span> index <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+	<span class="token class-name">String</span> digested <span class="token operator">=</span> raw<span class="token punctuation">;</span>
+
+	<span class="token class-name">String</span> regex <span class="token operator">=</span> <span class="token string">"\\?(?=[^\"]*(?:\"[^\"]*\"[^\"]*)*$)"</span><span class="token punctuation">;</span>
+	<span class="token class-name">Matcher</span> matcher <span class="token operator">=</span> <span class="token class-name">Pattern</span><span class="token punctuation">.</span><span class="token function">compile</span><span class="token punctuation">(</span>regex<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">matcher</span><span class="token punctuation">(</span>digested<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token keyword">while</span> <span class="token punctuation">(</span>matcher<span class="token punctuation">.</span><span class="token function">find</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		digested <span class="token operator">=</span> digested<span class="token punctuation">.</span><span class="token function">replaceFirst</span><span class="token punctuation">(</span>regex<span class="token punctuation">,</span> <span class="token string">"&#123;"</span> <span class="token operator">+</span> index <span class="token operator">+</span> <span class="token string">"&#125;"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		index<span class="token operator">++</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token keyword">return</span> digested<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  neo4j-jdbc 里对PreparedStatement里的语句仅仅是把占位符组装成一个cypher语句，没有做预编译处理</p>
+<h1 id="Orientdb"><a href="#Orientdb" class="headerlink" title="Orientdb"></a>Orientdb</h1><p>  com.orientechnologies.orient.jdbc.OrientJdbcPreparedStatement.java</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token keyword">public</span> <span class="token class-name">OrientJdbcPreparedStatement</span><span class="token punctuation">(</span><span class="token class-name">OrientJdbcConnection</span> iConnection<span class="token punctuation">,</span> <span class="token class-name">String</span> sql<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">(</span>iConnection<span class="token punctuation">,</span> <span class="token number">1003</span><span class="token punctuation">,</span> <span class="token number">1007</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token class-name">OrientJdbcPreparedStatement</span><span class="token punctuation">(</span><span class="token class-name">OrientJdbcConnection</span> iConnection<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetType<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetConcurrency<span class="token punctuation">,</span> <span class="token class-name">String</span> sql<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">(</span>iConnection<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token class-name">OrientJdbcPreparedStatement</span><span class="token punctuation">(</span><span class="token class-name">OrientJdbcConnection</span> iConnection<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetType<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetConcurrency<span class="token punctuation">,</span> <span class="token keyword">int</span> resultSetHoldability<span class="token punctuation">,</span> <span class="token class-name">String</span> sql<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">super</span><span class="token punctuation">(</span>iConnection<span class="token punctuation">,</span> resultSetType<span class="token punctuation">,</span> resultSetConcurrency<span class="token punctuation">,</span> resultSetHoldability<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>sql <span class="token operator">=</span> sql<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>params <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  orientdb-jdbc jar包里没有对PreparedStatement的语句做预编译处理</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.im/post/59875a836fb9a03c4a7615ae">JDBC PreparedStatement 实现原理【推荐阅读】</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.csdn.net/py941215/article/details/78020663">mysql-JDBC源码解析</a><br>[3] <a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/5.7/en/sql-syntax-prepared-statements.html">mysql sql-syntax-prepared-statements</a><br>[4] <a target="_blank" rel="noopener" href="https://github.com/mysql/mysql-connector-j">github mysql-connector-j</a><br>[5] <a target="_blank" rel="noopener" href="https://github.com/neo4j-contrib/neo4j-jdbc">github neo4j-jdbc </a><br>[6] <a target="_blank" rel="noopener" href="http://neo4j-contrib.github.io/neo4j-jdbc/">neo4j-jdbc doc</a><br>[7] <a target="_blank" rel="noopener" href="https://github.com/orientechnologies/orientdb-jdbc">github orientdb-jdbc</a><br>[8] <a target="_blank" rel="noopener" href="https://github.com/orientechnologies/orientdb-docs">orientdb-docs</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/jdbc/" rel="tag"># jdbc</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2019/08/18/java-concurrent/" rel="prev" title="java 并发">
+                  <i class="fa fa-chevron-left"></i> java 并发
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2019/08/18/orientdb-config/" rel="next" title="orientdb-config">
+                  orientdb-config <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

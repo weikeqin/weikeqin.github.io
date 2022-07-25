@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="在日常的开发中遇到1个问题我们要部署一个系统给甲方，但是又不想让甲方知道我们的代码是怎么写的，需要Java的代码如果要加密不让别人获取到有什么办法？    研发人员都知道我们写的Java代码是.java文件，然后被编译成.class文件后，JVM可以解释执行class文件。  我们写的Java代码不会给甲方，给甲方的是编译好的包，也就是一堆class文件，但是class文件也有可能被反编译，获取">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JVM类加载机制">
+<meta property="og:url" content="http://weikeqin.com/2019/06/01/jvm-class-loader/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在日常的开发中遇到1个问题我们要部署一个系统给甲方，但是又不想让甲方知道我们的代码是怎么写的，需要Java的代码如果要加密不让别人获取到有什么办法？    研发人员都知道我们写的Java代码是.java文件，然后被编译成.class文件后，JVM可以解释执行class文件。  我们写的Java代码不会给甲方，给甲方的是编译好的包，也就是一堆class文件，但是class文件也有可能被反编译，获取">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/file/jvm/class/java-class-life-cycle.png">
+<meta property="article:published_time" content="2019-06-01T04:52:34.000Z">
+<meta property="article:modified_time" content="2022-05-28T08:29:22.696Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="jvm">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/file/jvm/class/java-class-life-cycle.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2019/06/01/jvm-class-loader/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2019/06/01/jvm-class-loader/","path":"2019/06/01/jvm-class-loader/","title":"JVM类加载机制"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>JVM类加载机制 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-JVM%E5%8A%A0%E8%BD%BDclass%E8%BF%87%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">(1) JVM加载class过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E5%8A%A0%E8%BD%BD"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 加载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E9%AA%8C%E8%AF%81"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 验证</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E9%AA%8C%E8%AF%81"><span class="nav-number">1.2.1.</span> <span class="nav-text">(1.2.1) 文件格式验证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-%E5%85%83%E6%95%B0%E6%8D%AE%E9%AA%8C%E8%AF%81"><span class="nav-number">1.2.2.</span> <span class="nav-text">(1.2.2) 元数据验证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-3-%E5%AD%97%E8%8A%82%E7%A0%81%E9%AA%8C%E8%AF%81"><span class="nav-number">1.2.3.</span> <span class="nav-text">(1.2.3) 字节码验证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-4-%E7%AC%A6%E5%8F%B7%E5%BC%95%E7%94%A8%E9%AA%8C%E8%AF%81"><span class="nav-number">1.2.4.</span> <span class="nav-text">(1.2.4) 符号引用验证</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-%E5%87%86%E5%A4%87"><span class="nav-number">1.3.</span> <span class="nav-text">(1.3) 准备</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-%E8%A7%A3%E6%9E%90"><span class="nav-number">1.4.</span> <span class="nav-text">(1.4) 解析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-5-%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">1.5.</span> <span class="nav-text">(1.5) 初始化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B1%BB%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96%E8%A7%A6%E5%8F%91%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.</span> <span class="nav-text">类的初始化触发条件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-5-%E4%BD%BF%E7%94%A8"><span class="nav-number">2.1.</span> <span class="nav-text">(1.5) 使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-6-%E5%8D%B8%E8%BD%BD"><span class="nav-number">2.2.</span> <span class="nav-text">(1.6) 卸载</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">(2) 类加载器</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E7%B1%BB%E5%9E%8B"><span class="nav-number">3.1.</span> <span class="nav-text">(2.1) 类加载器类型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.2.</span> <span class="nav-text">(2.2) 双亲委派模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.2.1.</span> <span class="nav-text">(2.2.1) 双亲委派模型的实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-2-%E7%A0%B4%E5%9D%8F%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.2.2.</span> <span class="nav-text">(2.2.2) 破坏双亲委派模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-3-%E8%87%AA%E5%AE%9A%E4%B9%89%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8"><span class="nav-number">3.2.3.</span> <span class="nav-text">(2.2.3) 自定义类加载器</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E8%8E%B7%E5%8F%96ClassLoader%E5%87%A0%E7%A7%8D%E6%96%B9%E5%BC%8F"><span class="nav-number">3.3.</span> <span class="nav-text">(2.3) 获取ClassLoader几种方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">4.</span> <span class="nav-text">(3) 遇到的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#org-springframework-beans-factory-BeanDefinitionStoreException-Failed-to-read-candidate-component-class"><span class="nav-number">4.1.</span> <span class="nav-text">org.springframework.beans.factory.BeanDefinitionStoreException: Failed to read candidate component class</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">5.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/06/01/jvm-class-loader/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JVM类加载机制
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-06-01 12:52:34" itemprop="dateCreated datePublished" datetime="2019-06-01T12:52:34+08:00">2019-06-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 16:29:22" itemprop="dateModified" datetime="2022-05-28T16:29:22+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/jvm/" itemprop="url" rel="index"><span itemprop="name">jvm</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2019/06/01/jvm-class-loader/" class="post-meta-item leancloud_visitors" data-flag-title="JVM类加载机制" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <blockquote>
+<p>在日常的开发中遇到1个问题<br>我们要部署一个系统给甲方，但是又不想让甲方知道我们的代码是怎么写的，需要Java的代码如果要加密不让别人获取到有什么办法？</p>
+</blockquote>
+<p>  研发人员都知道我们写的Java代码是.java文件，然后被编译成.class文件后，JVM可以解释执行class文件。<br>  我们写的Java代码不会给甲方，给甲方的是编译好的包，也就是一堆class文件，但是class文件也有可能被反编译，获取到.java文件。<br>  想了很久，通过对class文件加密，在使用时通过自定义的ClassLoader加载class，然后在自定义的ClassLoader里再增加一个验证秘钥方法，通过秘钥才能继续执行方法加载class文件。</p>
+<h1 id="1-JVM加载class过程"><a href="#1-JVM加载class过程" class="headerlink" title="(1) JVM加载class过程"></a>(1) JVM加载class过程</h1><p>  <img src="/file/jvm/class/java-class-life-cycle.png" alt="java-class-life-cycle"></p>
+<blockquote>
+<p> 一个类型从被加载到虚拟机内存中开始，到卸载出内存为止，它的整个生命周期将会经历加载(Loading)、验证(Verification)、准备(Preparation)、解析(Resolution)、初始化(Initialization)、使用(Using)和卸载(Unloading)七个阶段。</p>
+<p> 其中验证、准备、解析三个部分统称为连接(Linking)。</p>
+<p> 加载、验证、准备、初始化和卸载这五个阶段的顺序是确定，而解析阶段则不一定：它在某些情况下可以在初始化阶段之后再开始。</p>
+</blockquote>
+<h2 id="1-1-加载"><a href="#1-1-加载" class="headerlink" title="(1.1) 加载"></a>(1.1) 加载</h2><p>  Class文件又称字节码文件，一种二进制文件，它是由某种语言经过编译而来，注意这里并不一定是Java语言，还有可能是 Scala、Groovy 等，Class文件运行在Java虚拟机上。<br>  Java虚拟机不与任何一种语言绑定，它只与Class文件这种特定的二进制文件格式所关联。</p>
+<blockquote>
+<p> 加载，是指查找字节流，并且据此创建类的过程。</p>
+</blockquote>
+<blockquote>
+<p>在加载阶段，Java虚拟机需要完成以下三件事情：</p>
+<ol>
+<li>通过一个类的全限定名来获取定义此类的二进制字节流。</li>
+<li>将这个字节流所代表的静态存储结构转化为方法区的运行时数据结构。</li>
+<li>在内存中生成一个代表这个类的 java.lang.Class 对象，作为方法区这个类的各种数据的访问入口。</li>
+</ol>
+</blockquote>
+<span id="more"></span>
+
+<blockquote>
+<p> Java 语言的类型可以分为两大类：基本类型（primitive types）和引用类型（reference types）。<br> Java 的基本类型，它们是由 Java 虚拟机预先定义好的。<br> 引用类型，Java 将其细分为四种：类、接口、数组类和泛型参数。<br> 由于泛型参数会在编译过程中被擦除，因此 Java 虚拟机实际上只有前三种。在类、接口和数组类中，数组类是由 Java 虚拟机直接生成的，其他两种则有对应的字节流。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>类加载器</th>
+<th>作用</th>
+<th>实现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>启动类加载器（bootstrap Class Loader）</td>
+<td>启动类加载器负责加载最为基础、最为重要的类，比如存放在 JRE 的 Lib 目录下 Jar 包中的类（以及由虚拟机参数 -Xbootclasspath 指定的类）</td>
+<td>启动类加载器是由 C++ 实现的。</td>
+</tr>
+<tr>
+<td>扩展类加载器（extension Class Loader）</td>
+<td>负责加载相对次要、但又通用的类，比如存放在 JRE 的 Lib/ext 目录下 Jar 包中的类（以及由系统变量 Java.ext.dirs 指定的类）</td>
+<td>由 Java 核心类库提供</td>
+</tr>
+<tr>
+<td>应用类加载器（application Class Loader）</td>
+<td>负责加载应用程序路径下的类。（这里的应用程序路径，便是指虚拟机参数 -Cp/-Classpath、系统变量 Java.class.path 或环境变量 CLASSPATH 所指定的路径。）默认情况下，应用程序中包含的类便是由应用类加载器加载的。</td>
+<td>由 Java 核心类库提供</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p> Java 9 引入了模块系统，并且略微更改了上述的类加载器1。扩展类加载器被改名为平台类加载器（platform class loader）。Java SE 中除了少数几个关键模块，比如说 java.base 是由启动类加载器加载之外，其他的模块均由平台类加载器所加载。</p>
+</blockquote>
+<blockquote>
+<p> 在 Java 虚拟机中，类的唯一性是由类加载器实例以及类的全名一同确定的。<br>即便是同一串字节流，经由不同的类加载器加载，也会得到两个不同的类。<br>在大型应用中，我们往往借助这一特性，来运行同一个类的不同版本。</p>
+</blockquote>
+<h2 id="1-2-验证"><a href="#1-2-验证" class="headerlink" title="(1.2) 验证"></a>(1.2) 验证</h2><p>  虚拟机可以接受任何语言编译而成的Class文件，因此也给虚拟机带来了安全隐患，为了提供语言无关性的功能就必须做好安全防备措施，避免危险有害的类文件载入到虚拟机中，对虚拟机造成损害。所以在类加载的第二大阶段就是验证，这一步工作是虚拟机安全防护的关键所在，其中检查的步骤就是对class文件按照《Java虚拟机规范》规定的内容来对其进行验证。</p>
+<blockquote>
+<p>验证阶段的目的，在于确保被加载类能够满足 Java 虚拟机的约束条件。<br>验证的目的是确保Class文件的字节流中包含的信息符合《Java虚拟机规范》的全部约束要求，并且不会危害虚拟机自身的安全。<br>从整体上看，验证阶段大致上会完成下面四个阶段的检验动作：文件格式验证、元数据验证、字节码验证和符号引用验证。</p>
+</blockquote>
+<h3 id="1-2-1-文件格式验证"><a href="#1-2-1-文件格式验证" class="headerlink" title="(1.2.1) 文件格式验证"></a>(1.2.1) 文件格式验证</h3><blockquote>
+<p>验证字节流是否符合Class文件格式的规范，并且能被当前版本的虚拟机处理，如：<br>是否以魔数0xCAFEBABE开头<br>主、次版本号是否在当前Java虚拟机接受范围之内<br>常量池的常量中是否有不被支持的常量类型(检查常量tag标志)<br>指向常量的各种索引值中是否有指向不存在的常量或不符合类型的常量<br>CONSTANT_Utf8_info型的常量中是否有不符合UTF-8编码的数据<br>Class文件中各个部分及文件本身是否有被删除的或附加的其他信息</p>
+</blockquote>
+<h3 id="1-2-2-元数据验证"><a href="#1-2-2-元数据验证" class="headerlink" title="(1.2.2) 元数据验证"></a>(1.2.2) 元数据验证</h3><blockquote>
+<p>对字节码描述的信息进行语义分析，以保证其描述的信息符合《Java语言规范》的要求，如：</p>
+</blockquote>
+<blockquote>
+<p>这个类是否有父类(除了java.lang.Object之外，所有的类都应当有父类)<br>这个类的父类是否继承了不允许被继承的类(被final修饰的类)<br>如果这个类不是抽象类，是否实现了其父类或接口之中要求实现的所有方法<br>类中的字段、方法是否与父类产生矛盾(例如覆盖了父类的final字段，或者出现不符合规则的方法重载，例如方法参数都一致，但返回值类型却不同等)</p>
+</blockquote>
+<h3 id="1-2-3-字节码验证"><a href="#1-2-3-字节码验证" class="headerlink" title="(1.2.3) 字节码验证"></a>(1.2.3) 字节码验证</h3><blockquote>
+<p>通过数据流分析和控制流分析，确定程序语义是合法的、符合逻辑的，如：</p>
+</blockquote>
+<p>保证任意时刻操作数栈的数据类型与指令代码序列都能配合工作，例如不会出现类似于“在操作栈放置了一个int类型的数据，使用时却按long类型来加载入本地变量表中”这样的情况<br>保证任何跳转指令都不会跳转到方法体以外的字节码指令上<br>保证方法体中的类型转换总是有效的，例如父类=子类对象是合法的，返回来就是非法的</p>
+<h3 id="1-2-4-符号引用验证"><a href="#1-2-4-符号引用验证" class="headerlink" title="(1.2.4) 符号引用验证"></a>(1.2.4) 符号引用验证</h3><blockquote>
+<p>符号引用验证发生在虚拟机将符号引用转化为直接引用的时候，即解析阶段。主要目的是检查该类是否缺少或者被禁止访问它依赖的某些外部类、方法、字段等资源，如：<br>符号引用中通过字符串描述的全限定名是否能找到对应的类<br>在指定类中是否存在符合方法的字段描述符及简单名称所描述的方法和字段<br>符号引用中的类、字段、方法的可访问性(private、protected、public、)是否可被当前类访问</p>
+</blockquote>
+<br>
+
+
+<h2 id="1-3-准备"><a href="#1-3-准备" class="headerlink" title="(1.3) 准备"></a>(1.3) 准备</h2><blockquote>
+<p>准备阶段的目的，则是为被加载类的静态字段分配内存。<br>准备阶段是正式为类中定义的变量(即静态变量，被static修饰的变量)分配内存并设置类变量初始值的阶段，当类变量被final修饰时，在准备阶段就直接会被复制，不是使用初始值，如：</p>
+</blockquote>
+<blockquote>
+<p>public static int a = 123;<br>public static final int B = 123;<br>在准备阶段a的值是0，B的值是123。</p>
+</blockquote>
+<blockquote>
+<p>下面是，基本数据类型的初始值：<br>类型|默认值<br>—|—| int | 0 long | 0L byte | (byte)0 short | (short)0 char| ‘\u000’ float | 0.0f double | 0.0d boolean | false reference| null</p>
+</blockquote>
+<h2 id="1-4-解析"><a href="#1-4-解析" class="headerlink" title="(1.4) 解析"></a>(1.4) 解析</h2><blockquote>
+<p> 解析阶段的目的，是将符号引用解析成为实际引用。</p>
+</blockquote>
+<blockquote>
+<p> 在 class 文件被加载至 Java 虚拟机之前，这个类无法知道其他类及其方法、字段所对应的具体地址，甚至不知道自己方法、字段的地址。因此，每当需要引用这些成员时，Java 编译器会生成一个符号引用。在运行阶段，这个符号引用一般都能够无歧义地定位到具体目标上。<br> 对于一个方法调用，编译器会生成一个包含目标方法所在类的名字、目标方法的名字、接收参数类型以及返回值类型的符号引用，来指代所要调用的方法。</p>
+</blockquote>
+<blockquote>
+<p> 如果符号引用指向一个未被加载的类，或者未被加载类的字段或方法，那么解析将触发这个类的加载（但未必触发这个类的链接以及初始化。）</p>
+</blockquote>
+<blockquote>
+<p> 符号引用(Symbolic References)：符号引用以一组符号来描述所引用的目标，符号可以是任何形式的字面量，只要使用时能无歧义地定位到目标即可，引用的目标并不一定是已经加载到虚拟机内存当中的资源；<br> 直接引用(Direct References)：直接引用是可以直接指向目标的指针、相对偏移量或者是一个能间接定位到目标的句柄，如果有了直接引用，那引用的目标必定已经在虚拟机的内存中存在；</p>
+</blockquote>
+<br>
+
+<h2 id="1-5-初始化"><a href="#1-5-初始化" class="headerlink" title="(1.5) 初始化"></a>(1.5) 初始化</h2><blockquote>
+<p> 类加载的最后一步是初始化，便是为标记为常量值的字段赋值，以及执行 &lt; clinit &gt; 方法的过程。Java 虚拟机会通过加锁来确保类的 &lt; clinit &gt; 方法仅被执行一次。<br> 只有当初始化完成之后，类才正式成为可执行的状态。</p>
+</blockquote>
+<p>初始化阶段就是执行**类构造器 ()**方法的过程，它是真正开始执行Java代码的阶段，比如给类属性赋真实的值。</p>
+<p>public static int a = 123;<br>在初始化阶段后，a的值才等于123。</p>
+<p>(1) 方法是由编译器自动收集类中的所有类变量(static变量)的赋值动作和静态语句块(static{}块)中的语句合并产生的，收集顺序是源文件中的代码顺序；<br>(2) 方法不是必须的，如果我们的源文件中没有静态语句块和静态属性的赋值，那么久不会有() 方法。<br>(3) 方法在多线程情况下会通过加锁的方式来保证同步，并且只会被执行一次<br>子类() 方法执行之前需要保证先执行父类的() 方法，所以Object类的() 方法是第一个执行的</p>
+<h1 id="类的初始化触发条件"><a href="#类的初始化触发条件" class="headerlink" title="类的初始化触发条件"></a>类的初始化触发条件</h1><blockquote>
+<p> 类的初始化何时会被触发呢？JVM 规范枚举了下述多种触发情况：</p>
+</blockquote>
+<ol>
+<li>当虚拟机启动时，初始化用户指定的主类；</li>
+<li>当遇到用以新建目标类实例的 new 指令时，初始化 new 指令的目标类；</li>
+<li>当遇到调用静态方法的指令时，初始化该静态方法所在的类；</li>
+<li>当遇到访问静态字段的指令时，初始化该静态字段所在的类；</li>
+<li>子类的初始化会触发父类的初始化；</li>
+<li>如果一个接口定义了 default 方法，那么直接实现或者间接实现该接口的类的初始化，会触发该接口的初始化；</li>
+<li>使用反射 API 对某个类进行反射调用时，初始化这个类；</li>
+<li>当初次调用 MethodHandle 实例时，初始化该 MethodHandle 指向的方法所在的类。</li>
+</ol>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Singleton</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">private</span> <span class="token class-name">Singleton</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+  <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">LazyHolder</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">Singleton</span> INSTANCE <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Singleton</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Singleton</span> <span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token class-name">LazyHolder</span><span class="token punctuation">.</span>INSTANCE<span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  著名的单例延迟初始化例子中，只有当调用 Singleton.getInstance 时，程序才会访问 LazyHolder.INSTANCE，才会触发对 LazyHolder 的初始化（对应第 4 种情况），继而新建一个 Singleton 的实例。</p>
+<h2 id="1-5-使用"><a href="#1-5-使用" class="headerlink" title="(1.5) 使用"></a>(1.5) 使用</h2><h2 id="1-6-卸载"><a href="#1-6-卸载" class="headerlink" title="(1.6) 卸载"></a>(1.6) 卸载</h2><br>
+
+
+<h1 id="2-类加载器"><a href="#2-类加载器" class="headerlink" title="(2) 类加载器"></a>(2) 类加载器</h1><blockquote>
+<p> 通过 JVM 参数 <code>-verbose:class</code> 来打印类加载的先后顺序</p>
+</blockquote>
+<blockquote>
+<p> 对于任意一个类，都必须由加载它的类加载器和这个类本身一起共同确立其在Java虚拟机中的唯一性，每一个类加载器，都拥有一个独立的类名称空间。</p>
+</blockquote>
+<h2 id="2-1-类加载器类型"><a href="#2-1-类加载器类型" class="headerlink" title="(2.1) 类加载器类型"></a>(2.1) 类加载器类型</h2><p>** 启动类加载器(Bootstrap Class Loader) **</p>
+<blockquote>
+<p> 启动类加载器(Bootstrap Class Loader)：负责加载存放在lib目录，或者被-Xbootclasspath参数所指定的路径中存放的，而且是Java虚拟机能够识别的(按照文件名识别，如rt.jar、tools.jar，名字不符合的类库即使放在lib目录中也不会被加载)类库加载到虚拟机的内存中；</p>
+</blockquote>
+<p> ** 扩展类加载器(Extension Class Loader) **</p>
+<blockquote>
+<p> 扩展类加载器(Extension Class Loader)：这个类加载器是在类sun.misc.Launcher$ExtClassLoader中以Java代码的形式实现的。它负责加载\lib\ext目录中，或者被java.ext.dirs系统变量所指定的路径中所有的类库；</p>
+</blockquote>
+<p> ** 应用程序类加载器(Application Class Loader) ** </p>
+<blockquote>
+<p> 应用程序类加载器(Application Class Loader)：这个类加载器由sun.misc.Launcher$AppClassLoader来实现，也称为”系统类加载器”。它负责加载用户类路径(ClassPath)上所有的类库，开发者同样可以直接在代码中使用这个类加载器；</p>
+</blockquote>
+<h2 id="2-2-双亲委派模型"><a href="#2-2-双亲委派模型" class="headerlink" title="(2.2) 双亲委派模型"></a>(2.2) 双亲委派模型</h2><p>如图中展示的各种类加载器之间的层次关系被称为类加载器的“双亲委派模型(ParentsDelegation Model)”。双亲委派模型要求除了顶层的启动类加载器外，其余的类加载器都应有自己的父类加载器。不过这里类加载器之间的父子关系一般不是以继承(Inheritance)的关系来实现的，而是通常使用组合(Composition)关系来复用父加载器的代码。</p>
+<p>双亲委派模型的工作过程是：所有类的加载都委托给父加载器去完成，当父加载器无法加载这个类的时候，子加载器才会尝试加载。</p>
+<p>双亲委派模型最大的好处就是Java中的类随着它的类加载器一起具备了一种带有优先级的层次关系，保证同一个类只会被一个加载器加载。</p>
+<h3 id="2-2-1-双亲委派模型的实现"><a href="#2-2-1-双亲委派模型的实现" class="headerlink" title="(2.2.1) 双亲委派模型的实现"></a>(2.2.1) 双亲委派模型的实现</h3><p>先检查请求加载的类型是否已经被加载过，若没有则调用父加载器的loadClass()方法，若父加载器为空则默认使用启动类加载器作为父加载器。假如父类加载器加载失败，抛出ClassNotFoundException异常的话，才调用自己的findClass()方法尝试进行加载。</p>
+<h3 id="2-2-2-破坏双亲委派模型"><a href="#2-2-2-破坏双亲委派模型" class="headerlink" title="(2.2.2) 破坏双亲委派模型"></a>(2.2.2) 破坏双亲委派模型</h3><blockquote>
+<p> 双亲委派模型主要出现过3次较大规模“被破坏”的情况：</p>
+</blockquote>
+<p>在1.2之前，由于实现自定义类加载器只有覆盖loadClass()方法，导致了双亲委派模型的破坏，在1.2之后引入了findClass()方法之后得以解决。<br>基础类型无法调用回用户的代码，如JNDI、JDBC、JCE、JAXB和JBI等，他们的接口定义是基础类型，但是他们的实现是各各厂商，这就导致了基础类型需要调用用户代码。后来引入线程上下文类加载器(Thread Context ClassLoader)得以解决。<br>双亲委派模型的第三次“被破坏”是由于用户对程序动态性的追求而导致的，这里所说的“动态性”指的是一些非常“热”门的名词：代码热替换(Hot Swap)、模块热部署(HotDeployment)等。</p>
+<h3 id="2-2-3-自定义类加载器"><a href="#2-2-3-自定义类加载器" class="headerlink" title="(2.2.3) 自定义类加载器"></a>(2.2.3) 自定义类加载器</h3><blockquote>
+<p> 自定义类加载器需要继承ClassLoader类，为了不破坏双亲委派模型，自定义类加器建议覆盖findClass()方法，不建议覆盖loadClass()方法。下面是我实现的一个加载加密class文件、防止反编译核心代码的类加载器。</p>
+</blockquote>
+<h2 id="2-3-获取ClassLoader几种方式"><a href="#2-3-获取ClassLoader几种方式" class="headerlink" title="(2.3) 获取ClassLoader几种方式"></a>(2.3) 获取ClassLoader几种方式</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 方式一：获取当前类的 ClassLoader</span>
+clazz<span class="token punctuation">.</span><span class="token function">getClassLoader</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token comment">// 方式二：获取当前线程上下文的 ClassLoader</span>
+<span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token function">currentThread</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getContextClassLoader</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token comment">// 方式三：获取系统的 ClassLoader</span>
+<span class="token class-name">ClassLoader</span><span class="token punctuation">.</span><span class="token function">getSystemClassLoader</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token comment">// 方式四：获取调用者的 ClassLoader</span>
+<span class="token class-name">DriverManager</span><span class="token punctuation">.</span><span class="token function">getCallerClassLoader</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+<h1 id="3-遇到的问题"><a href="#3-遇到的问题" class="headerlink" title="(3) 遇到的问题"></a>(3) 遇到的问题</h1><h2 id="org-springframework-beans-factory-BeanDefinitionStoreException-Failed-to-read-candidate-component-class"><a href="#org-springframework-beans-factory-BeanDefinitionStoreException-Failed-to-read-candidate-component-class" class="headerlink" title="org.springframework.beans.factory.BeanDefinitionStoreException: Failed to read candidate component class"></a>org.springframework.beans.factory.BeanDefinitionStoreException: Failed to read candidate component class</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">org.springframework.beans.factory.BeanDefinitionStoreException:</span> <span class="token property">Failed to read candidate component class:</span> URL <span class="token punctuation">[</span>jar<span class="token operator">:</span>file<span class="token operator">:</span><span class="token file-path string">/cn/wkq/java/test/classtest.jar!/com/xx/yy/HelloServiceImpl.class</span><span class="token punctuation">]</span><span class="token operator">;</span> nested exception is java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ArrayIndexOutOfBoundsException<span class="token operator">:</span> <span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<blockquote>
+<p> Spring在扫描指定包路径下的类时，并不会一一用类加载器加载它们，而是自己把类文件当成普通文件从本地磁盘中读进来变成一个字节数组（并没有经过JVM类加载过程），然后用ASM去解析这个字节数组得到这个类的元数据，然后判断这个类的元数据里面是否有@Component等相关Spring的注解。如果有的话后面才会进一步使用类加载器去加载这个类，没有的话就不会尝试去加载。</p>
+</blockquote>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] 《深入理解Java虚拟机：JVM高级特性与最佳实践》 周志明<br>[2] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/z3KRsf425RPZG-_o9EuyPg">深入理解JVM - 类加载机制</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/11523">03 | Java虚拟机是如何加载Java类的?</a><br>[4] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/YRgEK9S2xkrK10cVp0siUQ">80%以上Javaer可能不知道的一个Spring知识点</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/jvm/" rel="tag"># jvm</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2019/05/13/seckill-system/" rel="prev" title="秒杀系统">
+                  <i class="fa fa-chevron-left"></i> 秒杀系统
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2019/06/30/orientdb-sql/" rel="next" title="orientdb 常用语句">
+                  orientdb 常用语句 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

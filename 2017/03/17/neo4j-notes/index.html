@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="Neo4j使用笔记 1. Neo4j介绍  Neo4j是一种NoSQL数据库，原理是数学里的图论。  常见的SQL数据库有MySQL  Oracle等  常见的NoSQL数据库有Redis  ES  Mongdb  Neo4j等  近几年比较流行的的图数据库有Neo4j Titan  OrientDB  Sparksee  Virtuso  ArangoDb  Airaph  GraphDB  G">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Neo4j 笔记">
+<meta property="og:url" content="http://weikeqin.com/2017/03/17/neo4j-notes/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Neo4j使用笔记 1. Neo4j介绍  Neo4j是一种NoSQL数据库，原理是数学里的图论。  常见的SQL数据库有MySQL  Oracle等  常见的NoSQL数据库有Redis  ES  Mongdb  Neo4j等  近几年比较流行的的图数据库有Neo4j Titan  OrientDB  Sparksee  Virtuso  ArangoDb  Airaph  GraphDB  G">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-03-17T02:46:17.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.255Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="neo4j">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/03/17/neo4j-notes/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/03/17/neo4j-notes/","path":"2017/03/17/neo4j-notes/","title":"Neo4j 笔记"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Neo4j 笔记 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Neo4j%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">1. Neo4j介绍</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Neo4j%E4%B8%8B%E8%BD%BD%E3%80%81%E5%AE%89%E8%A3%85%E3%80%81%E9%85%8D%E7%BD%AE"><span class="nav-number">2.</span> <span class="nav-text">2. Neo4j下载、安装、配置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E4%B8%8B%E8%BD%BD"><span class="nav-number">2.1.</span> <span class="nav-text">2.1  下载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E5%AE%89%E8%A3%85%E4%BD%BF%E7%94%A8"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 安装使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-linux%E4%B8%8B%E5%AE%89%E8%A3%85%E4%BD%BF%E7%94%A8"><span class="nav-number">2.2.1.</span> <span class="nav-text">2.2.1 linux下安装使用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AEneo4j%E5%BC%80%E6%9C%BA%E5%90%AF%E5%8A%A8"><span class="nav-number">2.2.2.</span> <span class="nav-text">设置neo4j开机启动</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-2-windows%E4%B8%8B%E5%AE%89%E8%A3%85%E4%BD%BF%E7%94%A8"><span class="nav-number">2.2.3.</span> <span class="nav-text">2.2.2 windows下安装使用</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E9%85%8D%E7%BD%AE"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%B8%E7%94%A8%E9%85%8D%E7%BD%AE"><span class="nav-number">2.3.1.</span> <span class="nav-text">常用配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#neo4j%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E7%BD%AE%E5%88%9D%E5%A7%8B%E5%AF%86%E7%A0%81"><span class="nav-number">2.3.2.</span> <span class="nav-text">neo4j数据库设置初始密码</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Neo4j%E4%BD%BF%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">3. Neo4j使用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Neo4j%E5%90%AF%E5%8A%A8%E5%90%8E%E5%8A%A8%E6%80%81%E4%BF%AE%E6%94%B9%E9%85%8D%E7%BD%AE"><span class="nav-number">4.</span> <span class="nav-text">Neo4j启动后动态修改配置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Cypher"><span class="nav-number">4.1.</span> <span class="nav-text">Cypher</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#github%E4%BE%8B%E5%AD%90"><span class="nav-number">4.2.</span> <span class="nav-text">github例子</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">5.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/03/17/neo4j-notes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Neo4j 笔记
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-03-17 10:46:17" itemprop="dateCreated datePublished" datetime="2017-03-17T10:46:17+08:00">2017-03-17</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/neo4j/" itemprop="url" rel="index"><span itemprop="name">neo4j</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/03/17/neo4j-notes/" class="post-meta-item leancloud_visitors" data-flag-title="Neo4j 笔记" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>Neo4j使用笔记</p>
+<h1 id="1-Neo4j介绍"><a href="#1-Neo4j介绍" class="headerlink" title="1. Neo4j介绍"></a>1. Neo4j介绍</h1><p>  Neo4j是一种NoSQL数据库，原理是数学里的图论。<br>  常见的SQL数据库有MySQL  Oracle等<br>  常见的NoSQL数据库有Redis  ES  Mongdb  Neo4j等<br>  近几年比较流行的的图数据库有Neo4j Titan  OrientDB  Sparksee  Virtuso  ArangoDb  Airaph  GraphDB  GraphBase等</p>
+<p>  Neo4j数据库比较适合处理关系，比如人和人之间的社交关系。<br>  比较成功的应用有 领英 FaceBook  Twitter</p>
+<h1 id="2-Neo4j下载、安装、配置"><a href="#2-Neo4j下载、安装、配置" class="headerlink" title="2. Neo4j下载、安装、配置"></a>2. Neo4j下载、安装、配置</h1><p>  Neo4j是开源免费的图数据库，社区版代码开源，企业版代码除集群相关的代码，其余代码全部开源<br>  还有一点，社区版免费，企业版收费。<br>  社区版最多允许 <code>2^35</code> 个节点，<code>2^35</code> 个关系，<code>2^36</code> 个属性</p>
+<span id="more"></span>
+
+
+<h2 id="2-1-下载"><a href="#2-1-下载" class="headerlink" title="2.1  下载"></a>2.1  下载</h2><!--
+
+社区版
+　https://neo4j.com/artifact.php?name=neo4j-community-3.1.2-unix.tar.gz   community Linux 版
+　https://neo4j.com/artifact.php?name=neo4j-community-3.1.2-windows.zip   community Windows 版
+
+  https://neo4j.com/artifact.php?name=neo4j-community-4.0.1-unix.tar.gz  
+  https://neo4j.com/artifact.php?name=neo4j-community-4.0.1-windows.zip
+
+企业版
+  https://neo4j.com/artifact.php?name=neo4j-enterprise-3.4.0-unix.tar.gz  enterprise-linux 版
+  https://neo4j.com/artifact.php?name=neo4j-enterprise-3.4.0-windows.zip  enterprise-windows 版
+
+
+-->
+<p>  <a target="_blank" rel="noopener" href="https://neo4j.com/download/other-releases/">Neo4j所有版本的下载地址</a><br>  linux unix 推荐使用 .tar.gz包，windows推荐使用.zip包<br>  这样做的好处就是解压完就可以使用，对目录结构、配置等比较了解<br>  windows上使用.exe安装的用户经常找不见配置，load csv以及其他操作时经常找不见目录</p>
+<h2 id="2-2-安装使用"><a href="#2-2-安装使用" class="headerlink" title="2.2 安装使用"></a>2.2 安装使用</h2><h3 id="2-2-1-linux下安装使用"><a href="#2-2-1-linux下安装使用" class="headerlink" title="2.2.1 linux下安装使用"></a>2.2.1 linux下安装使用</h3><ol>
+<li>tar -zxvf neo4j-community-3.1.2.tar.gz</li>
+<li>进入bin目录，使用 <code>neo4j console</code> 启动Neo4j数据库，如果想让Neo4j后台运行，使用 <code>neo4j start</code> 启动</li>
+<li>在浏览器里输入<a href="http://localhost:7474来访问数据库，默认用户名、密码">http://localhost:7474来访问数据库，默认用户名、密码</a>: neo4j/neo4j</li>
+<li>如果想自定义配置，可以在${NEO4J_HOME}/conf/neo4j.conf修改对应配置</li>
+</ol>
+<p>  linux用户注意:<br>  使用超级用户修改 <code>/etc/security/limits.conf</code> 文件，允许当前用户(neo4j)打开40000个文件</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">neo4j   soft    nofile  <span class="token number">40000</span>
+neo4j   hard    nofile  <span class="token number">40000</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>  修改 <code>/etc/pam.d/su</code> 文件</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">session    required   pam_limits.so<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h3 id="设置neo4j开机启动"><a href="#设置neo4j开机启动" class="headerlink" title="设置neo4j开机启动"></a>设置neo4j开机启动</h3><p>  <code>vim /etc/rc.d/rc.local</code><br>  在文件最后添加如下命令：<code>/usr/share/neo4j/bin/neo4j start</code><br>  其中 <code>/usr/share/neo4j/bin/</code> 是Neo4j的安装路径</p>
+<h3 id="2-2-2-windows下安装使用"><a href="#2-2-2-windows下安装使用" class="headerlink" title="2.2.2 windows下安装使用"></a>2.2.2 windows下安装使用</h3><ol>
+<li>下载的压缩包neo4j-community-3.1.2.zip，解压完就可以用。</li>
+<li>解压完进入bin目录，输入 <code>neo4j console</code> 就可以看到neo4j数据库启动了</li>
+<li>在浏览器里输入<a href="http://localhost:7474来访问数据库，默认用户名、密码">http://localhost:7474来访问数据库，默认用户名、密码</a>: neo4j/neo4j</li>
+<li>如果想自定义配置，可以在${NEO4J_HOME}/conf/neo4j.conf修改对应配置</li>
+</ol>
+<h2 id="2-3-配置"><a href="#2-3-配置" class="headerlink" title="2.3 配置"></a>2.3 配置</h2><h3 id="常用配置"><a href="#常用配置" class="headerlink" title="常用配置"></a>常用配置</h3><pre class="line-numbers language-text" data-language="text"><code class="language-text">#设置可以通过ip当问Neo4j数据库
+dbms.connectors.default_listen_address=0.0.0.0  
+
+#历史版本请修改
+dbms.connector.http.address=0.0.0.0:7474
+org.neo4j.server.webserver.address=0.0.0.0
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="neo4j数据库设置初始密码"><a href="#neo4j数据库设置初始密码" class="headerlink" title="neo4j数据库设置初始密码"></a>neo4j数据库设置初始密码</h3><pre class="line-numbers language-text" data-language="text"><code class="language-text">bin/neo4j-admin set-initial-password yourpassword<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+
+<h1 id="3-Neo4j使用"><a href="#3-Neo4j使用" class="headerlink" title="3. Neo4j使用"></a>3. Neo4j使用</h1><p>  Neo4j里非常重要的一些思想，一个节点、一条边就是一个对象<br>  节点可以有多个Label、边只能有一个RelationShip<br>  Neo4j是no schema的数据库，导入数据前不需要定义结构<br>  不要用关系型数据库的思维来对待Neo4j</p>
+<p>  A row is a node<br>  A table name is a label name</p>
+<p>　Properties<br>　Both nodes and relationships can have properties.<br>　Properties are named values where the name is a string. The supported property values are:<br>　• Numeric values,<br>　• String values,<br>　• Boolean values,<br>　• Collections of any other type of value.</p>
+<p>Labels have an id space of an int, meaning the maximum number of labels the database can contain is roughly 2 billion.</p>
+<p>Paths<br>A path is one or more nodes with connecting relationships, typically retrieved as a query or traversal result</p>
+<p>Neo4j is a schema-optional graph database</p>
+<p>You can use Neo4j without any schema. Optionally you can introduce it in order to gain performance or modeling benefits. This allows a way of working where the schema does not get in your way until you are at a stage where you want to reap the benefits of having one.</p>
+<p>Indexs<br>Performance is gained by creating indexes, which improve the speed of looking up nodes in the database.</p>
+<h1 id="Neo4j启动后动态修改配置"><a href="#Neo4j启动后动态修改配置" class="headerlink" title="Neo4j启动后动态修改配置"></a>Neo4j启动后动态修改配置</h1><pre class="line-numbers language-text" data-language="text"><code class="language-text">//
+CALL dbms.setConfigValue('dbms.logs.query.enabled', 'true')
+
+dbms.checkpoint.iops.limit    Limit the number of IOs the background checkpoint process will consume per second.
+dbms.logs.query.enabled    Log executed queries that take longer than the configured threshold, dbms.logs.query.threshold.
+dbms.logs.query.rotation.keep_number    Maximum number of history files for the query log.
+dbms.logs.query.rotation.size    The file size in bytes at which the query log will auto-rotate.
+dbms.logs.query.threshold    If the execution of query takes more time than this threshold, the query is logged - provided query logging is enabled.
+dbms.transaction.timeout    The maximum time interval of a transaction within which it should be completed.<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="Cypher"><a href="#Cypher" class="headerlink" title="Cypher"></a>Cypher</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">:help  帮助页面
+:schema  查看数据库结构
+:schema ls -l :Person
+
+:server change-password  // 修改密码
+CALL dbms.changePassword("newpassword")  // (旧版本)修改密码
+
+:server connect  连接
+
+:play sysinfo 查看系统信息
+
+// List node labels  查询所有的label
+CALL db.labels()
+
+// List relationship types  查询所有的type
+CALL db.relationshipTypes()
+
+// What is related, and how  查询数据里的节点和关系 类似于 SQL的desc
+CALL db.schema()
+
+// List functions
+CALL dbms.functions()
+
+// List procedures
+CALL dbms.procedures()
+
+CALL dbms.listQueries() ;
+
+CALL dbms.killQuery(queryId);
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">
+// delete single node
+// 删除id=1的节点
+match (n:DictEntity) where id(n) = 1 delete n;
+
+// delete a node and connected relationships
+// 删除节点和关系
+match (n:DictEntity &#123;name: 'zhangsan'&#125;)-[r]-() delete r,n
+
+// delete all nodes and relationships
+// 删除所有节点和关系
+match (n) OPTIONAL match (n)-[r]-() delete n,r
+
+// delete all nodes and relationships
+// 删除所有节点和关系
+// 容易内存溢出
+match (n) detach delete n;
+
+match (n)-[r]-() where n.name = '词典1' delete r   删除关系  
+match (n:DictEntity) where n.name="词典1" delete n   删除节点
+match (n:DictEntity &#123;name:"词典1"&#125;) delete n
+
+
+// Count all nodes
+// 查询一共有多少节点
+match (n) RETURN count(n)
+
+// Count all relationships
+// 查询一共有多少关系  // 不带方向的话结果是2倍
+match ()-->() RETURN count(*);
+match ()-[r]->() return count(r);
+
+// What kind of nodes exist
+// Sample some nodes, reporting on property and relationship counts per node.
+match (n) where rand() &lt;= 0.1
+RETURN
+DISTINCT labels(n),
+count(*) AS SampleSize,
+avg(size(keys(n))) as Avg_PropertyCount,
+min(size(keys(n))) as Min_PropertyCount,
+max(size(keys(n))) as Max_PropertyCount,
+avg(size( (n)-[]-() ) ) as Avg_RelationshipCount,
+min(size( (n)-[]-() ) ) as Min_RelationshipCount,
+max(size( (n)-[]-() ) ) as Max_RelationshipCount
+
+
+// What is related, and how
+// Sample the graph, reporting the patterns of connected labels,
+// with min, max, avg degrees and associated node and relationship properties.
+match (n) where rand() &lt;= 0.1
+match (n)-[r]->(m)
+WITH n, type(r) as via, m
+RETURN labels(n) as from,
+reduce(keys = [], keys_n in collect(keys(n)) | keys + filter(k in keys_n where NOT k IN keys)) as props_from,
+via,
+labels(m) as to,
+reduce(keys = [], keys_m in collect(keys(m)) | keys + filter(k in keys_m where NOT k IN keys)) as props_to,
+count(*) as freq
+
+
+// 在用户结点的用户名属性上创建索引  (除了结点名和字段名，cypther不区分大小写)
+create index on :Person(name);   
+
+// 删除索引
+drop index on :Person(name);
+
+
+create constraint on (p:Person) assert p.name is unique;  //
+CREATE CONSTRAINT ON (book:Book) ASSERT book.isbn IS UNIQUE;  // 在Book对象isbn属性上创建唯一性约束
+
+// 删除Person类别上的name属性 索引
+drop constraint on (p:Person) assert p.name is unique;
+// 删除isbn属性上的唯一性约束
+DROP CONSTRAINT ON (book:Book) ASSERT book.isbn IS UNIQUE  
+
+//
+DROP CONSTRAINT ON (book:Book) ASSERT exists(book.isbn)
+
+PROFILE 在查询前加上prifile可以查看数据库查询的详细流程
+
+
+
+
+match (a:Person), (b:Person) where a.name = 'zhangsan' and b.name = 'lisi'
+merge (a)-[r:RELTYPE]->(b) return r<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 模糊匹配</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> where n<span class="token punctuation">.</span>name <span class="token operator">=</span><span class="token operator">~</span> <span class="token char">'张.*'</span> <span class="token keyword">return</span> n
+
+<span class="token comment">// 包含</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> where n<span class="token punctuation">.</span>name contains <span class="token char">'张'</span> <span class="token keyword">return</span> n<span class="token punctuation">;</span>
+
+<span class="token comment">// 去重</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> <span class="token keyword">with</span> <span class="token namespace">n<span class="token punctuation">.</span>name</span> as name  <span class="token keyword">return</span> distinct name<span class="token punctuation">;</span>
+
+<span class="token comment">// Count all nodes  </span>
+<span class="token comment">// 查询一共有多少节点</span>
+match <span class="token punctuation">(</span>n<span class="token punctuation">)</span> <span class="token class-name">RETURN</span> <span class="token function">count</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span>
+
+<span class="token comment">// Count all relationships</span>
+<span class="token comment">// 查询一共有多少关系</span>
+match <span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">--</span><span class="token operator">></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token class-name">RETURN</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Get some data  随便查一些数据</span>
+match <span class="token punctuation">(</span>n1<span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>n2<span class="token punctuation">)</span> <span class="token class-name">RETURN</span> r<span class="token punctuation">,</span> n1<span class="token punctuation">,</span> n2 LIMIT <span class="token number">25</span>
+
+
+
+<span class="token comment">// 查询一共有多少种节点</span>
+call db<span class="token punctuation">.</span><span class="token function">labels</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+match <span class="token punctuation">(</span>n<span class="token punctuation">)</span> <span class="token keyword">return</span> distinct <span class="token function">label</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+
+<span class="token comment">// 查询一共有多少关系</span>
+call db<span class="token punctuation">.</span><span class="token function">relationshipTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+<span class="token comment">// 查询数据库里的所有属性</span>
+match <span class="token punctuation">(</span>n<span class="token punctuation">)</span> unwind <span class="token function">keys</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span> as allkeys  <span class="token keyword">return</span> distinct allkeys<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 查询关系最多的节点</span>
+<span class="token comment">// 实际使用时，最好对n加个范围，要不然 全图扫描</span>
+<span class="token comment">// 使用with 和 别名，能减少一次count(*)的查询</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Movie</span><span class="token punctuation">)</span><span class="token operator">--</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">with</span> <span class="token namespace">n<span class="token punctuation">.</span>title</span> as title<span class="token punctuation">,</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> as count <span class="token keyword">return</span> title<span class="token punctuation">,</span> count order by count desc limit <span class="token number">1</span><span class="token punctuation">;</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Movie</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">with</span> <span class="token namespace">n<span class="token punctuation">.</span>tile</span> as title<span class="token punctuation">,</span> <span class="token function">count</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span> as count <span class="token keyword">return</span> title<span class="token punctuation">,</span> count order by count desc limit <span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 查询孤立节点</span>
+match <span class="token punctuation">(</span>n<span class="token punctuation">)</span> where not <span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token operator">--</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token function">id</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 查询有3条关系的节点</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Test</span><span class="token punctuation">)</span><span class="token operator">--</span><span class="token operator">></span><span class="token punctuation">(</span>m<span class="token punctuation">)</span> <span class="token keyword">with</span> <span class="token namespace">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> as count<span class="token punctuation">,</span> n as result where count <span class="token operator">=</span><span class="token number">3</span> <span class="token keyword">return</span> result limit <span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 查询有3度关系的节点</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Test</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">RelationShip</span><span class="token operator">*</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>m<span class="token punctuation">)</span> <span class="token keyword">return</span> n limit <span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 查询有1到3度关系的节点</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Test</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">RelationShip</span><span class="token operator">*</span><span class="token number">1.</span><span class="token number">.3</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>m<span class="token punctuation">)</span> <span class="token keyword">return</span> n limit <span class="token number">10</span><span class="token punctuation">;</span>
+
+
+match <span class="token punctuation">(</span>p<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> where <span class="token function">id</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">184</span> set p<span class="token punctuation">.</span>number<span class="token operator">=</span>p<span class="token punctuation">.</span>序号<span class="token punctuation">,</span> p<span class="token punctuation">.</span>name<span class="token operator">=</span>p<span class="token punctuation">.</span>姓名<span class="token punctuation">,</span> p<span class="token punctuation">.</span><span class="token keyword">class</span> <span class="token operator">=</span> p<span class="token punctuation">.</span>班级<span class="token punctuation">,</span> p<span class="token punctuation">.</span>sex <span class="token operator">=</span> p<span class="token punctuation">.</span>性别 remove p<span class="token punctuation">.</span>序号<span class="token punctuation">,</span>p<span class="token punctuation">.</span>姓名<span class="token punctuation">,</span>p<span class="token punctuation">.</span>班级<span class="token punctuation">,</span>p<span class="token punctuation">.</span>性别 <span class="token keyword">return</span> p<span class="token punctuation">;</span>
+
+<span class="token comment">// Person对象有个sex属性，因为业务需要想改成gender属性</span>
+match <span class="token punctuation">(</span>p<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'张三'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span> set  p<span class="token punctuation">.</span>gender <span class="token operator">=</span> p<span class="token punctuation">.</span>sex remove p<span class="token punctuation">.</span>sex <span class="token keyword">return</span> p
+
+<span class="token comment">// 关系r的名字叫IsFriend，因为业务需要改成汉语的名字</span>
+match <span class="token punctuation">(</span>a<span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">IsFrend</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>b<span class="token punctuation">)</span> create <span class="token punctuation">(</span>a<span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r2<span class="token operator">:</span>朋友<span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>b<span class="token punctuation">)</span> set r2<span class="token punctuation">.</span>id <span class="token operator">=</span> r<span class="token punctuation">.</span>id delete r
+
+match <span class="token punctuation">(</span>p1<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span>isFrend<span class="token operator">*</span><span class="token number">1.</span><span class="token number">.6</span> <span class="token punctuation">&#123;</span>friend<span class="token operator">:</span><span class="token number">1</span><span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>p2<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> <span class="token keyword">return</span> p1<span class="token punctuation">,</span>r<span class="token punctuation">,</span>p2
+
+
+
+match <span class="token punctuation">(</span>a<span class="token operator">:</span><span class="token class-name">A</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r1<span class="token operator">:</span>AB<span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span>b<span class="token operator">:</span><span class="token class-name">B</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r2<span class="token operator">:</span>BC<span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span>c<span class="token operator">:</span><span class="token class-name">C</span><span class="token punctuation">)</span> where not <span class="token punctuation">(</span>a<span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span><span class="token operator">:</span>AC<span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token keyword">return</span> a<span class="token punctuation">,</span>r1<span class="token punctuation">,</span>b<span class="token punctuation">,</span>r2<span class="token punctuation">,</span>c
+
+
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'lisi'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span> <span class="token keyword">with</span> <span class="token namespace">n</span> skip <span class="token number">1</span> delete n <span class="token punctuation">;</span>
+
+
+<span class="token punctuation">(</span>a<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'a'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">RelationShip</span> <span class="token punctuation">&#123;</span>date<span class="token operator">:</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">00</span><span class="token operator">:</span><span class="token number">00</span>'<span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>c<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'c'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token operator">&lt;</span><span class="token operator">-</span><span class="token punctuation">[</span>r2<span class="token operator">:</span><span class="token class-name">RelationShip</span> <span class="token punctuation">&#123;</span>date<span class="token operator">:</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">30</span><span class="token operator">:</span><span class="token number">00</span>'<span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span>b<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'b'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+<span class="token punctuation">(</span>d<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'d'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">RelationShip</span> <span class="token punctuation">&#123;</span>date<span class="token operator">:</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">00</span><span class="token operator">:</span><span class="token number">00</span>'<span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>e<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'e'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+想删除a<span class="token punctuation">,</span> d<span class="token punctuation">,</span> e
+<span class="token comment">// 创建节点</span>
+merge <span class="token punctuation">(</span>a<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'a'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">RelationShip</span> <span class="token punctuation">&#123;</span>date<span class="token operator">:</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">00</span><span class="token operator">:</span><span class="token number">00</span>'<span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>c<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'c'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token operator">&lt;</span><span class="token operator">-</span><span class="token punctuation">[</span>r2<span class="token operator">:</span><span class="token class-name">RelationShip</span> <span class="token punctuation">&#123;</span>date<span class="token operator">:</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">30</span><span class="token operator">:</span><span class="token number">00</span>'<span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span>b<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'b'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span> <span class="token keyword">return</span> r<span class="token punctuation">,</span>r2<span class="token punctuation">;</span>
+merge <span class="token punctuation">(</span>d<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'d'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token operator">:</span><span class="token class-name">RelationShip</span> <span class="token punctuation">&#123;</span>date<span class="token operator">:</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">00</span><span class="token operator">:</span><span class="token number">00</span>'<span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>e<span class="token operator">:</span><span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>name<span class="token operator">:</span><span class="token char">'e'</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span> <span class="token keyword">return</span> r
+<span class="token comment">// 分三次执行</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token punctuation">]</span><span class="token operator">-></span><span class="token punctuation">(</span>m<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> where <span class="token punctuation">(</span>r<span class="token punctuation">.</span>date <span class="token operator">>=</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">11</span><span class="token operator">:</span><span class="token number">00</span><span class="token operator">:</span><span class="token number">00</span>' and r<span class="token punctuation">.</span>date<span class="token operator">&lt;=</span>'<span class="token number">2017</span><span class="token operator">-</span><span class="token number">06</span><span class="token operator">-</span><span class="token number">22</span> <span class="token number">12</span><span class="token operator">:</span><span class="token number">29</span><span class="token operator">:</span><span class="token number">59</span>'<span class="token punctuation">)</span> set n<span class="token punctuation">.</span>flag <span class="token operator">=</span> <span class="token char">'1'</span> <span class="token punctuation">,</span> m<span class="token punctuation">.</span>flag <span class="token operator">=</span> <span class="token char">'1'</span> delete r <span class="token punctuation">;</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">[</span>r<span class="token punctuation">]</span><span class="token operator">-</span><span class="token punctuation">(</span>m<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span>  <span class="token keyword">with</span> <span class="token namespace">count</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span>  as count <span class="token punctuation">,</span> n  where count <span class="token operator">></span> <span class="token number">0</span> set n<span class="token punctuation">.</span>flag <span class="token operator">=</span> <span class="token char">'0'</span>  <span class="token keyword">return</span> count<span class="token punctuation">,</span>n<span class="token punctuation">;</span>
+match <span class="token punctuation">(</span>n<span class="token operator">:</span><span class="token class-name">Person</span><span class="token punctuation">)</span> where n<span class="token punctuation">.</span>flag <span class="token operator">=</span> <span class="token char">'1'</span> delete n<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>As the indexes are created after the nodes are inserted, their population happens asynchronously, so we use schema await (a shell command) to block until they are populated.<br>schema await</p>
+<p>[r:Person*3..4]</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ CALL dbms.procedures();
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| name                                           | signature                                                                                                                                                           | description                                                                                                            |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| "db.awaitIndex"                                | "db.awaitIndex(index :: STRING?, timeOutSeconds = 300 :: INTEGER?) :: VOID"                                                                                         | "Wait for an index to come online (for example: CALL db.awaitIndex(":Person(name)"))."                                 |
+| "db.awaitIndexes"                              | "db.awaitIndexes(timeOutSeconds = 300 :: INTEGER?) :: VOID"                                                                                                         | "Wait for all indexes to come online (for example: CALL db.awaitIndexes("500"))."                                      |
+| "db.constraints"                               | "db.constraints() :: (description :: STRING?)"                                                                                                                      | "List all constraints in the database."                                                                                |
+| "db.createLabel"                               | "db.createLabel(newLabel :: STRING?) :: VOID"                                                                                                                       | "Create a label"                                                                                                       |
+| "db.createProperty"                            | "db.createProperty(newProperty :: STRING?) :: VOID"                                                                                                                 | "Create a Property"                                                                                                    |
+| "db.createRelationshipType"                    | "db.createRelationshipType(newRelationshipType :: STRING?) :: VOID"                                                                                                 | "Create a RelationshipType"                                                                                            |
+| "db.index.explicit.addNode"                    | "db.index.explicit.addNode(indexName :: STRING?, node :: NODE?, key :: STRING?, value :: ANY?) :: (success :: BOOLEAN?)"                                            | "Add a node to an explicit index based on a specified key and value"                                                   |
+| "db.index.explicit.addRelationship"            | "db.index.explicit.addRelationship(indexName :: STRING?, relationship :: RELATIONSHIP?, key :: STRING?, value :: ANY?) :: (success :: BOOLEAN?)"                    | "Add a relationship to an explicit index based on a specified key and value"                                           |
+| "db.index.explicit.auto.searchNodes"           | "db.index.explicit.auto.searchNodes(query :: ANY?) :: (node :: NODE?, weight :: FLOAT?)"                                                                            | "Search nodes in explicit automatic index. Replaces `START n=node:node_auto_index('key:foo*')`"                        |
+| "db.index.explicit.auto.searchRelationships"   | "db.index.explicit.auto.searchRelationships(query :: ANY?) :: (relationship :: RELATIONSHIP?, weight :: FLOAT?)"                                                    | "Search relationship in explicit automatic index. Replaces `START r=relationship:relationship_auto_index('key:foo*')`" |
+| "db.index.explicit.auto.seekNodes"             | "db.index.explicit.auto.seekNodes(key :: STRING?, value :: ANY?) :: (node :: NODE?)"                                                                                | "Get node from explicit automatic index. Replaces `START n=node:node_auto_index(key = 'A')`"                           |
+| "db.index.explicit.auto.seekRelationships"     | "db.index.explicit.auto.seekRelationships(key :: STRING?, value :: ANY?) :: (relationship :: RELATIONSHIP?)"                                                        | "Get relationship from explicit automatic index. Replaces `START r=relationship:relationship_auto_index(key = 'A')`"   |
+| "db.index.explicit.drop"                       | "db.index.explicit.drop(indexName :: STRING?) :: (type :: STRING?, name :: STRING?, config :: MAP?)"                                                                | "Remove an explicit index - YIELD type,name,config"                                                                    |
+| "db.index.explicit.existsForNodes"             | "db.index.explicit.existsForNodes(indexName :: STRING?) :: (success :: BOOLEAN?)"                                                                                   | "Check if a node explicit index exists"                                                                                |
+| "db.index.explicit.existsForRelationships"     | "db.index.explicit.existsForRelationships(indexName :: STRING?) :: (success :: BOOLEAN?)"                                                                           | "Check if a relationship explicit index exists"                                                                        |
+| "db.index.explicit.forNodes"                   | "db.index.explicit.forNodes(indexName :: STRING?) :: (type :: STRING?, name :: STRING?, config :: MAP?)"                                                            | "Get or create a node explicit index - YIELD type,name,config"                                                         |
+| "db.index.explicit.forRelationships"           | "db.index.explicit.forRelationships(indexName :: STRING?) :: (type :: STRING?, name :: STRING?, config :: MAP?)"                                                    | "Get or create a relationship explicit index - YIELD type,name,config"                                                 |
+| "db.index.explicit.list"                       | "db.index.explicit.list() :: (type :: STRING?, name :: STRING?, config :: MAP?)"                                                                                    | "List all explicit indexes - YIELD type,name,config"                                                                   |
+| "db.index.explicit.removeNode"                 | "db.index.explicit.removeNode(indexName :: STRING?, node :: NODE?, key :: STRING?) :: (success :: BOOLEAN?)"                                                        | "Remove a node from an explicit index with an optional key"                                                            |
+| "db.index.explicit.removeRelationship"         | "db.index.explicit.removeRelationship(indexName :: STRING?, relationship :: RELATIONSHIP?, key :: STRING?) :: (success :: BOOLEAN?)"                                | "Remove a relationship from an explicit index with an optional key"                                                    |
+| "db.index.explicit.searchNodes"                | "db.index.explicit.searchNodes(indexName :: STRING?, query :: ANY?) :: (node :: NODE?, weight :: FLOAT?)"                                                           | "Search nodes in explicit index. Replaces `START n=node:nodes('key:foo*')`"                                            |
+| "db.index.explicit.searchRelationships"        | "db.index.explicit.searchRelationships(indexName :: STRING?, query :: ANY?) :: (relationship :: RELATIONSHIP?, weight :: FLOAT?)"                                   | "Search relationship in explicit index. Replaces `START r=relationship:relIndex('key:foo*')`"                          |
+| "db.index.explicit.searchRelationshipsBetween" | "db.index.explicit.searchRelationshipsBetween(indexName :: STRING?, in :: NODE?, out :: NODE?, query :: ANY?) :: (relationship :: RELATIONSHIP?, weight :: FLOAT?)" | "Search relationship in explicit index, starting at the node 'in' and ending at 'out'."                                |
+| "db.index.explicit.searchRelationshipsIn"      | "db.index.explicit.searchRelationshipsIn(indexName :: STRING?, in :: NODE?, query :: ANY?) :: (relationship :: RELATIONSHIP?, weight :: FLOAT?)"                    | "Search relationship in explicit index, starting at the node 'in'."                                                    |
+| "db.index.explicit.searchRelationshipsOut"     | "db.index.explicit.searchRelationshipsOut(indexName :: STRING?, out :: NODE?, query :: ANY?) :: (relationship :: RELATIONSHIP?, weight :: FLOAT?)"                  | "Search relationship in explicit index, ending at the node 'out'."                                                     |
+| "db.index.explicit.seekNodes"                  | "db.index.explicit.seekNodes(indexName :: STRING?, key :: STRING?, value :: ANY?) :: (node :: NODE?)"                                                               | "Get node from explicit index. Replaces `START n=node:nodes(key = 'A')`"                                               |
+| "db.index.explicit.seekRelationships"          | "db.index.explicit.seekRelationships(indexName :: STRING?, key :: STRING?, value :: ANY?) :: (relationship :: RELATIONSHIP?)"                                       | "Get relationship from explicit index. Replaces `START r=relationship:relIndex(key = 'A')`"                            |
+| "db.indexes"                                   | "db.indexes() :: (description :: STRING?, label :: STRING?, properties :: LIST? OF STRING?, state :: STRING?, type :: STRING?, provider :: MAP?)"                   | "List all indexes in the database."                                                                                    |
+| "db.labels"                                    | "db.labels() :: (label :: STRING?)"                                                                                                                                 | "List all labels in the database."                                                                                     |
+| "db.propertyKeys"                              | "db.propertyKeys() :: (propertyKey :: STRING?)"                                                                                                                     | "List all property keys in the database."                                                                              |
+| "db.relationshipTypes"                         | "db.relationshipTypes() :: (relationshipType :: STRING?)"                                                                                                           | "List all relationship types in the database."                                                                         |
+| "db.resampleIndex"                             | "db.resampleIndex(index :: STRING?) :: VOID"                                                                                                                        | "Schedule resampling of an index (for example: CALL db.resampleIndex(":Person(name)"))."                               |
+| "db.resampleOutdatedIndexes"                   | "db.resampleOutdatedIndexes() :: VOID"                                                                                                                              | "Schedule resampling of all outdated indexes."                                                                         |
+| "db.schema"                                    | "db.schema() :: (nodes :: LIST? OF NODE?, relationships :: LIST? OF RELATIONSHIP?)"                                                                                 | "Show the schema of the data."                                                                                         |
+| "dbms.changePassword"                          | "dbms.changePassword(password :: STRING?) :: VOID"                                                                                                                  | "Change the current user's password. Deprecated by dbms.security.changePassword."                                      |
+| "dbms.components"                              | "dbms.components() :: (name :: STRING?, versions :: LIST? OF STRING?, edition :: STRING?)"                                                                          | "List DBMS components and their versions."                                                                             |
+| "dbms.functions"                               | "dbms.functions() :: (name :: STRING?, signature :: STRING?, description :: STRING?)"                                                                               | "List all user functions in the DBMS."                                                                                 |
+| "dbms.listConfig"                              | "dbms.listConfig(searchString =  :: STRING?) :: (name :: STRING?, description :: STRING?, value :: STRING?)"                                                        | "List the currently active config of Neo4j."                                                                           |
+| "dbms.procedures"                              | "dbms.procedures() :: (name :: STRING?, signature :: STRING?, description :: STRING?)"                                                                              | "List all procedures in the DBMS."                                                                                     |
+| "dbms.queryJmx"                                | "dbms.queryJmx(query :: STRING?) :: (name :: STRING?, description :: STRING?, attributes :: MAP?)"                                                                  | "Query JMX management data by domain and name. For instance, "org.neo4j:*""                                            |
+| "dbms.security.changePassword"                 | "dbms.security.changePassword(password :: STRING?) :: VOID"                                                                                                         | "Change the current user's password."                                                                                  |
+| "dbms.security.createUser"                     | "dbms.security.createUser(username :: STRING?, password :: STRING?, requirePasswordChange = true :: BOOLEAN?) :: VOID"                                              | "Create a new user."                                                                                                   |
+| "dbms.security.deleteUser"                     | "dbms.security.deleteUser(username :: STRING?) :: VOID"                                                                                                             | "Delete the specified user."                                                                                           |
+| "dbms.security.listUsers"                      | "dbms.security.listUsers() :: (username :: STRING?, flags :: LIST? OF STRING?)"                                                                                     | "List all local users."                                                                                                |
+| "dbms.security.showCurrentUser"                | "dbms.security.showCurrentUser() :: (username :: STRING?, flags :: LIST? OF STRING?)"                                                                               | "Show the current user. Deprecated by dbms.showCurrentUser."                                                           |
+| "dbms.showCurrentUser"                         | "dbms.showCurrentUser() :: (username :: STRING?, flags :: LIST? OF STRING?)"                                                                                        | "Show the current user."                                                                                               |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+46 rows
+96 ms
+neo4j-sh (?)$<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="github例子"><a href="#github例子" class="headerlink" title="github例子"></a>github例子</h2><p>　　<a target="_blank" rel="noopener" href="https://github.com/neo4j-examples/movies-java-spring-data-neo4j-4">https://github.com/neo4j-examples/movies-java-spring-data-neo4j-4</a></p>
+<p>批量执行cpyther语句<br>要创建上百个索引，想找一个简单的办法</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">./neo4j-shell -c &lt; /data/stale/data01/neo4j/create_index.cypther<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+<p>热启动命令1<br>MATCH (n)<br>OPTIONAL MATCH (n)-[r]-&gt;()<br>RETURN count(n.prop) + count(r.prop);</p>
+<p>1.1亿节点</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ match (n) optional match (n)-[r]->() return count(n.prop), count(r.prop);
++-------------------------------+
+| count(n.prop) + count(r.prop) |
++-------------------------------+
+| 0                             |
++-------------------------------+
+1 row
+556974 ms
+
+neo4j-sh (?)$ match (n) optional match (n)-[r]->() return count(n)+count(r);
++-------------------+
+| count(n)+count(r) |
++-------------------+
+| 262701611         |
++-------------------+
+1 row
+172145 ms
+
+neo4j-sh (?)$ match (n) optional match (n)-[r]->() return count(n.uuid), count(r);
++---------------------------+
+| count(n.uuid) | count(r)  |
++---------------------------+
+| 1233398       | 111001002 |
++---------------------------+
+1 row
+260481 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>热启动命令2<br>CALL apoc.warmup.run();</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">neo4j-sh (?)$ CALL apoc.warmup.run();
++--------------------------------------------------------------------------------------------------------------------------+
+| pageSize | nodesPerPage | nodesTotal | nodePages | nodesTime | relsPerPage | relsTotal | relPages | relsTime | totalTime |
++--------------------------------------------------------------------------------------------------------------------------+
+| 8192     | 546          | 110000000  | 201466    | 0         | 240         | 110000000 | 458334   | 0        | 1         |
++--------------------------------------------------------------------------------------------------------------------------+
+1 row
+1416 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>社区版和企业版有什么区别。其实他们在功能上没有本质区别。主要区别在如下几点：</p>
+<p>1、容量：社区版最多支持 320 亿个节点、320 亿个关系和 640 亿个属性，而企业版没有这个限制；<br>2、并发：社区版只能部署成单实例，不能做集群。而企业版可以部署成高可用集群或因果集群，从而可以解决高并发量的问题；<br>3、容灾：由于企业版支持集群，部分实例出故障不会影响整个系统正常运行；<br>4、热备：社区版只支持冷备份，即需要停止服务后才能进行备份，而企业版支持热备，第一次是全量备份，后续是增量备份；<br>5、性能：社区版最多用到 4 个内核，而企业能用到全部内核，且对性能做了精心的优化；<br>6、支持：企业版客户能得到 5X10 电话支持（Neo4j 美国电话、邮件，微云数聚电话、微信、邮件）；</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/operations-manual/3.1/">http://neo4j.com/docs/operations-manual/3.1/</a><br>[2] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/developer-manual/3.1/">https://neo4j.com/docs/developer-manual/3.1/</a><br>[3] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/2.2.9/query-delete.html">http://neo4j.com/docs/2.2.9/query-delete.html</a><br>[4] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/developer-manual/3.1/cypher/">https://neo4j.com/docs/developer-manual/3.1/cypher/</a><br>[5] <a target="_blank" rel="noopener" href="https://neo4j.com/blog/neo4j-3-1-ga-release/?ref=home">https://neo4j.com/blog/neo4j-3-1-ga-release/?ref=home</a><br>[6] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/developer-manual/3.1/cypher/clauses/set/">https://neo4j.com/docs/developer-manual/3.1/cypher/clauses/set/</a><br>[7] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/operations-manual/3.2/installation/linux/debian/#multiple-java-versions">https://neo4j.com/docs/operations-manual/3.2/installation/linux/debian/#multiple-java-versions</a><br>[8] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/operations-manual/current/installation/windows/">https://neo4j.com/docs/operations-manual/current/installation/windows/</a><br>[9] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/developer-manual/current/extending-neo4j/procedures/">http://neo4j.com/docs/developer-manual/current/extending-neo4j/procedures/</a><br>[10] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/guide-importing-data-and-etl/">https://neo4j.com/developer/guide-importing-data-and-etl/</a>  使用ETL方式导入Neo4j<br>[11] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/guide-import-csv/">https://neo4j.com/developer/guide-import-csv/</a>  使用csv文件方式导入Neo4j<br>[12] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/">https://neo4j.com/docs/</a><br>[13] <a target="_blank" rel="noopener" href="https://neo4j.com/blog/neo4j-3-0-massive-scale-developer-productivity/#capabilities-data-size">https://neo4j.com/blog/neo4j-3-0-massive-scale-developer-productivity/#capabilities-data-size</a>    neo4j支持节点个数<br>[14] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/kb/warm-the-cache-to-improve-performance-from-cold-start/">https://neo4j.com/developer/kb/warm-the-cache-to-improve-performance-from-cold-start/</a></p>
+<p><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/41762487/neo4j-bulk-import-and-indexing">https://stackoverflow.com/questions/41762487/neo4j-bulk-import-and-indexing</a><br><a target="_blank" rel="noopener" href="https://neo4j.com/blog/batchinsert-auto-indexing-and-friend-recommendation-with-neo4j/">https://neo4j.com/blog/batchinsert-auto-indexing-and-friend-recommendation-with-neo4j/</a><br><a target="_blank" rel="noopener" href="http://grokbase.com/t/gg/neo4j/146xv2wa77/how-i-can-create-index-schema-legacy-after-importing-data-by-batch-inserter-from-neo4j-shell">http://grokbase.com/t/gg/neo4j/146xv2wa77/how-i-can-create-index-schema-legacy-after-importing-data-by-batch-inserter-from-neo4j-shell</a></p>
+<p><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/44996896/how-to-execute-cypher-file-using-neo4j-3-1-4-not-through-zip-file">https://stackoverflow.com/questions/44996896/how-to-execute-cypher-file-using-neo4j-3-1-4-not-through-zip-file</a><br><a target="_blank" rel="noopener" href="https://github.com/neo4j/cypher-shell/issues/96">https://github.com/neo4j/cypher-shell/issues/96</a></p>
+<p><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/15161221/neo4j-script-file-format-is-there-any">https://stackoverflow.com/questions/15161221/neo4j-script-file-format-is-there-any</a>  </p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/neo4j/" rel="tag"># neo4j</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/03/16/git-notes/" rel="prev" title="git 笔记">
+                  <i class="fa fa-chevron-left"></i> git 笔记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/03/18/characte-encoding/" rel="next" title="字符编码 笔记">
+                  字符编码 笔记 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

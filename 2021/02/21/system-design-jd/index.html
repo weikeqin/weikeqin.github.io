@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="对于传统的电商，为了保障大促时系统稳定性，保证用户可以查看购买下单，有一个黄金流程，一般的黄金流程都包括4大领域 导购(首页、分类、商详、搜索)、营销(促销、权益、券)、交易(购物车、提单、下单、支付)、履约(接单、生产、配送)">
+<meta property="og:type" content="article">
+<meta property="og:title" content="电商-京东 黄金流程 PC">
+<meta property="og:url" content="http://weikeqin.com/2021/02/21/system-design-jd/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="对于传统的电商，为了保障大促时系统稳定性，保证用户可以查看购买下单，有一个黄金流程，一般的黄金流程都包括4大领域 导购(首页、分类、商详、搜索)、营销(促销、权益、券)、交易(购物车、提单、下单、支付)、履约(接单、生产、配送)">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/file/system/design/jd.com/img/index_20210221.png">
+<meta property="og:image" content="http://weikeqin.com/file/system/design/jd.com/img/all_category.png">
+<meta property="article:published_time" content="2021-02-20T23:02:50.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.264Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="design">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/file/system/design/jd.com/img/index_20210221.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2021/02/21/system-design-jd/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2021/02/21/system-design-jd/","path":"2021/02/21/system-design-jd/","title":"电商-京东 黄金流程 PC"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>电商-京东 黄金流程 PC | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E9%A6%96%E9%A1%B5"><span class="nav-number">1.</span> <span class="nav-text">(1) 首页</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%BA%AC%E4%B8%9C%E7%A7%92%E6%9D%80%E4%B8%93%E5%8C%BA"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 京东秒杀专区</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E6%AF%8F%E6%97%A5%E7%89%B9%E4%BB%B7-%E8%B5%84%E6%BA%90%E4%BD%8D"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 每日特价-资源位</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-%E6%8E%A8%E8%8D%90-%E8%B5%84%E6%BA%90%E4%BD%8D"><span class="nav-number">1.3.</span> <span class="nav-text">(1.3) 推荐-资源位</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-%E6%8E%A8%E8%8D%90"><span class="nav-number">1.4.</span> <span class="nav-text">(1.4) 推荐</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E6%90%9C%E7%B4%A2"><span class="nav-number">2.</span> <span class="nav-text">(2) 搜索</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E6%90%9C%E7%B4%A2%E6%8E%A8%E8%8D%90"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 搜索推荐</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-1-%E6%90%9C%E7%B4%A2%E8%AF%8D-p"><span class="nav-number">2.1.1.</span> <span class="nav-text">(2.1.1) 搜索词&#x3D;p</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-2-%E6%90%9C%E7%B4%A2%E8%AF%8D-ping"><span class="nav-number">2.1.2.</span> <span class="nav-text">(2.1.2) 搜索词&#x3D;ping</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-3-%E6%90%9C%E7%B4%A2%E8%AF%8D-%E8%8B%B9"><span class="nav-number">2.1.3.</span> <span class="nav-text">(2.1.3) 搜索词&#x3D;苹</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E6%90%9C%E7%B4%A2"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 搜索</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%88%86%E7%B1%BB"><span class="nav-number">3.</span> <span class="nav-text">(3) 分类</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%88%86%E7%B1%BB%E5%85%A5%E5%8F%A3"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 分类入口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E5%88%86%E7%B1%BB%E7%BB%93%E6%9E%84"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 分类结构</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%95%86%E8%AF%A6"><span class="nav-number">4.</span> <span class="nav-text">(4) 商详</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E8%B4%AD%E7%89%A9%E8%BD%A6"><span class="nav-number">5.</span> <span class="nav-text">(5) 购物车</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8A%A0%E8%B4%AD"><span class="nav-number">5.1.</span> <span class="nav-text">加购</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8A%A0%E8%B4%AD%E4%B8%80%E4%BB%B6"><span class="nav-number">5.1.1.</span> <span class="nav-text">加购一件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8A%A0%E8%B4%AD%E5%A4%9A%E4%BB%B6"><span class="nav-number">5.1.2.</span> <span class="nav-text">加购多件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%95%86%E5%93%81%E9%80%89%E4%B8%AD"><span class="nav-number">5.2.</span> <span class="nav-text">商品选中</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%A8%E9%80%89"><span class="nav-number">5.2.1.</span> <span class="nav-text">全选</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%80%89%E4%B8%AD%E5%A4%9A%E4%BB%B6"><span class="nav-number">5.3.</span> <span class="nav-text">选中多件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B4%AD%E7%89%A9%E8%BD%A6-%E6%8D%A2%E8%B4%AD"><span class="nav-number">5.4.</span> <span class="nav-text">购物车-换购</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E4%BA%A4%E6%98%93"><span class="nav-number">6.</span> <span class="nav-text">(6) 交易</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E7%AE%97%E9%A1%B5-%E6%8F%90%E5%8D%95%E9%A1%B5"><span class="nav-number">6.1.</span> <span class="nav-text">结算页&#x2F;提单页</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8B%E5%8D%95-%E6%8F%90%E4%BA%A4%E8%AE%A2%E5%8D%95"><span class="nav-number">6.2.</span> <span class="nav-text">下单&#x2F;提交订单</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%94%B6%E9%93%B6"><span class="nav-number">6.3.</span> <span class="nav-text">收银</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E6%94%AF%E4%BB%98%E4%BF%A1%E6%81%AF"><span class="nav-number">6.4.</span> <span class="nav-text">获取支付信息</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2021/02/21/system-design-jd/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          电商-京东 黄金流程 PC
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2021-02-21 07:02:50" itemprop="dateCreated datePublished" datetime="2021-02-21T07:02:50+08:00">2021-02-21</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/design/" itemprop="url" rel="index"><span itemprop="name">design</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2021/02/21/system-design-jd/" class="post-meta-item leancloud_visitors" data-flag-title="电商-京东 黄金流程 PC" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <blockquote>
+<p> 对于传统的电商，为了保障大促时系统稳定性，保证用户可以查看购买下单，有一个黄金流程，一般的黄金流程都包括4大领域<br> 导购(首页、分类、商详、搜索)、营销(促销、权益、券)、交易(购物车、提单、下单、支付)、履约(接单、生产、配送)</p>
+</blockquote>
+<span id="more"></span> 
+
+<br>
+
+<h1 id="1-首页"><a href="#1-首页" class="headerlink" title="(1) 首页"></a>(1) 首页</h1><p>  通过 浏览器 -&gt; 开发者工具 -&gt; 网络 或者 <code>curl &quot;https://www.jd.com/&quot;</code> 查看京东首页，发现其实首页只显示 导航栏、快速入口、类目、常用功能<br>  图片是再次发请求 </p>
+<p> <img src="/file/system/design/jd.com/img/index_20210221.png" alt="首页"></p>
+<!--more-->
+
+<h2 id="1-1-京东秒杀专区"><a href="#1-1-京东秒杀专区" class="headerlink" title="(1.1) 京东秒杀专区"></a>(1.1) 京东秒杀专区</h2><p><a target="_blank" rel="noopener" href="https://lapi.jd.com/pchome/pcIndexMiaoShaArea?source=pc_seckill&amp;pin=12345678-123456&amp;uuid=16035486886821200401381&amp;isAdvance=0&amp;callback=jsonpSeckill&amp;_=1613864577982">https://lapi.jd.com/pchome/pcIndexMiaoShaArea?source=pc_seckill&amp;pin=12345678-123456&amp;uuid=16035486886821200401381&amp;isAdvance=0&amp;callback=jsonpSeckill&amp;_=1613864577982</a></p>
+<p>  一页返回了20条 返回的数据大小22KB、这个大小稍微有点偏大</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"canFreeRead"</span><span class="token operator">:</span> <span class="token string">"false"</span><span class="token punctuation">,</span>
+    <span class="token property">"discount"</span><span class="token operator">:</span> <span class="token string">"3.90"</span><span class="token punctuation">,</span>
+    <span class="token property">"adword"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"endRemainTime"</span><span class="token operator">:</span> <span class="token number">80220</span><span class="token punctuation">,</span>
+    <span class="token property">"jdPrice"</span><span class="token operator">:</span> <span class="token string">"31.90"</span><span class="token punctuation">,</span>
+    <span class="token property">"bubbleTips"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"startTimeMills"</span><span class="token operator">:</span> <span class="token number">1613858400000</span><span class="token punctuation">,</span>
+    <span class="token property">"message"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"resultSort"</span><span class="token operator">:</span> <span class="token number">11</span><span class="token punctuation">,</span>
+    <span class="token property">"startRemainTime"</span><span class="token operator">:</span> <span class="token number">-6178</span><span class="token punctuation">,</span>
+    <span class="token property">"sourceValue"</span><span class="token operator">:</span> <span class="token string">"50_1_67035843439_0_1##24690_0_0"</span><span class="token punctuation">,</span>
+    <span class="token property">"rate"</span><span class="token operator">:</span> <span class="token string">"8.8折"</span><span class="token punctuation">,</span>
+    <span class="token property">"almostSoldoutViewUser"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"miaoSha"</span><span class="token operator">:</span> <span class="token string">"true"</span><span class="token punctuation">,</span>
+    <span class="token property">"book"</span><span class="token operator">:</span> <span class="token string">"false"</span><span class="token punctuation">,</span>
+    <span class="token property">"activeId"</span><span class="token operator">:</span> <span class="token string">"6190020"</span><span class="token punctuation">,</span>
+    <span class="token property">"promotion"</span><span class="token operator">:</span> <span class="token string">"false"</span><span class="token punctuation">,</span>
+    <span class="token property">"promotionId"</span><span class="token operator">:</span> <span class="token string">"104767788678"</span><span class="token punctuation">,</span>
+    <span class="token property">"lowestPriceDaysInfo"</span><span class="token operator">:</span> <span class="token string">"80天最低价"</span><span class="token punctuation">,</span>
+    <span class="token property">"wareId"</span><span class="token operator">:</span> <span class="token string">"67035843439"</span><span class="token punctuation">,</span>
+    <span class="token property">"seckillProdType"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+    <span class="token property">"startTimeShow"</span><span class="token operator">:</span> <span class="token string">"06:00"</span><span class="token punctuation">,</span>
+    <span class="token property">"imageurl"</span><span class="token operator">:</span> <span class="token string">"//m.360buyimg.com/seckillcms/s250x250_jfs/t1/166459/14/7309/123707/6030ad06Ec040f8a3/8ddb2e3c14c26577.jpg"</span><span class="token punctuation">,</span>
+    <span class="token property">"hashKey"</span><span class="token operator">:</span> <span class="token number">67035843439</span><span class="token punctuation">,</span>
+    <span class="token property">"spuId"</span><span class="token operator">:</span> <span class="token string">"14310874641"</span><span class="token punctuation">,</span>
+    <span class="token property">"isNewGoods"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"isHistoryProduct"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+    <span class="token property">"miaoShaPrice"</span><span class="token operator">:</span> <span class="token string">"28.00"</span><span class="token punctuation">,</span>
+    <span class="token property">"moreFunId"</span><span class="token operator">:</span> <span class="token string">"searchCatelogy"</span><span class="token punctuation">,</span>
+    <span class="token property">"good"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"cid"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"canBuy"</span><span class="token operator">:</span> <span class="token string">"true"</span><span class="token punctuation">,</span>
+    <span class="token property">"wname"</span><span class="token operator">:</span> <span class="token string">"黑麦全麦面包吐司粗粮0饱腹代餐脂肪热量零食早餐整箱焙乐 【黑麦面包500g送500g/箱】"</span><span class="token punctuation">,</span>
+    <span class="token property">"cName"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"operateWord"</span><span class="token operator">:</span> <span class="token string">"早餐面包"</span><span class="token punctuation">,</span>
+    <span class="token property">"discountNew"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"promoType"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+    <span class="token property">"seckillNum"</span><span class="token operator">:</span> <span class="token string">"4500"</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="1-2-每日特价-资源位"><a href="#1-2-每日特价-资源位" class="headerlink" title="(1.2) 每日特价-资源位"></a>(1.2) 每日特价-资源位</h2><p>  <a target="_blank" rel="noopener" href="https://floor.jd.com/recommend-v20/daily_speci_data/get?source=pc-home&amp;id=2&amp;callback=jsonpSpecialOfferContent0&amp;_=1613864578176">https://floor.jd.com/recommend-v20/daily_speci_data/get?source=pc-home&amp;id=2&amp;callback=jsonpSpecialOfferContent0&amp;_=1613864578176</a></p>
+<p>  一页展示5条　　可以看到返回的字段、大小相对比较简洁　　返回的数据989B<br>  为了方便查看，我只留1条 </p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"msg"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"data"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token property">"skuId"</span><span class="token operator">:</span> <span class="token number">10021736970334</span><span class="token punctuation">,</span>
+            <span class="token property">"miaoShaPrice"</span><span class="token operator">:</span> <span class="token string">"19.9"</span><span class="token punctuation">,</span>
+            <span class="token property">"imageurl"</span><span class="token operator">:</span> <span class="token string">"//m.360buyimg.com/seckillcms/s144x144_jfs/t1/156722/8/961/96822/5fdd7845E1eb7c845/8bfe6bf044ae6c8d.jpg!q70.jpg"</span><span class="token punctuation">,</span>
+            <span class="token property">"lowestPriceDaysInfo"</span><span class="token operator">:</span> <span class="token string">"157天历史最低价"</span><span class="token punctuation">,</span>
+            <span class="token property">"wname"</span><span class="token operator">:</span> <span class="token string">"原生态红富士苹果"</span><span class="token punctuation">,</span>
+            <span class="token property">"jdPrice"</span><span class="token operator">:</span> <span class="token string">"33.6"</span><span class="token punctuation">,</span>
+            <span class="token property">"alreadySoldInfoPcPre"</span><span class="token operator">:</span> <span class="token string">"热卖中"</span>
+        <span class="token punctuation">&#125;</span> 
+    <span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token property">"code"</span><span class="token operator">:</span> <span class="token number">0</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="1-3-推荐-资源位"><a href="#1-3-推荐-资源位" class="headerlink" title="(1.3) 推荐-资源位"></a>(1.3) 推荐-资源位</h2><p>  <a target="_blank" rel="noopener" href="https://floor.jd.com/recommend-v20/red_new/get?source=pc-home&amp;pin=12345678-123456&amp;callback=jsonpLightningBuy&amp;_=1613864578020">https://floor.jd.com/recommend-v20/red_new/get?source=pc-home&amp;pin=12345678-123456&amp;callback=jsonpLightningBuy&amp;_=1613864578020</a></p>
+<h2 id="1-4-推荐"><a href="#1-4-推荐" class="headerlink" title="(1.4) 推荐"></a>(1.4) 推荐</h2><p>  <a target="_blank" rel="noopener" href="https://floor.jd.com/user-v20/feed/get?page=1&amp;pagesize=25&amp;area=1_72_2799_0&amp;source=pc-home&amp;callback=jsonpMore2Goods&amp;_=1613866109270">https://floor.jd.com/user-v20/feed/get?page=1&amp;pagesize=25&amp;area=1_72_2799_0&amp;source=pc-home&amp;callback=jsonpMore2Goods&amp;_=1613866109270</a></p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"latency"</span><span class="token operator">:</span> <span class="token number">216</span><span class="token punctuation">,</span>
+    <span class="token property">"bucket"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"encode"</span><span class="token operator">:</span> <span class="token string">"utf-8"</span><span class="token punctuation">,</span>
+    <span class="token property">"request_url"</span><span class="token operator">:</span> <span class="token string">"//indivsoa.m.jd.local/mixer?appid=pc&amp;functionId=mixer&amp;client=pc&amp;pin=&amp;body=&#123;\"p\":610009,\"uuid\":\"16035486886821200401381\",\"sku\":\"\",\"skus\":\"\",\"c1\":\"\",\"c2\":\"\",\"c3\":\"\",\"sp\":\"\",\"fne\":\"\",\"ro\":\"\",\"fe\":\"\",\"lid\":\"1,72,2799,0\",\"ec\":\"utf-8\",\"lim\":25,\"__jda\":\"xxx.xxx.xxx.xxx.xxx.xxx\",\"hi\":\"page:1\",\"location_info\":\"1-12-1234-0\",\"iplocation\":\"123.123.123.123\"&#125;&amp;loginType=3"</span><span class="token punctuation">,</span>
+    <span class="token property">"callNewMixerStrategy"</span><span class="token operator">:</span> <span class="token string">"B"</span><span class="token punctuation">,</span>
+    <span class="token property">"error_msg"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+    <span class="token property">"request_time"</span><span class="token operator">:</span> <span class="token number">1613866109.644</span><span class="token punctuation">,</span>
+    <span class="token property">"data"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token property">"wsn"</span><span class="token operator">:</span> <span class="token string">"-1"</span><span class="token punctuation">,</span>
+            <span class="token property">"subsku"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+            <span class="token property">"abt"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+            <span class="token property">"pid"</span><span class="token operator">:</span> <span class="token string">"600040675"</span><span class="token punctuation">,</span>
+            <span class="token property">"noFilter"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"commentAbStrategy"</span><span class="token operator">:</span> <span class="token string">"A"</span><span class="token punctuation">,</span>
+            <span class="token property">"spu"</span><span class="token operator">:</span> <span class="token number">42908321659</span><span class="token punctuation">,</span>
+            <span class="token property">"vid"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"mp"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+            <span class="token property">"tips"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"t"</span><span class="token operator">:</span> <span class="token number">116</span><span class="token punctuation">,</span>
+                    <span class="token property">"v"</span><span class="token operator">:</span> <span class="token string">"您的浏览足迹"</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"t"</span><span class="token operator">:</span> <span class="token number">102</span><span class="token punctuation">,</span>
+                    <span class="token property">"v"</span><span class="token operator">:</span> <span class="token string">"浏览商品"</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"t"</span><span class="token operator">:</span> <span class="token number">9999</span><span class="token punctuation">,</span>
+                    <span class="token property">"v"</span><span class="token operator">:</span> <span class="token string">"0"</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"t"</span><span class="token operator">:</span> <span class="token string">"【昌圣祥绿豆饼400g】绿豆饼红豆饼休闲零食糕点点心 【简装】红豆饼1包绿豆饼1包"</span><span class="token punctuation">,</span>
+            <span class="token property">"bn"</span><span class="token operator">:</span> <span class="token string">"昌聖祥"</span><span class="token punctuation">,</span>
+            <span class="token property">"client_click_url"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+            <span class="token property">"clk"</span><span class="token operator">:</span> <span class="token string">"//knicks.jd.com/log/server?t=rec_common_clk&amp;v=type=rec.610009$src=rec$action=1$reqsig=375d4c048c75ca31f5e9101b12a0c214942321ee$enb=1$sku=0$p=610009$pin=$uuid=dfHRXLhd2uPdAy%2BCwBUdEtPnHQiaB0kx$csku=42908321661$index=0$st=0$adcli=$expid=100$mexpid=$im=$rid=8718363267860211836$ver=1$sig=8322b349090751cab490457515d8058876284364"</span><span class="token punctuation">,</span>
+            <span class="token property">"c3"</span><span class="token operator">:</span> <span class="token number">1590</span><span class="token punctuation">,</span>
+            <span class="token property">"miniCanAddCart"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"impr"</span><span class="token operator">:</span> <span class="token string">"1"</span><span class="token punctuation">,</span>
+            <span class="token property">"rt"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"renl"</span><span class="token operator">:</span> <span class="token number">99</span><span class="token punctuation">,</span>
+            <span class="token property">"srn"</span><span class="token operator">:</span> <span class="token number">-1</span><span class="token punctuation">,</span>
+            <span class="token property">"jp"</span><span class="token operator">:</span> <span class="token string">"19.80"</span><span class="token punctuation">,</span>
+            <span class="token property">"pcp"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+            <span class="token property">"ssid"</span><span class="token operator">:</span> <span class="token number">33</span><span class="token punctuation">,</span>
+            <span class="token property">"w"</span><span class="token operator">:</span> <span class="token number">0.7767</span><span class="token punctuation">,</span>
+            <span class="token property">"itemType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"canUseCoupon"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"op"</span><span class="token operator">:</span> <span class="token string">"19.80"</span><span class="token punctuation">,</span>
+            <span class="token property">"wt"</span><span class="token operator">:</span> <span class="token string">"1.0"</span><span class="token punctuation">,</span>
+            <span class="token property">"duration"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"newSource"</span><span class="token operator">:</span> <span class="token string">"-1"</span><span class="token punctuation">,</span>
+            <span class="token property">"sid"</span><span class="token operator">:</span> <span class="token string">"f52671b2-ea30-4ce0-9d48-79a7418ad353"</span><span class="token punctuation">,</span>
+            <span class="token property">"img"</span><span class="token operator">:</span> <span class="token string">"jfs/t1/29982/29/9873/119911/5c822a87E2136f4ba/e4d864044ad493fe.jpg"</span><span class="token punctuation">,</span>
+            <span class="token property">"transImg"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"lp_type"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"isMbox"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+            <span class="token property">"sku"</span><span class="token operator">:</span> <span class="token number">42908321661</span><span class="token punctuation">,</span>
+            <span class="token property">"have_similar"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"broker_info"</span><span class="token operator">:</span> <span class="token string">"eyJwIjoiNjEwMDA5IiwicG9pbnRfaWQiOiIiLCJzb3VyY2UiOiIwIiwidGFnIjoiMTAiLCJjc191c2VyIjoiMiIsInBhbGFudGlyX2V4cGlkcyI6IlJ8TUlYVEFHX1JSfCIsImV4cGlkIjoiMTAwIiwicmVxc2lnIjoiMzc1ZDRjMDQ4Yzc1Y2EzMWY1ZTkxMDFiMTJhMGMyMTQ5NDIzMjFlZSJ9"</span><span class="token punctuation">,</span>
+            <span class="token property">"clk_url"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+            <span class="token property">"target_url"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+            <span class="token property">"source"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+            <span class="token property">"client_exposal_url"</span><span class="token operator">:</span> <span class="token string">""</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token property">"success"</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+    <span class="token property">"timestamp"</span><span class="token operator">:</span> <span class="token number">1613866109423</span><span class="token punctuation">,</span>
+    <span class="token property">"flow"</span><span class="token operator">:</span> <span class="token string">"66"</span><span class="token punctuation">,</span>
+    <span class="token property">"priceResCode"</span><span class="token operator">:</span> <span class="token number">1000</span><span class="token punctuation">,</span>
+    <span class="token property">"impr"</span><span class="token operator">:</span> <span class="token string">"//knicks.jd.com/log/server?t=rec_common_exp&amp;v=type=rec.610009$src=rec$action=0$reqsig=375d4c048c75ca31f5e9101b12a0c214942321ee$enb=1$csku=42908321661,3343744,5563435,1333448,27355361140,1160162,4420194,41330993488,11898431,10004584450,10102014255,1530841,269884,100002358949,4819911,25251975814,4420220,24939565523,4068815,37560759906,4815413,28916642304,1290129,19206110770,40106154386$st=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0$sku=0$p=610009$pin=$uuid=dfHRXLhd2uPdAy%2BCwBUdEtPnHQiaB0kx$expid=100$mexpid=$gm=page%5E1$rt=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0$rid=8718363267860211836$ver=1$sig=3239aa808362b93688411d1f1658254f1aa1db78"</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h1 id="2-搜索"><a href="#2-搜索" class="headerlink" title="(2) 搜索"></a>(2) 搜索</h1><h2 id="2-1-搜索推荐"><a href="#2-1-搜索推荐" class="headerlink" title="(2.1) 搜索推荐"></a>(2.1) 搜索推荐</h2><p>  搜索推荐主要为了解决错别字，把用户往期望的方向引<br>  引导用户用 热词，有缓存、搜索结果快 </p>
+<h3 id="2-1-1-搜索词-p"><a href="#2-1-1-搜索词-p" class="headerlink" title="(2.1.1) 搜索词=p"></a>(2.1.1) 搜索词=p</h3><p>  <a target="_blank" rel="noopener" href="https://dd-search.jd.com/?terminal=pc&amp;newjson=1&amp;ver=2&amp;zip=1&amp;key=p&amp;pvid=a4f1e3669750421d8a4473d1db113a90&amp;t=1613867002272&amp;curr_url=www.jd.com/&amp;callback=jQuery6958642">https://dd-search.jd.com/?terminal=pc&amp;newjson=1&amp;ver=2&amp;zip=1&amp;key=p&amp;pvid=a4f1e3669750421d8a4473d1db113a90&amp;t=1613867002272&amp;curr_url=www.jd.com%2F&amp;callback=jQuery6958642</a><br>  返回结果500B左右<br>  请求耗时60ms</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">[</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"935194"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果12"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"90923"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"p40"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"872441"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果11"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"72235"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"ps5"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"59848"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"平板电脑"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"650917"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果手机"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"160044"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"p40pro"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"871383"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"皮带男"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"735751"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"p40华为"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"90776"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"跑步机"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"69378"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"p30"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"872824"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"啤酒"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"205588"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"version"</span><span class="token operator">:</span> <span class="token string">"base"</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="2-1-2-搜索词-ping"><a href="#2-1-2-搜索词-ping" class="headerlink" title="(2.1.2) 搜索词=ping"></a>(2.1.2) 搜索词=ping</h3><p>  <a target="_blank" rel="noopener" href="https://dd-search.jd.com/?terminal=pc&amp;newjson=1&amp;ver=2&amp;zip=1&amp;key=ping&amp;pvid=ed90302882f8410584a44b0f908998ff&amp;t=1613867293678&amp;curr_url=www.jd.com/&amp;callback=jQuery6254769">https://dd-search.jd.com/?terminal=pc&amp;newjson=1&amp;ver=2&amp;zip=1&amp;key=ping&amp;pvid=ed90302882f8410584a44b0f908998ff&amp;t=1613867293678&amp;curr_url=www.jd.com%2F&amp;callback=jQuery6254769</a></p>
+<p>  返回结果500B左右<br>  请求耗时60ms</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">[</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果12"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"90923"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果11"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"72235"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"935194"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果手机"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"160044"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果x"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"46129"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果耳机"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"523892"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果平板"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"44345"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果8"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"56234"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果充电线"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"387363"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果手表"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"9384"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果xs"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"38895"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果醋"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"4248"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果快充"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"384773"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"version"</span><span class="token operator">:</span> <span class="token string">"base"</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="2-1-3-搜索词-苹"><a href="#2-1-3-搜索词-苹" class="headerlink" title="(2.1.3) 搜索词=苹"></a>(2.1.3) 搜索词=苹</h3><p><a target="_blank" rel="noopener" href="https://dd-search.jd.com/?terminal=pc&amp;newjson=1&amp;ver=2&amp;zip=1&amp;key=%E8%8B%B9&amp;pvid=ed90302882f8410584a44b0f908998ff&amp;t=1613867297212&amp;curr_url=www.jd.com/&amp;callback=jQuery1259079">https://dd-search.jd.com/?terminal=pc&amp;newjson=1&amp;ver=2&amp;zip=1&amp;key=%E8%8B%B9&amp;pvid=ed90302882f8410584a44b0f908998ff&amp;t=1613867297212&amp;curr_url=www.jd.com%2F&amp;callback=jQuery1259079</a></p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">[</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果12"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"90923"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"935194"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果11"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"72235"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"平板"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"899211"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果手机"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"160044"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果耳机"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"523892"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果数据线"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"293882"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果x"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"46129"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"平底锅"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"193582"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果手表"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"9384"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果平板"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"44345"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"平衡车"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"212580"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"key"</span><span class="token operator">:</span> <span class="token string">"苹果电脑"</span><span class="token punctuation">,</span>
+        <span class="token property">"qre"</span><span class="token operator">:</span> <span class="token string">"55392"</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token property">"version"</span><span class="token operator">:</span> <span class="token string">"base"</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="2-2-搜索"><a href="#2-2-搜索" class="headerlink" title="(2.2) 搜索"></a>(2.2) 搜索</h2><p>  <a target="_blank" rel="noopener" href="https://search.jd.com/Search?keyword=%E8%8B%B9%E6%9E%9C&amp;enc=utf-8&amp;wq=%E8%8B%B9%E6%9E%9C&amp;pvid=51e3947abe824f99a4b845034239f73a">https://search.jd.com/Search?keyword=%E8%8B%B9%E6%9E%9C&amp;enc=utf-8&amp;wq=%E8%8B%B9%E6%9E%9C&amp;pvid=51e3947abe824f99a4b845034239f73a</a></p>
+<p>  请求结果 82KB<br>  耗时1060ms<br>  返回的结果是聚合结果，包括 品牌、分类、原产地、屏幕尺寸、机身颜色、高级选项 </p>
+<br>
+
+
+<h1 id="3-分类"><a href="#3-分类" class="headerlink" title="(3) 分类"></a>(3) 分类</h1><p>  全部商品分类  <a target="_blank" rel="noopener" href="https://www.jd.com/allSort.aspx">https://www.jd.com/allSort.aspx</a><br>  <img src="/file/system/design/jd.com/img/all_category.png" alt="全部商品分类"></p>
+<h2 id="3-1-分类入口"><a href="#3-1-分类入口" class="headerlink" title="(3.1) 分类入口"></a>(3.1) 分类入口</h2><p>  从首页可以进入分类<br>  从商详的左上角 点击全部分类也可以看到分类</p>
+<h2 id="3-2-分类结构"><a href="#3-2-分类结构" class="headerlink" title="(3.2) 分类结构"></a>(3.2) 分类结构</h2><p>  生鲜 一级分类    <a target="_blank" rel="noopener" href="https://fresh.jd.com/">https://fresh.jd.com/</a><br>  新鲜水果 二级分类  <a target="_blank" rel="noopener" href="https://search.jd.com/Search?keyword=%E6%B0%B4%E6%9E%9C&amp;enc=utf-8&amp;wq=">https://search.jd.com/Search?keyword=%E6%B0%B4%E6%9E%9C&amp;enc=utf-8&amp;wq=</a><br>  苹果 三级分类  <a target="_blank" rel="noopener" href="https://search.jd.com/search?keyword=%E8%8B%B9%E6%9E%9C&amp;enc=utf-8&amp;qrst=1&amp;stop=1&amp;vt=2&amp;cid2=12221#J_searchWrap">https://search.jd.com/search?keyword=%E8%8B%B9%E6%9E%9C&amp;enc=utf-8&amp;qrst=1&amp;stop=1&amp;vt=2&amp;cid2=12221#J_searchWrap</a></p>
+<br>
+
+
+<h1 id="4-商详"><a href="#4-商详" class="headerlink" title="(4) 商详"></a>(4) 商详</h1><p>  <a target="_blank" rel="noopener" href="https://item.jd.com/60713932952.html">https://item.jd.com/60713932952.html</a><br>skuId比较长11位，用long存储<br>int类型 -2^31 ~ 2^31-1 最长10位 2147483647，如果是无符号的话11位 最大支持 4294967295 </p>
+<p><a target="_blank" rel="noopener" href="https://item.jd.com/652352.html">https://item.jd.com/652352.html</a><br>可以看到这个skuId是很短的只有6位</p>
+<br>
+<br>
+
+<h1 id="5-购物车"><a href="#5-购物车" class="headerlink" title="(5) 购物车"></a>(5) 购物车</h1><h2 id="加购"><a href="#加购" class="headerlink" title="加购"></a>加购</h2><h3 id="加购一件"><a href="#加购一件" class="headerlink" title="加购一件"></a>加购一件</h3><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;cart.jd.com&#x2F;tproduct?pid&#x3D;3773507&amp;rid&#x3D;0.3696100407542984&#39; \
+  -X &#39;POST&#39; \
+  -H &#39;authority: cart.jd.com&#39; \
+  -H &#39;content-length: 0&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;javascript, *&#x2F;*; q&#x3D;0.01&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;x-requested-with: XMLHttpRequest&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;cart.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-origin&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;cart.jd.com&#x2F;addToCart.html?rcd&#x3D;1&amp;pid&#x3D;3773507&amp;pc&#x3D;1&amp;eb&#x3D;1&amp;rid&#x3D;1619268872759&amp;em&#x3D;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: xxx&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p> pid是商品skuId</p>
+<p>返回结果 </p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"adMessage"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"addSkuLimitState"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"allSkuIds"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"areas"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"btg"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"callback"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"cart"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"checkIsAll"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"checkedCartState"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"cm"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"customInfoId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"did"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"directBuyAuthority"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+    <span class="token property">"dist"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"errorMessage"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"f"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"fsIds"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"gids"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"giftPoolType"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"gl"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"gs"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"gsid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"hasSkuInOutSkus"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"ids"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"isLogin"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+    <span class="token property">"jd3csid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"jdhsid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"k"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"l"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"lastAddedSku"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+        <span class="token property">"addPrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"addPriceDifferences"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"awardType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"bulk"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"calWeight"</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+        <span class="token property">"calculateStock"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"cartMessageList"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"checkType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"checkboxDisabled"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"cid"</span><span class="token operator">:</span> <span class="token number">13567</span><span class="token punctuation">,</span>
+        <span class="token property">"cm"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"color"</span><span class="token operator">:</span> <span class="token string">"耙耙柑特级大果5kg装"</span><span class="token punctuation">,</span>
+        <span class="token property">"customInfoId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"cz"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"dataType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"deliveryId"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"discountPrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"discountedPrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"dist"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"factoryShip"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"fbp"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"fbpSam"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"fcs"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"firstCid"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"flashPurchase"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"flashPurchaseCode"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"freePostal"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"fresh"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"giftAddMoney"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"giftBuy"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"giftNeedMoney"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"giftSelectState"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"giftSourceType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"handtailor"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"id"</span><span class="token operator">:</span> <span class="token string">"3773507"</span><span class="token punctuation">,</span>
+        <span class="token property">"imgUrl"</span><span class="token operator">:</span> <span class="token string">"jfs/t1/138326/10/16598/173141/5fc83ab3E290c9af9/77c07c6cd7bd1cee.jpg"</span><span class="token punctuation">,</span>
+        <span class="token property">"isCanUseDQ"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"isCanUseJQ"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"isInOutSkus"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"isOverseaPurchase"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"jdCellphone"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jdComputer"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jdDigital"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jdHomeAppliance"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jdMarket"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jdStationery"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jdbx"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"jingXuan"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jingYuZN"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jingZao"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"jzfp"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"locFlag"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"lsid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"marketPrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"minBuyNum"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"name"</span><span class="token operator">:</span> <span class="token string">"四川春见耙耙柑 粑粑柑 丑柑橘子 精选特级大果5kg礼盒装 单果约180-300g 新鲜水果"</span><span class="token punctuation">,</span>
+        <span class="token property">"noStockType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"numLimit"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"ob"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"overlengthName"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"oversea"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"partitionInfo"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCard"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardLinkType"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardNumber"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardPag"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardPbn"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardRpcDG"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardSpid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardStatus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnCardType"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"pnHyj"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"popInfo"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"price"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"promotion"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"promotionPrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"rePrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"samGoods"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"samMemberZx"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"scareBuy"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"secondCid"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"serviceTemplateId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"sevenHover"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"sevenToReturn"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"shopId"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"shortName"</span><span class="token operator">:</span> <span class="token string">"四川春见耙耙柑 粑粑柑 丑柑橘子 精选特级..."</span><span class="token punctuation">,</span>
+        <span class="token property">"size"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+        <span class="token property">"sizeDesc"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"stock"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"sumDiscountedPrice"</span><span class="token operator">:</span> <span class="token string">"0.00"</span><span class="token punctuation">,</span>
+        <span class="token property">"sumWeight"</span><span class="token operator">:</span> <span class="token string">"0"</span><span class="token punctuation">,</span>
+        <span class="token property">"toplife"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"type"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"unusable"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"unusableType"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"venderId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"virtualNoFreight"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"weight"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token property">"yuShouNoWay"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+        <span class="token property">"ziying"</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+        <span class="token property">"zy"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+        <span class="token property">"zyShopDB"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+    <span class="token property">"lcount"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"lid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"lsid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"modifyProductPromoID"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"modifyPromoID"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"modifyResult"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"notifyKey"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"nums"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"oft"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"otherSkus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"outBean"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"outSkus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"packId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pag"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"passAdd"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pbn"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pcount"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"pgid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pid"</span><span class="token operator">:</span> <span class="token string">"3773507"</span><span class="token punctuation">,</span>
+    <span class="token property">"pids"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pin"</span><span class="token operator">:</span> <span class="token string">"32060130-350614"</span><span class="token punctuation">,</span>
+    <span class="token property">"platformInfos"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pn"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pncount"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"pnid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"pnums"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"productExtIconsMap"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"productYbInfos"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"promiseIconMap"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"ptype"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"redirectUrl"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"sid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"sidnums"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"sids"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"slsid"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"snums"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"subType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"success"</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+    <span class="token property">"targetId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"tc"</span><span class="token operator">:</span> <span class="token string">"e"</span><span class="token punctuation">,</span>
+    <span class="token property">"type"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"vids"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"vnums"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"wids"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"ybId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"zids"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="加购多件"><a href="#加购多件" class="headerlink" title="加购多件"></a>加购多件</h3><h2 id="商品选中"><a href="#商品选中" class="headerlink" title="商品选中"></a>商品选中</h2><h3 id="全选"><a href="#全选" class="headerlink" title="全选"></a>全选</h3><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;api.m.jd.com&#x2F;api?functionId&#x3D;pcCart_jc_cartCheckAll&amp;appid&#x3D;JDC_mall_cart&amp;loginType&#x3D;3&amp;body&#x3D;%7B%22serInfo%22:%7B%22area%22:%2222_1930_49324_0%22,%22user-key%22:%22xxx%22%7D%7D&#39; \
+  -X &#39;POST&#39; \
+  -H &#39;authority: api.m.jd.com&#39; \
+  -H &#39;content-length: 0&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;plain, *&#x2F;*&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;cart.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-site&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;cart.jd.com&#x2F;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: xxx&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="选中多件"><a href="#选中多件" class="headerlink" title="选中多件"></a>选中多件</h2><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;api.m.jd.com&#x2F;api&#39; \
+  -H &#39;authority: api.m.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;plain, *&#x2F;*&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;content-type: application&#x2F;x-www-form-urlencoded&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;cart.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-site&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;cart.jd.com&#x2F;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;; shshshfpa&#x3D;; pinId&#x3D;; pin&#x3D;; unick&#x3D;; _tp&#x3D;; _pst&#x3D;; shshshfpb&#x3D;; abtest&#x3D;; __jdv&#x3D;; mt_xid&#x3D;; cn&#x3D;; areaId&#x3D;; ipLoc-djd&#x3D;; PCSYCityID&#x3D;; user-key&#x3D;; TrackID&#x3D;; thor&#x3D;; ceshi3.com&#x3D;; shshshfp&#x3D;; __jda&#x3D;; __jdb&#x3D;; __jdc&#x3D;; shshshsID&#x3D;; 3AB9D23F7A4B3C9B&#x3D;; &#39; \
+  --data-raw &#39;functionId&#x3D;pcCart_jc_cartCheckSingle&amp;appid&#x3D;JDC_mall_cart&amp;body&#x3D;%7B%22operations%22%3A%5B%7B%22carttype%22%3A%225%22%2C%22ThePacks%22%3A%5B%7B%22num%22%3A1%2C%22sType%22%3A11%2C%22Id%22%3A200081944537%2C%22TheSkus%22%3A%5B%7B%22num%22%3A1%2C%22Id%22%3A%2211966296%22%2C%22skuUuid%22%3A%22113319456898232947810357251%22%2C%22useUuid%22%3Afalse%7D%5D%7D%5D%7D%5D%2C%22serInfo%22%3A%7B%22area%22%3A%2222_1930_49324_0%22%2C%22user-key%22%3A%22xxx%22%7D%7D&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"operations"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token property">"carttype"</span><span class="token operator">:</span> <span class="token string">"5"</span><span class="token punctuation">,</span>
+            <span class="token property">"ThePacks"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"sType"</span><span class="token operator">:</span> <span class="token number">11</span><span class="token punctuation">,</span>
+                    <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token number">200081944537</span><span class="token punctuation">,</span>
+                    <span class="token property">"TheSkus"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+                        <span class="token punctuation">&#123;</span>
+                            <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                            <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token string">"11966296"</span><span class="token punctuation">,</span>
+                            <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token string">"113319456898232947810357251"</span><span class="token punctuation">,</span>
+                            <span class="token property">"useUuid"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+                        <span class="token punctuation">&#125;</span>
+                    <span class="token punctuation">]</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">]</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token property">"serInfo"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+        <span class="token property">"area"</span><span class="token operator">:</span> <span class="token string">"22_1930_49324_0"</span><span class="token punctuation">,</span>
+        <span class="token property">"user-key"</span><span class="token operator">:</span> <span class="token string">"xxx"</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"operations"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token property">"ThePacks"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"TheSkus"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token string">"10026398212355"</span><span class="token punctuation">,</span>
+                    <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token string">"116624189909634859026489344"</span><span class="token punctuation">,</span>
+                    <span class="token property">"useUuid"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token string">"10023982874451"</span><span class="token punctuation">,</span>
+                    <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token string">"1017291148909634822865551360"</span><span class="token punctuation">,</span>
+                    <span class="token property">"useUuid"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token string">"10023902508289"</span><span class="token punctuation">,</span>
+                    <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token string">"101723195909634804763471872"</span><span class="token punctuation">,</span>
+                    <span class="token property">"useUuid"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token string">"10023902508288"</span><span class="token punctuation">,</span>
+                    <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token string">"1018039220909634786699603968"</span><span class="token punctuation">,</span>
+                    <span class="token property">"useUuid"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"Id"</span><span class="token operator">:</span> <span class="token string">"10023908434237"</span><span class="token punctuation">,</span>
+                    <span class="token property">"num"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"skuUuid"</span><span class="token operator">:</span> <span class="token string">"1166100181909634762773331968"</span><span class="token punctuation">,</span>
+                    <span class="token property">"useUuid"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"carttype"</span><span class="token operator">:</span> <span class="token string">"5"</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token property">"serInfo"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+        <span class="token property">"area"</span><span class="token operator">:</span> <span class="token string">"22_1930_49324_0"</span><span class="token punctuation">,</span>
+        <span class="token property">"user-key"</span><span class="token operator">:</span> <span class="token string">"xxx"</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="购物车-换购"><a href="#购物车-换购" class="headerlink" title="购物车-换购"></a>购物车-换购</h2><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">https:&#x2F;&#x2F;api.m.jd.com&#x2F;api?functionId&#x3D;pcCart_jc_cartAdd&amp;appid&#x3D;JDC_mall_cart&amp;loginType&#x3D;3&amp;body&#x3D;&#123;&quot;serInfo&quot;:&#123;&quot;area&quot;:&quot;22_1930_49324_0&quot;&#125;,&quot;operations&quot;:[&#123;&quot;carttype&quot;:&quot;2&quot;,&quot;ThePacks&quot;:[&#123;&quot;num&quot;:1,&quot;sType&quot;:16,&quot;Id&quot;:200072119660,&quot;theGifts&quot;:[&#123;&quot;Id&quot;:&quot;100017384398&quot;,&quot;num&quot;:1&#125;]&#125;]&#125;]&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;api.m.jd.com&#x2F;api?functionId&#x3D;pcCart_jc_cartAdd&amp;appid&#x3D;JDC_mall_cart&amp;loginType&#x3D;3&amp;body&#x3D;%7B%22serInfo%22:%7B%22area%22:%2222_1930_49324_0%22%7D,%22operations%22:%5B%7B%22carttype%22:%222%22,%22ThePacks%22:%5B%7B%22num%22:1,%22sType%22:16,%22Id%22:200072119660,%22theGifts%22:%5B%7B%22Id%22:%22100017384398%22,%22num%22:1%7D%5D%7D%5D%7D%5D%7D&#39; \
+  -X &#39;POST&#39; \
+  -H &#39;authority: api.m.jd.com&#39; \
+  -H &#39;content-length: 0&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;plain, *&#x2F;*&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;cart.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-site&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;cart.jd.com&#x2F;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: xxx&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>返回结果</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"success"</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+    <span class="token property">"code"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token property">"message"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+    <span class="token property">"resultData"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+        <span class="token property">"errInfo"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+            <span class="token property">"errCode"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"errSrc"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"errDesc"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+        <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+        <span class="token property">"cartInfo"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+            <span class="token property">"Num"</span><span class="token operator">:</span> <span class="token number">511</span><span class="token punctuation">,</span>
+            <span class="token property">"cartNum"</span><span class="token operator">:</span> <span class="token number">69</span><span class="token punctuation">,</span>
+            <span class="token property">"checkedWareNum"</span><span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span>
+            <span class="token property">"limitCartNum"</span><span class="token operator">:</span> <span class="token number">50</span><span class="token punctuation">,</span>
+            <span class="token property">"limitWareNum"</span><span class="token operator">:</span> <span class="token number">1000</span><span class="token punctuation">,</span>
+            <span class="token property">"limitBookNum"</span><span class="token operator">:</span> <span class="token number">1000</span><span class="token punctuation">,</span>
+            <span class="token property">"limitNotBookNum"</span><span class="token operator">:</span> <span class="token number">200</span><span class="token punctuation">,</span>
+            <span class="token property">"HasDaJiaDian"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"RePrice"</span><span class="token operator">:</span> <span class="token number">282.77</span><span class="token punctuation">,</span>
+            <span class="token property">"Price"</span><span class="token operator">:</span> <span class="token number">4894.9</span><span class="token punctuation">,</span>
+            <span class="token property">"IsEmpty"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+            <span class="token property">"PriceShow"</span><span class="token operator">:</span> <span class="token string">"￥4,612.13"</span><span class="token punctuation">,</span>
+            <span class="token property">"Discount"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"Skus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"Suits"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"Gifts"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"tip_1"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+            <span class="token property">"tip_2"</span><span class="token operator">:</span> <span class="token string">""</span><span class="token punctuation">,</span>
+            <span class="token property">"replaceSkus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"freeFreight"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"cutPriceSkuNum"</span><span class="token operator">:</span> <span class="token number">31</span><span class="token punctuation">,</span>
+            <span class="token property">"baitiaoSkuNum"</span><span class="token operator">:</span> <span class="token number">3</span><span class="token punctuation">,</span>
+            <span class="token property">"baitiaoNoticeOn"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+            <span class="token property">"ZYWeight"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"ZYPrice"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"configVersion"</span><span class="token operator">:</span> <span class="token string">"195"</span><span class="token punctuation">,</span>
+            <span class="token property">"abCards"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                <span class="token property">"1"</span><span class="token operator">:</span> <span class="token string">"B"</span><span class="token punctuation">,</span>
+                <span class="token property">"15"</span><span class="token operator">:</span> <span class="token string">"B"</span><span class="token punctuation">,</span>
+                <span class="token property">"23"</span><span class="token operator">:</span> <span class="token string">"B"</span><span class="token punctuation">,</span>
+                <span class="token property">"106"</span><span class="token operator">:</span> <span class="token string">"A"</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+            <span class="token property">"hasPacksOrMZSku"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+            <span class="token property">"selectedPacksOrMZSku"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+            <span class="token property">"promotionSwitch"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"promotionSavePrice"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"promotionRelation"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"cartClearGuide"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"cartAddClearGuide"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"cartClearShow"</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+            <span class="token property">"plusCartShow"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"cartNumGroup"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                <span class="token property">"3"</span><span class="token operator">:</span> <span class="token number">5</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+            <span class="token property">"orderNumLimit"</span><span class="token operator">:</span> <span class="token number">110</span><span class="token punctuation">,</span>
+            <span class="token property">"unusableSkus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"abConfigs"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"promotionInfo"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"plusInfo"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"promotionTotalInfo"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"notice"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                <span class="token property">"value"</span><span class="token operator">:</span> <span class="token string">"购物车中有31件商品已降价，快去看看"</span><span class="token punctuation">,</span>
+                <span class="token property">"specialId"</span><span class="token operator">:</span> <span class="token number">0</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+            <span class="token property">"hitZjh"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"jdShopIcon"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"popShopIcon"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"globalSkuIcon"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"jdGlobalShopIcon"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"vendors"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">[</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"vendorId"</span><span class="token operator">:</span> <span class="token number">10644951</span><span class="token punctuation">,</span>
+                    <span class="token property">"vendorType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+                    <span class="token property">"shopId"</span><span class="token operator">:</span> <span class="token number">10416750</span><span class="token punctuation">,</span>
+                    <span class="token property">"shopName"</span><span class="token operator">:</span> <span class="token string">"晚峰书屋官方旗舰店"</span><span class="token punctuation">,</span>
+                    <span class="token property">"hasCoupon"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"vendorPrice"</span><span class="token operator">:</span> <span class="token number">1980</span><span class="token punctuation">,</span>
+                    <span class="token property">"freeFreight"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"specialId"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+                    <span class="token property">"sorted"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                    <span class="token property">"fareMsg"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"shopMsg"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"coudanPageMsg"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"fareType"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"weight"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"priceNeed"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"weightNeed"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"linkUrl"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"vendorFare"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                        <span class="token property">"notFreshPrice"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                        <span class="token property">"freshPrice"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                        <span class="token property">"fareMap"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+                    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                    <span class="token property">"fareMap"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"fareRule"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"vendorLabels"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                        <span class="token property">"vendorHead"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+                            <span class="token punctuation">&#123;</span>
+                                <span class="token property">"u"</span><span class="token operator">:</span> <span class="token string">"shopcart_POP_900"</span><span class="token punctuation">,</span>
+                                <span class="token property">"t"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                                <span class="token property">"c"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                                <span class="token property">"d"</span><span class="token operator">:</span> <span class="token string">"shopcart_POP_dark"</span><span class="token punctuation">,</span>
+                                <span class="token property">"dd"</span><span class="token operator">:</span> <span class="token string">"shopcart_POP_dark"</span><span class="token punctuation">,</span>
+                                <span class="token property">"s"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                                <span class="token property">"vt"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                                <span class="token property">"st"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+                            <span class="token punctuation">&#125;</span>
+                        <span class="token punctuation">]</span>
+                    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                    <span class="token property">"vendorHeadSpecialId"</span><span class="token operator">:</span> <span class="token number">4</span><span class="token punctuation">,</span>
+                    <span class="token property">"checkType"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                    <span class="token property">"isNoCheck"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+                    <span class="token property">"storeId"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"inCoverage"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+                    <span class="token property">"overWeight"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"belowMoney"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"storeType"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"storeName"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"djStatus"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"venderFlag"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+                <span class="token punctuation">&#125;</span> 
+            <span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"specialId"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"actTag"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"checkType"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"isNoCheck"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token property">"preferentialSummary"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+                <span class="token property">"totalPrice"</span><span class="token operator">:</span> <span class="token string">"￥4,894.90"</span><span class="token punctuation">,</span>
+                <span class="token property">"promotionPrice"</span><span class="token operator">:</span> <span class="token string">"￥282.77"</span><span class="token punctuation">,</span>
+                <span class="token property">"totalReprice"</span><span class="token operator">:</span> <span class="token string">"￥282.77"</span><span class="token punctuation">,</span>
+                <span class="token property">"couponStatus"</span><span class="token operator">:</span> <span class="token string">"0"</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+            <span class="token property">"status"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+            <span class="token property">"preferentialDetail"</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"itemType"</span><span class="token operator">:</span> <span class="token string">"1"</span><span class="token punctuation">,</span>
+                    <span class="token property">"itemName"</span><span class="token operator">:</span> <span class="token string">"商品总额"</span><span class="token punctuation">,</span>
+                    <span class="token property">"price"</span><span class="token operator">:</span> <span class="token string">"￥4,894.90"</span><span class="token punctuation">,</span>
+                    <span class="token property">"subItemName"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"subPrice"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"itemType"</span><span class="token operator">:</span> <span class="token string">"1"</span><span class="token punctuation">,</span>
+                    <span class="token property">"itemName"</span><span class="token operator">:</span> <span class="token string">"立减"</span><span class="token punctuation">,</span>
+                    <span class="token property">"price"</span><span class="token operator">:</span> <span class="token string">"-￥282.77"</span><span class="token punctuation">,</span>
+                    <span class="token property">"subItemName"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"subPrice"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token property">"itemType"</span><span class="token operator">:</span> <span class="token string">"2"</span><span class="token punctuation">,</span>
+                    <span class="token property">"itemName"</span><span class="token operator">:</span> <span class="token string">"共优惠"</span><span class="token punctuation">,</span>
+                    <span class="token property">"price"</span><span class="token operator">:</span> <span class="token string">"-￥282.77"</span><span class="token punctuation">,</span>
+                    <span class="token property">"subItemName"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+                    <span class="token property">"subPrice"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"checkedCartState"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+            <span class="token property">"pin"</span><span class="token operator">:</span> <span class="token null keyword">null</span><span class="token punctuation">,</span>
+            <span class="token property">"canGetCouponList"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token property">"isEmpty"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+            <span class="token property">"empty"</span><span class="token operator">:</span> <span class="token boolean">false</span>
+        <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+        <span class="token property">"pin"</span><span class="token operator">:</span> <span class="token string">"32060130-350614"</span><span class="token punctuation">,</span>
+        <span class="token property">"newUserState"</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token property">"uplusState"</span><span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span>
+        <span class="token property">"userInfo"</span><span class="token operator">:</span> <span class="token null keyword">null</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+<br>
+
+<h1 id="6-交易"><a href="#6-交易" class="headerlink" title="(6) 交易"></a>(6) 交易</h1><h2 id="结算页-提单页"><a href="#结算页-提单页" class="headerlink" title="结算页/提单页"></a>结算页/提单页</h2><p>  从购物车跳转到结算页 </p>
+<ol>
+<li>收货人信息 </li>
+<li>实名信息</li>
+<li>支付方式</li>
+<li>送货清单 </li>
+<li>发票信息</li>
+<li>使用优惠/礼品卡/抵用</li>
+</ol>
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;trade.jd.com&#x2F;shopping&#x2F;order&#x2F;getOrderInfo.action&#39; \
+  -H &#39;authority: trade.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;upgrade-insecure-requests: 1&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;accept: text&#x2F;html,application&#x2F;xhtml+xml,application&#x2F;xml;q&#x3D;0.9,image&#x2F;avif,image&#x2F;webp,image&#x2F;apng,*&#x2F;*;q&#x3D;0.8,application&#x2F;signed-exchange;v&#x3D;b3;q&#x3D;0.9&#39; \
+  -H &#39;sec-fetch-site: same-site&#39; \
+  -H &#39;sec-fetch-mode: navigate&#39; \
+  -H &#39;sec-fetch-user: ?1&#39; \
+  -H &#39;sec-fetch-dest: document&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;cart.jd.com&#x2F;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D; ;shshshfpa&#x3D; ;pinId&#x3D; ;pin&#x3D; ;unick&#x3D; ;_tp&#x3D; ;_pst&#x3D; ;shshshfpb&#x3D; ;__jdv&#x3D; ;mt_xid&#x3D; ;cn&#x3D; ;areaId&#x3D; ;PCSYCityID&#x3D; ;user-key&#x3D; ;TrackID&#x3D; ;ceshi3.com&#x3D; ;shshshfp&#x3D; ;__jda&#x3D; ;__jdc&#x3D; ;_contrast&#x3D; ;_contrast_status&#x3D; ;ipLoc-djd&#x3D; ;ipLocation&#x3D; ;__jdb&#x3D; ;shshshsID&#x3D; ;3AB9D23F7A4B3C9B&#x3D; ;JSESSIONID&#x3D; ;thor&#x3D; &#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  订单校验-前端  <a target="_blank" rel="noopener" href="https://trade.jd.com/shopping/misc/js/order.common.js?r=20201229">https://trade.jd.com/shopping/misc/js/order.common.js?r=20201229</a><br>               <a target="_blank" rel="noopener" href="https://trade.jd.com/shopping/misc/js/module/payAndShipment.js?r=2020122903091">https://trade.jd.com/shopping/misc/js/module/payAndShipment.js?r=2020122903091</a> </p>
+<h2 id="下单-提交订单"><a href="#下单-提交订单" class="headerlink" title="下单/提交订单"></a>下单/提交订单</h2><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;trade.jd.com&#x2F;shopping&#x2F;order&#x2F;submitOrder.action?&amp;presaleStockSign&#x3D;1&#39; \
+  -H &#39;authority: trade.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;javascript, *&#x2F;*; q&#x3D;0.01&#39; \
+  -H &#39;x-requested-with: XMLHttpRequest&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;content-type: application&#x2F;x-www-form-urlencoded&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;trade.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-origin&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;trade.jd.com&#x2F;shopping&#x2F;order&#x2F;getOrderInfo.action&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;16035486886821200401381; shshshfpa&#x3D;bf14a290-938d-b388-ace4-6d23955dd250-1603548691; pinId&#x3D;X_uq58Hj4QHqBlohBRfJ1w; pin&#x3D;32060130-350614; unick&#x3D;WKQ6688; _tp&#x3D;8WTsybs00aFnPAHeXheCOQ%3D%3D; _pst&#x3D;32060130-350614; shshshfpb&#x3D;trJc3sxy6u5wJMhF4OqXXpw%3D%3D; __jdv&#x3D;76161171|direct|-|none|-|1618016115059; mt_xid&#x3D;V2_52007VwMVU19cV1MYQBBbDGQDEVNcXVNaHUAZbARiBhtbVQtXRkhNGVgZYlNBBUELUVMXVR5YBzMDQlsKWFdfHXkaXQZnHxNXQVhTSx5AElgNbAIWYl9oUWocSB9UAGIzEFpfWA%3D%3D; cn&#x3D;511; areaId&#x3D;22; PCSYCityID&#x3D;CN_510000_510100_510116; user-key&#x3D;cb051e08-5334-4078-948a-1e06c1b2f074; TrackID&#x3D;11lLhhEXH1Uo0KpRfl3Pu-tDt5T6RPYxyg-zvztCLLcfeQ0bjjvQEBxmmRK3tQGjmZo7X151tPvCShDe4POl5iSj8yYq3WLs7_cST98kanzaSD9KeGBpRV2C22jE5d9Dd; ceshi3.com&#x3D;201; _contrast&#x3D;; ipLoc-djd&#x3D;22-1930-50945-57033.2821411614; ipLocation&#x3D;%u56db%u5ddd; thor&#x3D;53D543F142545D43F57705A7BAF63BAF5FF77944F3359C34C6A2B04A334FBD7DCC0F83C8386C54C30E0344580A6E660CE6D6A5DD165A45903CB9091D80D4CD6E3A53EA5D5FD2A9D3922DA90FC0626D3A2EA4C349FEA3DA4B8A2488E19F95EF5B570C79F421F511AC226D416AF53F02EBEBE416E6A6931F059189915A04EBFC633494DFAA036BBC474682A9538A85A35B73265379C0BE7E5005FAF53847B82016; __jda&#x3D;122270672.16035486886821200401381.1603548689.1618016115.1619265954.49; __jdc&#x3D;122270672; shshshfp&#x3D;cc2e1a53f7ef5a129392630b3b2040ca; shshshsID&#x3D;4c10df0ba2c2c8d424f0cebc53436116_16_1619271145880; __jdb&#x3D;122270672.30.16035486886821200401381|49.1619265954; JSESSIONID&#x3D;A3048AA8BC031815943A845C04F91E34.s1; 3AB9D23F7A4B3C9B&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI&#39; \
+  --data-raw &#39;overseaPurchaseCookies&#x3D;&amp;vendorRemarks&#x3D;[&#123;&quot;venderId&quot;:&quot;720328&quot;,&quot;remark&quot;:&quot;&quot;&#125;,&#123;&quot;venderId&quot;:&quot;51585&quot;,&quot;remark&quot;:&quot;&quot;&#125;]&amp;submitOrderParam.sopNotPutInvoice&#x3D;false&amp;submitOrderParam.trackID&#x3D;TestTrackId&amp;presaleStockSign&#x3D;1&amp;submitOrderParam.ignorePriceChange&#x3D;0&amp;submitOrderParam.btSupport&#x3D;0&amp;submitOrderParam.eid&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI&amp;submitOrderParam.fp&#x3D;1b996940087f5b4390ef2e652ef52331&amp;submitOrderParam.isBestCoupon&#x3D;1&amp;submitOrderParam.skuDetailInfo&#x3D;[&#123;&quot;firstCategory&quot;:null,&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;3471&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;12508425&quot;,&quot;num&quot;:1,&quot;price&quot;:1990,&quot;skuName&quot;:&quot;反本能2：如何对抗人性弱点&quot;,&quot;discount&quot;:0&#125;,&#123;&quot;firstCategory&quot;:null,&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;13567&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;3773507&quot;,&quot;num&quot;:5,&quot;price&quot;:15900,&quot;skuName&quot;:&quot;四川春见耙耙柑 粑粑柑 丑柑橘子 精选特级大果5kg礼盒装 单果约180-300g 新鲜水果&quot;,&quot;discount&quot;:0&#125;,&#123;&quot;firstCategory&quot;:null,&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;13558&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;25567537480&quot;,&quot;num&quot;:1,&quot;price&quot;:5580,&quot;skuName&quot;:&quot;第二件减5元优仙果 海南贵妃芒果中大果4斤（单果80g起）精选新鲜水果&quot;,&quot;discount&quot;:0&#125;,&#123;&quot;firstCategory&quot;:null,&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;1593&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;46798090085&quot;,&quot;num&quot;:2,&quot;price&quot;:5500,&quot;skuName&quot;:&quot;【山西馆】维之王山楂蜜饯388g*2袋山西特产休闲零食山楂凉果&quot;,&quot;discount&quot;:0&#125;]&amp;submitOrderParam.amount&#x3D;510.00&amp;submitOrderParam.needCheck&#x3D;1&#39; \
+  --compressed
+
+
+  curl &#39;https:&#x2F;&#x2F;trade.jd.com&#x2F;shopping&#x2F;order&#x2F;submitOrder.action?&amp;presaleStockSign&#x3D;1&#39; \
+  -H &#39;authority: trade.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;javascript, *&#x2F;*; q&#x3D;0.01&#39; \
+  -H &#39;x-requested-with: XMLHttpRequest&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;content-type: application&#x2F;x-www-form-urlencoded&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;trade.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-origin&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;trade.jd.com&#x2F;shopping&#x2F;order&#x2F;getOrderInfo.action&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;16035486886821200401381; shshshfpa&#x3D;bf14a290-938d-b388-ace4-6d23955dd250-1603548691; pinId&#x3D;X_uq58Hj4QHqBlohBRfJ1w; pin&#x3D;32060130-350614; unick&#x3D;WKQ6688; _tp&#x3D;8WTsybs00aFnPAHeXheCOQ%3D%3D; _pst&#x3D;32060130-350614; shshshfpb&#x3D;trJc3sxy6u5wJMhF4OqXXpw%3D%3D; __jdv&#x3D;76161171|direct|-|none|-|1618016115059; mt_xid&#x3D;V2_52007VwMVU19cV1MYQBBbDGQDEVNcXVNaHUAZbARiBhtbVQtXRkhNGVgZYlNBBUELUVMXVR5YBzMDQlsKWFdfHXkaXQZnHxNXQVhTSx5AElgNbAIWYl9oUWocSB9UAGIzEFpfWA%3D%3D; areaId&#x3D;22; PCSYCityID&#x3D;CN_510000_510100_510116; user-key&#x3D;cb051e08-5334-4078-948a-1e06c1b2f074; TrackID&#x3D;11lLhhEXH1Uo0KpRfl3Pu-tDt5T6RPYxyg-zvztCLLcfeQ0bjjvQEBxmmRK3tQGjmZo7X151tPvCShDe4POl5iSj8yYq3WLs7_cST98kanzaSD9KeGBpRV2C22jE5d9Dd; ceshi3.com&#x3D;201; _contrast&#x3D;; ipLocation&#x3D;%u56db%u5ddd; shshshfp&#x3D;cc2e1a53f7ef5a129392630b3b2040ca; cn&#x3D;496; answer-code&#x3D;&quot;&quot;; _distM&#x3D;170094630219; __jda&#x3D;122270672.16035486886821200401381.1603548689.1618016115.1619265954.49; __jdc&#x3D;122270672; thor&#x3D;53D543F142545D43F57705A7BAF63BAF5FF77944F3359C34C6A2B04A334FBD7DCC0F83C8386C54C30E0344580A6E660CA6868AA01B9876F0656D42D0962CFD6B3DFD32D6E3AB27E5E8317ACF814E7C728676E11833F842732113C9581297B4C15185C2B186641F3F83334546781F436394314DFDD749EC520DE4AB8A765061DA48AAADE7D905458495390CFB1330DADA236538BD4518ABA765A0A40E64274101; shshshsID&#x3D;4c10df0ba2c2c8d424f0cebc53436116_17_1619271517947; ipLoc-djd&#x3D;22-1930-50945-57033.2821411614; __jdb&#x3D;122270672.36.16035486886821200401381|49.1619265954; JSESSIONID&#x3D;9B01AA3CF690032AC34700D3A4A3286F.s1; 3AB9D23F7A4B3C9B&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI&#39; \
+  --data-raw &#39;overseaPurchaseCookies&#x3D;&amp;vendorRemarks&#x3D;[&#123;&quot;venderId&quot;:&quot;720328&quot;,&quot;remark&quot;:&quot;&quot;&#125;,&#123;&quot;venderId&quot;:&quot;51585&quot;,&quot;remark&quot;:&quot;&quot;&#125;]&amp;submitOrderParam.sopNotPutInvoice&#x3D;false&amp;submitOrderParam.trackID&#x3D;TestTrackId&amp;presaleStockSign&#x3D;1&amp;submitOrderParam.ignorePriceChange&#x3D;0&amp;submitOrderParam.btSupport&#x3D;0&amp;submitOrderParam.eid&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI&amp;submitOrderParam.fp&#x3D;1b996940087f5b4390ef2e652ef52331&amp;submitOrderParam.isBestCoupon&#x3D;1&amp;submitOrderParam.skuDetailInfo&#x3D;[&#123;&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;3471&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;firstCategory&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;12508425&quot;,&quot;num&quot;:1,&quot;price&quot;:1990,&quot;skuName&quot;:&quot;反本能2：如何对抗人性弱点&quot;,&quot;discount&quot;:0&#125;,&#123;&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;13567&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;firstCategory&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;3773507&quot;,&quot;num&quot;:1,&quot;price&quot;:15900,&quot;skuName&quot;:&quot;四川春见耙耙柑 粑粑柑 丑柑橘子 精选特级大果5kg礼盒装 单果约180-300g 新鲜水果&quot;,&quot;discount&quot;:0&#125;,&#123;&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;13558&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;firstCategory&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;25567537480&quot;,&quot;num&quot;:1,&quot;price&quot;:5580,&quot;skuName&quot;:&quot;第二件减5元优仙果 海南贵妃芒果中大果4斤（单果80g起）精选新鲜水果&quot;,&quot;discount&quot;:0&#125;,&#123;&quot;secondCategory&quot;:null,&quot;thirdCategory&quot;:&quot;1593&quot;,&quot;totalPrice&quot;:null,&quot;secondCategoryTotalPrice&quot;:null,&quot;firstCategory&quot;:null,&quot;thirdCategoryTotalPrice&quot;:null,&quot;skuId&quot;:&quot;46798090085&quot;,&quot;num&quot;:1,&quot;price&quot;:5500,&quot;skuName&quot;:&quot;【山西馆】维之王山楂蜜饯388g*2袋山西特产休闲零食山楂凉果&quot;,&quot;discount&quot;:0&#125;]&amp;submitOrderParam.amount&#x3D;157.50&amp;submitOrderParam.needCheck&#x3D;1&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;success.jd.com&#x2F;success&#x2F;success.action?orderId&#x3D;162514856405&amp;areaId&#x3D;22-1930-50945-57035.3894930080&amp;rid&#x3D;0.26536111152218456&#39; \
+  -H &#39;authority: success.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;upgrade-insecure-requests: 1&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;accept: text&#x2F;html,application&#x2F;xhtml+xml,application&#x2F;xml;q&#x3D;0.9,image&#x2F;avif,image&#x2F;webp,image&#x2F;apng,*&#x2F;*;q&#x3D;0.8,application&#x2F;signed-exchange;v&#x3D;b3;q&#x3D;0.9&#39; \
+  -H &#39;sec-fetch-site: same-site&#39; \
+  -H &#39;sec-fetch-mode: navigate&#39; \
+  -H &#39;sec-fetch-user: ?1&#39; \
+  -H &#39;sec-fetch-dest: document&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;trade.jd.com&#x2F;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;16035486886821200401381; shshshfpa&#x3D;bf14a290-938d-b388-ace4-6d23955dd250-1603548691; pinId&#x3D;X_uq58Hj4QHqBlohBRfJ1w; pin&#x3D;32060130-350614; unick&#x3D;WKQ6688; _tp&#x3D;8WTsybs00aFnPAHeXheCOQ%3D%3D; _pst&#x3D;32060130-350614; shshshfpb&#x3D;trJc3sxy6u5wJMhF4OqXXpw%3D%3D; __jdv&#x3D;76161171|direct|-|none|-|1618016115059; mt_xid&#x3D;V2_52007VwMVU19cV1MYQBBbDGQDEVNcXVNaHUAZbARiBhtbVQtXRkhNGVgZYlNBBUELUVMXVR5YBzMDQlsKWFdfHXkaXQZnHxNXQVhTSx5AElgNbAIWYl9oUWocSB9UAGIzEFpfWA%3D%3D; areaId&#x3D;22; PCSYCityID&#x3D;CN_510000_510100_510116; user-key&#x3D;cb051e08-5334-4078-948a-1e06c1b2f074; TrackID&#x3D;11lLhhEXH1Uo0KpRfl3Pu-tDt5T6RPYxyg-zvztCLLcfeQ0bjjvQEBxmmRK3tQGjmZo7X151tPvCShDe4POl5iSj8yYq3WLs7_cST98kanzaSD9KeGBpRV2C22jE5d9Dd; ceshi3.com&#x3D;201; _contrast&#x3D;; ipLocation&#x3D;%u56db%u5ddd; shshshfp&#x3D;cc2e1a53f7ef5a129392630b3b2040ca; _distM&#x3D;170094630219; __jda&#x3D;122270672.16035486886821200401381.1603548689.1618016115.1619265954.49; __jdc&#x3D;122270672; thor&#x3D;53D543F142545D43F57705A7BAF63BAF5FF77944F3359C34C6A2B04A334FBD7DCC0F83C8386C54C30E0344580A6E660CA6868AA01B9876F0656D42D0962CFD6B3DFD32D6E3AB27E5E8317ACF814E7C728676E11833F842732113C9581297B4C15185C2B186641F3F83334546781F436394314DFDD749EC520DE4AB8A765061DA48AAADE7D905458495390CFB1330DADA236538BD4518ABA765A0A40E64274101; shshshsID&#x3D;4c10df0ba2c2c8d424f0cebc53436116_17_1619271517947; ipLoc-djd&#x3D;22-1930-50945-57033.2821411614; __jdb&#x3D;122270672.36.16035486886821200401381|49.1619265954; 3AB9D23F7A4B3C9B&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI; cn&#x3D;491&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="收银"><a href="#收银" class="headerlink" title="收银"></a>收银</h2><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;pcashier.jd.com&#x2F;cashier&#x2F;index.action?orderId&#x3D;162514856405&amp;reqInfo&#x3D;eyJwYXlFeHQiOm51bGwsIm9yZGVyQW1vdW50IjoiMTU3LjUwMDAiLCJvcmRlckRhdGUiOm51bGwsImNvdW50ZG93blRpbWUiOm51bGwsImNvbXBhbnlJZCI6IjQiLCJ0b1R5cGUiOiIxMCIsImNhdGVnb3J5IjoiMSIsInZlcnNpb24iOiIzLjAiLCJvcmRlcklkIjoiMTYyNTE0ODU2NDA1Iiwib3JkZXJUeXBlIjoiMCIsInBheUFtb3VudCI6IjE1Ny41MDAwIn0&#x3D;&amp;sign&#x3D;24708f118f4764bfed670d088156ef29&#39; \
+  -H &#39;authority: pcashier.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;upgrade-insecure-requests: 1&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;accept: text&#x2F;html,application&#x2F;xhtml+xml,application&#x2F;xml;q&#x3D;0.9,image&#x2F;avif,image&#x2F;webp,image&#x2F;apng,*&#x2F;*;q&#x3D;0.8,application&#x2F;signed-exchange;v&#x3D;b3;q&#x3D;0.9&#39; \
+  -H &#39;sec-fetch-site: same-site&#39; \
+  -H &#39;sec-fetch-mode: navigate&#39; \
+  -H &#39;sec-fetch-user: ?1&#39; \
+  -H &#39;sec-fetch-dest: document&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;trade.jd.com&#x2F;&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;16035486886821200401381; shshshfpa&#x3D;bf14a290-938d-b388-ace4-6d23955dd250-1603548691; pinId&#x3D;X_uq58Hj4QHqBlohBRfJ1w; pin&#x3D;32060130-350614; unick&#x3D;WKQ6688; _tp&#x3D;8WTsybs00aFnPAHeXheCOQ%3D%3D; _pst&#x3D;32060130-350614; shshshfpb&#x3D;trJc3sxy6u5wJMhF4OqXXpw%3D%3D; __jdv&#x3D;76161171|direct|-|none|-|1618016115059; mt_xid&#x3D;V2_52007VwMVU19cV1MYQBBbDGQDEVNcXVNaHUAZbARiBhtbVQtXRkhNGVgZYlNBBUELUVMXVR5YBzMDQlsKWFdfHXkaXQZnHxNXQVhTSx5AElgNbAIWYl9oUWocSB9UAGIzEFpfWA%3D%3D; areaId&#x3D;22; PCSYCityID&#x3D;CN_510000_510100_510116; user-key&#x3D;cb051e08-5334-4078-948a-1e06c1b2f074; TrackID&#x3D;11lLhhEXH1Uo0KpRfl3Pu-tDt5T6RPYxyg-zvztCLLcfeQ0bjjvQEBxmmRK3tQGjmZo7X151tPvCShDe4POl5iSj8yYq3WLs7_cST98kanzaSD9KeGBpRV2C22jE5d9Dd; ceshi3.com&#x3D;201; _contrast&#x3D;; ipLocation&#x3D;%u56db%u5ddd; shshshfp&#x3D;cc2e1a53f7ef5a129392630b3b2040ca; _distM&#x3D;170094630219; __jda&#x3D;122270672.16035486886821200401381.1603548689.1618016115.1619265954.49; __jdc&#x3D;122270672; thor&#x3D;53D543F142545D43F57705A7BAF63BAF5FF77944F3359C34C6A2B04A334FBD7DCC0F83C8386C54C30E0344580A6E660CA6868AA01B9876F0656D42D0962CFD6B3DFD32D6E3AB27E5E8317ACF814E7C728676E11833F842732113C9581297B4C15185C2B186641F3F83334546781F436394314DFDD749EC520DE4AB8A765061DA48AAADE7D905458495390CFB1330DADA236538BD4518ABA765A0A40E64274101; shshshsID&#x3D;4c10df0ba2c2c8d424f0cebc53436116_17_1619271517947; __jdb&#x3D;122270672.36.16035486886821200401381|49.1619265954; 3AB9D23F7A4B3C9B&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI; cn&#x3D;491; ipLoc-djd&#x3D;22-1930-50945-57035.3894930080&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="获取支付信息"><a href="#获取支付信息" class="headerlink" title="获取支付信息"></a>获取支付信息</h2><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;pay.jd.com&#x2F;api-d-cashier&#x2F;jdpay&#x2F;getPayChannel?cashierId&#x3D;1&amp;appId&#x3D;pcashier&#39; \
+  -H &#39;authority: pay.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;sgm-context: 931049311124120200;931049311124120200&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;plain, *&#x2F;*&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;content-type: application&#x2F;json&#39; \
+  -H &#39;origin: https:&#x2F;&#x2F;pay.jd.com&#39; \
+  -H &#39;sec-fetch-site: same-origin&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;pay.jd.com&#x2F;d&#x2F;cashier&#x2F;?orderId&#x3D;162514856405&amp;reqInfo&#x3D;eyJjYXRlZ29yeSI6IjEiLCJvcmRlckFtb3VudCI6IjE1Ny41MCIsIm9yZGVyRXJwUGxhdCI6IkpEIiwidmVyc2lvbiI6IjMuMCIsIm9yZGVySWQiOiIxNjI1MTQ4NTY0MDUiLCJwYXlBbW91bnQiOiIxNTcuNTAiLCJjb21wYW55SWQiOiI0Iiwib3JkZXJUeXBlIjoiMCIsInRvVHlwZSI6IjEwIn0&#x3D;&amp;sign&#x3D;aa8141ad02646e0195cccbd8c0510309&amp;appId&#x3D;pcashier&amp;cashierId&#x3D;1&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;16035486886821200401381; shshshfpa&#x3D;bf14a290-938d-b388-ace4-6d23955dd250-1603548691; pinId&#x3D;X_uq58Hj4QHqBlohBRfJ1w; pin&#x3D;32060130-350614; unick&#x3D;WKQ6688; _tp&#x3D;8WTsybs00aFnPAHeXheCOQ%3D%3D; _pst&#x3D;32060130-350614; shshshfpb&#x3D;trJc3sxy6u5wJMhF4OqXXpw%3D%3D; qid_uid&#x3D;5fca01f7-5037-44ff-946d-56e5089ada55; qid_fs&#x3D;1608622420894; __jdv&#x3D;76161171|direct|-|none|-|1618016115059; mt_xid&#x3D;V2_52007VwMVU19cV1MYQBBbDGQDEVNcXVNaHUAZbARiBhtbVQtXRkhNGVgZYlNBBUELUVMXVR5YBzMDQlsKWFdfHXkaXQZnHxNXQVhTSx5AElgNbAIWYl9oUWocSB9UAGIzEFpfWA%3D%3D; areaId&#x3D;22; PCSYCityID&#x3D;CN_510000_510100_510116; user-key&#x3D;cb051e08-5334-4078-948a-1e06c1b2f074; TrackID&#x3D;11lLhhEXH1Uo0KpRfl3Pu-tDt5T6RPYxyg-zvztCLLcfeQ0bjjvQEBxmmRK3tQGjmZo7X151tPvCShDe4POl5iSj8yYq3WLs7_cST98kanzaSD9KeGBpRV2C22jE5d9Dd; ceshi3.com&#x3D;201; _contrast&#x3D;; ipLocation&#x3D;%u56db%u5ddd; shshshfp&#x3D;cc2e1a53f7ef5a129392630b3b2040ca; qid_ls&#x3D;1613896526207; qid_ts&#x3D;1619271242330; qid_sq&#x3D;3; qid_sid&#x3D;5fca01f7-5037-44ff-946d-56e5089ada55-3; qid_ad&#x3D;pay.jd.com%7C-%7Cjd%7C-%7C0; _distM&#x3D;170094630219; __jda&#x3D;122270672.16035486886821200401381.1603548689.1618016115.1619265954.49; __jdc&#x3D;122270672; thor&#x3D;53D543F142545D43F57705A7BAF63BAF5FF77944F3359C34C6A2B04A334FBD7DCC0F83C8386C54C30E0344580A6E660CA6868AA01B9876F0656D42D0962CFD6B3DFD32D6E3AB27E5E8317ACF814E7C728676E11833F842732113C9581297B4C15185C2B186641F3F83334546781F436394314DFDD749EC520DE4AB8A765061DA48AAADE7D905458495390CFB1330DADA236538BD4518ABA765A0A40E64274101; shshshsID&#x3D;4c10df0ba2c2c8d424f0cebc53436116_17_1619271517947; __jdb&#x3D;122270672.36.16035486886821200401381|49.1619265954; 3AB9D23F7A4B3C9B&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI; cn&#x3D;491; ipLoc-djd&#x3D;22-1930-50945-57035.3894930080&#39; \
+  --data-binary &#39;&#123;&quot;orderId&quot;:&quot;162514856405&quot;,&quot;reqInfo&quot;:&quot;eyJjYXRlZ29yeSI6IjEiLCJvcmRlckFtb3VudCI6IjE1Ny41MCIsIm9yZGVyRXJwUGxhdCI6IkpEIiwidmVyc2lvbiI6IjMuMCIsIm9yZGVySWQiOiIxNjI1MTQ4NTY0MDUiLCJwYXlBbW91bnQiOiIxNTcuNTAiLCJjb21wYW55SWQiOiI0Iiwib3JkZXJUeXBlIjoiMCIsInRvVHlwZSI6IjEwIn0&#x3D;&quot;,&quot;sign&quot;:&quot;aa8141ad02646e0195cccbd8c0510309&quot;,&quot;riskReqVo&quot;:&#123;&quot;deviceId&quot;:&quot;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI&quot;,&quot;fingerprint&quot;:&quot;1b996940087f5b4390ef2e652ef52331&quot;&#125;&#125;&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl &#39;https:&#x2F;&#x2F;pay.jd.com&#x2F;api-d-cashier&#x2F;log&#x2F;info?cashierId&#x3D;1&amp;appId&#x3D;pcashier&amp;orderId&#x3D;162514856405&amp;errorInfo&#x3D;cashierId%3D1,%E8%8E%B7%E5%8F%96%E5%88%B0%E9%A3%8E%E6%8E%A7%E4%BF%A1%E6%81%AF%E7%9A%84%E6%97%B6%E9%97%B4%3E%3E%3E50&#39; \
+  -H &#39;authority: pay.jd.com&#39; \
+  -H &#39;pragma: no-cache&#39; \
+  -H &#39;cache-control: no-cache&#39; \
+  -H &#39;sgm-context: 121385111064294100;121385111064294100&#39; \
+  -H &#39;accept: application&#x2F;json, text&#x2F;plain, *&#x2F;*&#39; \
+  -H &#39;user-agent: Mozilla&#x2F;5.0 (Macintosh; Intel Mac OS X 11_0_0) AppleWebKit&#x2F;537.36 (KHTML, like Gecko) Chrome&#x2F;86.0.4240.183 Safari&#x2F;537.36&#39; \
+  -H &#39;sec-fetch-site: same-origin&#39; \
+  -H &#39;sec-fetch-mode: cors&#39; \
+  -H &#39;sec-fetch-dest: empty&#39; \
+  -H &#39;referer: https:&#x2F;&#x2F;pay.jd.com&#x2F;d&#x2F;cashier&#x2F;?orderId&#x3D;162514856405&amp;reqInfo&#x3D;eyJjYXRlZ29yeSI6IjEiLCJvcmRlckFtb3VudCI6IjE1Ny41MCIsIm9yZGVyRXJwUGxhdCI6IkpEIiwidmVyc2lvbiI6IjMuMCIsIm9yZGVySWQiOiIxNjI1MTQ4NTY0MDUiLCJwYXlBbW91bnQiOiIxNTcuNTAiLCJjb21wYW55SWQiOiI0Iiwib3JkZXJUeXBlIjoiMCIsInRvVHlwZSI6IjEwIn0&#x3D;&amp;sign&#x3D;aa8141ad02646e0195cccbd8c0510309&amp;appId&#x3D;pcashier&amp;cashierId&#x3D;1&#39; \
+  -H &#39;accept-language: zh-CN,zh;q&#x3D;0.9,zh-TW;q&#x3D;0.8,en;q&#x3D;0.7,en-US;q&#x3D;0.6&#39; \
+  -H &#39;cookie: __jdu&#x3D;16035486886821200401381; shshshfpa&#x3D;bf14a290-938d-b388-ace4-6d23955dd250-1603548691; pinId&#x3D;X_uq58Hj4QHqBlohBRfJ1w; pin&#x3D;32060130-350614; unick&#x3D;WKQ6688; _tp&#x3D;8WTsybs00aFnPAHeXheCOQ%3D%3D; _pst&#x3D;32060130-350614; shshshfpb&#x3D;trJc3sxy6u5wJMhF4OqXXpw%3D%3D; qid_uid&#x3D;5fca01f7-5037-44ff-946d-56e5089ada55; qid_fs&#x3D;1608622420894; __jdv&#x3D;76161171|direct|-|none|-|1618016115059; mt_xid&#x3D;V2_52007VwMVU19cV1MYQBBbDGQDEVNcXVNaHUAZbARiBhtbVQtXRkhNGVgZYlNBBUELUVMXVR5YBzMDQlsKWFdfHXkaXQZnHxNXQVhTSx5AElgNbAIWYl9oUWocSB9UAGIzEFpfWA%3D%3D; areaId&#x3D;22; PCSYCityID&#x3D;CN_510000_510100_510116; user-key&#x3D;cb051e08-5334-4078-948a-1e06c1b2f074; TrackID&#x3D;11lLhhEXH1Uo0KpRfl3Pu-tDt5T6RPYxyg-zvztCLLcfeQ0bjjvQEBxmmRK3tQGjmZo7X151tPvCShDe4POl5iSj8yYq3WLs7_cST98kanzaSD9KeGBpRV2C22jE5d9Dd; ceshi3.com&#x3D;201; _contrast&#x3D;; ipLocation&#x3D;%u56db%u5ddd; shshshfp&#x3D;cc2e1a53f7ef5a129392630b3b2040ca; qid_ls&#x3D;1613896526207; qid_ts&#x3D;1619271242330; qid_sq&#x3D;3; qid_sid&#x3D;5fca01f7-5037-44ff-946d-56e5089ada55-3; qid_ad&#x3D;pay.jd.com%7C-%7Cjd%7C-%7C0; _distM&#x3D;170094630219; __jda&#x3D;122270672.16035486886821200401381.1603548689.1618016115.1619265954.49; __jdc&#x3D;122270672; thor&#x3D;53D543F142545D43F57705A7BAF63BAF5FF77944F3359C34C6A2B04A334FBD7DCC0F83C8386C54C30E0344580A6E660CA6868AA01B9876F0656D42D0962CFD6B3DFD32D6E3AB27E5E8317ACF814E7C728676E11833F842732113C9581297B4C15185C2B186641F3F83334546781F436394314DFDD749EC520DE4AB8A765061DA48AAADE7D905458495390CFB1330DADA236538BD4518ABA765A0A40E64274101; shshshsID&#x3D;4c10df0ba2c2c8d424f0cebc53436116_17_1619271517947; __jdb&#x3D;122270672.36.16035486886821200401381|49.1619265954; 3AB9D23F7A4B3C9B&#x3D;XCGA3JM7F7UFF2RROUAIJA6DBJCR7JR7KBEF53UIDJYQML3EUBPTK52VJGTPFUKT355YSNMZ7BDVZ2PYV7BF4QNBXI; cn&#x3D;491; ipLoc-djd&#x3D;22-1930-50945-57035.3894930080&#39; \
+  --compressed<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/design/" rel="tag"># design</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/12/21/on-line-item-oversold/" rel="prev" title="电商线上商品超卖">
+                  <i class="fa fa-chevron-left"></i> 电商线上商品超卖
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2021/04/18/ddd/" rel="next" title="DDD笔记">
+                  DDD笔记 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

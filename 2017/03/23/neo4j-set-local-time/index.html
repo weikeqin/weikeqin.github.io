@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="把Neo4j数据库日志的时间改成本地时间   在 neo4j.conf 里加上 dbms.db.timezone&#x3D;SYSTEM 即可   下面的方法弃用   这个方法只能把写到文件的日志里的时间转成自己想要的时区的时间，原理是用的pl脚本   首先需要启动neo4j数据库，等数据库启动后，执行utc.pl脚本，然后就可以看到日志里的时间转成想要的时区的时间了，  缺点是只是把文件里的时间改变了">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Neo4j 设置时间">
+<meta property="og:url" content="http://weikeqin.com/2017/03/23/neo4j-set-local-time/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="把Neo4j数据库日志的时间改成本地时间   在 neo4j.conf 里加上 dbms.db.timezone&#x3D;SYSTEM 即可   下面的方法弃用   这个方法只能把写到文件的日志里的时间转成自己想要的时区的时间，原理是用的pl脚本   首先需要启动neo4j数据库，等数据库启动后，执行utc.pl脚本，然后就可以看到日志里的时间转成想要的时区的时间了，  缺点是只是把文件里的时间改变了">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-03-23T08:22:04.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.255Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="neo4j">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/03/23/neo4j-set-local-time/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/03/23/neo4j-set-local-time/","path":"2017/03/23/neo4j-set-local-time/","title":"Neo4j 设置时间"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Neo4j 设置时间 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#utc-pl%E8%84%9A%E6%9C%AC"><span class="nav-number">1.</span> <span class="nav-text">utc.pl脚本</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AF%A6%E7%BB%86%E6%93%8D%E4%BD%9C%E8%BF%87%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">详细操作过程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References%EF%BC%9A"><span class="nav-number">3.</span> <span class="nav-text">References：</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/03/23/neo4j-set-local-time/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Neo4j 设置时间
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-03-23 16:22:04" itemprop="dateCreated datePublished" datetime="2017-03-23T16:22:04+08:00">2017-03-23</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/neo4j/" itemprop="url" rel="index"><span itemprop="name">neo4j</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/03/23/neo4j-set-local-time/" class="post-meta-item leancloud_visitors" data-flag-title="Neo4j 设置时间" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  把Neo4j数据库日志的时间改成本地时间</p>
+<p>  在 <code>neo4j.conf</code> 里加上 <code>dbms.db.timezone=SYSTEM</code> 即可</p>
+<p>  下面的方法弃用</p>
+<p>  <del>这个方法只能把写到文件的日志里的时间转成自己想要的时区的时间，原理是用的pl脚本</del></p>
+<p>  <del>首先需要启动neo4j数据库，等数据库启动后，执行utc.pl脚本，然后就可以看到日志里的时间转成想要的时区的时间了，</del><br>  <del>缺点是只是把文件里的时间改变了，并没有改变neo4j里的时间 时区，所以控制台输出的还是原来没转化的。</del></p>
+<p>  <del>脚本和方法如下</del><br>  <del>1. 首先新建utc.pl脚本，并用chmod设置权限</del><br>  <del>2. 启动neo4j数据库</del><br>  <del>3. 执行 utc.pl 脚本 <code>./utc.pl logs/debug.log  &gt; logs/debug.utc.log</code></del><br>  <del>4. 查看logs目录下的debug.utc.log，看是否起作用</del></p>
+<span id="more"></span>
+
+
+<h1 id="utc-pl脚本"><a href="#utc-pl脚本" class="headerlink" title="utc.pl脚本"></a>utc.pl脚本</h1><pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token shebang important">#!/usr/bin/perl -w</span>
+use strict<span class="token punctuation">;</span>
+use Time::Local<span class="token punctuation">;</span>  <span class="token comment">#needed for timegm()</span>
+
+my <span class="token variable">$file</span> <span class="token operator">=</span> <span class="token variable">$ARGV</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> or die <span class="token string">"USAGE: <span class="token variable">$0</span> &lt;filename><span class="token entity" title="\n">\n</span>"</span><span class="token punctuation">;</span>
+
+open<span class="token punctuation">(</span>my <span class="token variable">$data</span>, <span class="token string">'&lt;'</span>, <span class="token variable">$file</span><span class="token punctuation">)</span> or die <span class="token string">"Could not open '<span class="token variable">$file</span>' <span class="token variable">$!</span><span class="token entity" title="\n">\n</span>"</span><span class="token punctuation">;</span>
+
+<span class="token keyword">while</span> <span class="token punctuation">(</span>my <span class="token variable">$line</span> <span class="token operator">=</span> <span class="token operator">&lt;</span><span class="token variable">$data</span><span class="token operator">></span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment"># where a line might start as</span>
+  <span class="token comment"># 2017-01-11 23:22:28.372+0000 INFO ... .... ....</span>
+  chomp <span class="token variable">$line</span><span class="token punctuation">;</span>
+  <span class="token comment"># check to make sure the line begins with a YYYY-MM-DD HH</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span> <span class="token variable">$line</span> <span class="token operator">=~</span> /<span class="token punctuation">\</span>d<span class="token punctuation">\</span>d<span class="token punctuation">\</span>d<span class="token punctuation">\</span>d-<span class="token punctuation">\</span>d<span class="token punctuation">\</span>d-<span class="token punctuation">\</span>d<span class="token punctuation">\</span>d <span class="token punctuation">\</span>d<span class="token punctuation">\</span>d/ <span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+          my <span class="token variable">$newstring</span> <span class="token operator">=</span> UTC2LocalString<span class="token punctuation">(</span><span class="token variable">$line</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          print <span class="token string">"<span class="token variable">$newstring</span><span class="token entity" title="\n">\n</span>"</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+      print <span class="token string">"<span class="token variable">$line</span><span class="token entity" title="\n">\n</span>"</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+
+sub UTC2LocalString
+<span class="token punctuation">&#123;</span>
+  <span class="token comment"># below attributed to Marshall at http://www.perlmonks.org/?node_id=873435</span>
+  my <span class="token variable">$t</span> <span class="token operator">=</span> <span class="token builtin class-name">shift</span><span class="token punctuation">;</span>
+  my <span class="token punctuation">(</span><span class="token variable">$datehour</span>, <span class="token variable">$rest</span><span class="token punctuation">)</span> <span class="token operator">=</span> split<span class="token punctuation">(</span>/:/,<span class="token variable">$t</span>,2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">#   $datehour will represent YYYY-MM-DD HH  (i.e. 2017-01-14 12)</span>
+  <span class="token comment">#   $rest represents the rest of the line after</span>
+  <span class="token comment">#   and this will reassemble and return $datehour (adjusted) + $rest</span>
+  my <span class="token punctuation">(</span><span class="token variable">$year</span>, <span class="token variable">$month</span>, <span class="token variable">$day</span>, <span class="token variable">$hour</span><span class="token punctuation">)</span> <span class="token operator">=</span>
+      <span class="token variable">$datehour</span> <span class="token operator">=~</span> /<span class="token punctuation">(</span><span class="token punctuation">\</span>d+<span class="token punctuation">)</span>-<span class="token punctuation">(</span><span class="token punctuation">\</span>d<span class="token punctuation">\</span>d<span class="token punctuation">)</span>-<span class="token punctuation">(</span><span class="token punctuation">\</span>d<span class="token punctuation">\</span>d<span class="token punctuation">)</span><span class="token punctuation">\</span>s+<span class="token punctuation">(</span><span class="token punctuation">\</span>d<span class="token punctuation">\</span>d<span class="token punctuation">)</span>/<span class="token punctuation">;</span>
+
+  <span class="token comment">#  proto: $time = timegm($sec,$min,$hour,$mday,$mon,$year);</span>
+  my <span class="token variable">$epoch</span> <span class="token operator">=</span> timegm <span class="token punctuation">(</span><span class="token number">0,0</span>,<span class="token variable">$hour</span>,<span class="token variable">$day</span>,<span class="token variable">$month</span>-1,<span class="token variable">$year</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">#  proto: ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) =</span>
+  <span class="token comment">#          localtime(time);</span>
+  my <span class="token punctuation">(</span><span class="token variable">$lyear</span>,<span class="token variable">$lmonth</span>,<span class="token variable">$lday</span>,<span class="token variable">$lhour</span>,<span class="token variable">$isdst</span><span class="token punctuation">)</span> <span class="token operator">=</span>
+            <span class="token punctuation">(</span>localtime<span class="token punctuation">(</span><span class="token variable">$epoch</span><span class="token punctuation">))</span><span class="token punctuation">[</span><span class="token number">5,4</span>,3,2,-1<span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+  <span class="token variable">$lyear</span> <span class="token operator">+=</span> <span class="token number">1900</span><span class="token punctuation">;</span>  <span class="token comment"># year is 1900 based</span>
+  <span class="token variable">$lmonth</span>++<span class="token punctuation">;</span>       <span class="token comment"># month number is zero based</span>
+  <span class="token comment">#print "isdst: $isdst\n"; #debug flag day-light-savings time</span>
+  <span class="token builtin class-name">return</span> <span class="token punctuation">(</span> sprintf<span class="token punctuation">(</span><span class="token string">"%04d-%02d-%02d %02d:%s"</span>,
+           <span class="token variable">$lyear</span>,<span class="token variable">$lmonth</span>,<span class="token variable">$lday</span>,<span class="token variable">$lhour</span>,<span class="token variable">$rest</span><span class="token punctuation">)</span> <span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="详细操作过程"><a href="#详细操作过程" class="headerlink" title="详细操作过程"></a>详细操作过程</h1><pre class="line-numbers language-text" data-language="text"><code class="language-text">[wkq@wkq neo4j-community-3.4.1]$ ll
+total 288
+drwxr-xr-x. 3 wkq wkq   4096 Jun 11 23:11 bin
+drwxrwxr-x. 2 wkq wkq     51 Jul  4 16:31 certificates
+drwxr-xr-x. 2 wkq wkq     31 Jul  4 16:53 conf
+drwxr-xr-x. 4 wkq wkq     45 Jul  4 16:31 data
+drwxr-xr-x. 2 wkq wkq     10 Jun 11 22:57 import
+drwxrwxr-x. 2 wkq wkq   4096 Jul  4 16:31 lib
+-rw-r--r--. 1 wkq wkq  84668 Jun 11 22:57 LICENSES.txt
+-rw-r--r--. 1 wkq wkq  36005 Jun 11 22:57 LICENSE.txt
+drwxr-xr-x. 2 wkq wkq   4096 Jul  4 16:55 logs
+-rw-r--r--. 1 wkq wkq   5983 Jun 11 22:57 NOTICE.txt
+drwxr-xr-x. 2 wkq wkq     10 Jun 11 22:57 plugins
+-rw-r--r--. 1 wkq wkq   1596 Jun 11 22:57 README.txt
+drwxr-xr-x. 2 wkq wkq     10 Jul  4 16:58 run
+-rw-r--r--. 1 wkq wkq     96 Jun 11 22:57 UPGRADE.txt
+-rwxrwxrwx. 1 wkq wkq   1538 Jul  4 16:37 utc.pl
+[wkq@wkq neo4j-community-3.4.1]$ ./bin/neo4j console
+Active database: graph.db
+Directories in use:
+  home:         /data/stale/data01/neo4j/neo4j-community-3.4.1
+  config:       /data/stale/data01/neo4j/neo4j-community-3.4.1/conf
+  logs:         /data/stale/data01/neo4j/neo4j-community-3.4.1/logs
+  plugins:      /data/stale/data01/neo4j/neo4j-community-3.4.1/plugins
+  import:       NOT SET
+  data:         /data/stale/data01/neo4j/neo4j-community-3.4.1/data
+  certificates: /data/stale/data01/neo4j/neo4j-community-3.4.1/certificates
+  run:          /data/stale/data01/neo4j/neo4j-community-3.4.1/run
+Starting Neo4j.
+2018-07-04 08:59:51.364+0000 INFO  ======== Neo4j 3.4.1 ========
+2018-07-04 08:59:51.392+0000 INFO  Starting...
+2018-07-04 08:59:53.202+0000 INFO  Bolt enabled on 0.0.0.0:7687.
+2018-07-04 08:59:54.849+0000 INFO  Started.
+2018-07-04 08:59:55.631+0000 WARN  Low configured threads: (max=&#123;&#125; - required=&#123;&#125;)=&#123;&#125; &lt; warnAt=&#123;&#125; for &#123;&#125;
+2018-07-04 08:59:55.649+0000 INFO  Remote interface available at http://localhost:7474/
+
+
+[wkq@wkq neo4j-community-3.4.1]$ ./utc.pl logs/debug.log  > logs/debug.utc.log
+
+[wkq@wkq neo4j-community-3.4.1]$ cd logs/
+[wkq@wkq logs]$ ll
+total 140
+-rw-rw-r--. 1 wkq wkq 48884 Jul  4 17:02 debug.log
+-rw-rw-r--. 1 wkq wkq 48884 Jul  4 17:03 debug.utc.log
+-rw-rw-r--. 1 wkq wkq 40654 Jul  4 17:02 gc.log.0.current
+-rw-rw-r--. 1 wkq wkq   850 Jul  4 17:02 http.log
+
+
+[wkq@wkq logs]$ tail -100 debug.log
+2018-07-04 08:59:53.285+0000 INFO [o.n.k.i.DiagnosticsManager] Id usage:
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   ArrayPropertyStore: used=1 high=0
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   NodeStore: used=0 high=-1
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   PropertyIndexStore: used=0 high=-1
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   ArrayPropertyStore: used=1 high=0
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   PropertyStore: used=0 high=-1
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   RelationshipStore: used=0 high=-1
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   RelationshipTypeStore: used=0 high=-1
+2018-07-04 08:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   LabelTokenStore: used=0 high=-1
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   SchemaStore: used=1 high=0
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   RelationshipGroupStore: used=1 high=0
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   NeoStore: used=15 high=14
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for NEO_STORE_ID_USAGE END ---
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for NEO_STORE_RECORDS START ---
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] Neostore records:
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] TIME (Creation time): 1530693102899
+2018-07-04 08:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] RANDOM_NUMBER (Random number for store id): 8927400069693653901
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LOG_VERSION (Current log version): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_TRANSACTION_ID (Last committed transaction): 1
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] STORE_VERSION (Store format version): 16094931155187206
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] FIRST_GRAPH_PROPERTY (First property record containing graph properties): -1
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_CONSTRAINT_TRANSACTION (Last committed transaction containing constraint changes): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TRANSACTION_ID (Transaction id most recent upgrade was performed at): 1
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TIME (Time of last upgrade): 1530693102899
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_TRANSACTION_CHECKSUM (Checksum of last committed transaction): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TRANSACTION_CHECKSUM (Checksum of transaction id the most recent upgrade was performed at): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_CLOSED_TRANSACTION_LOG_VERSION (Log version where the last transaction commit entry has been written into): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET (Byte offset in the log file where the last transaction commit entry has been written into): 16
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_TRANSACTION_COMMIT_TIMESTAMP (Commit time timestamp for last committed transaction): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TRANSACTION_COMMIT_TIMESTAMP (Commit timestamp of transaction the most recent upgrade was performed at): 0
+2018-07-04 08:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for NEO_STORE_RECORDS END ---
+2018-07-04 08:59:53.289+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for TRANSACTION_RANGE START ---
+2018-07-04 08:59:53.289+0000 INFO [o.n.k.i.DiagnosticsManager] Transaction log:
+2018-07-04 08:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] Oldest transaction 2 found in log with version 0
+2018-07-04 08:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for TRANSACTION_RANGE END ---
+2018-07-04 08:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for KernelDiagnostics:StoreFiles START ---
+2018-07-04 08:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] Disk space on partition (Total / Free / Free %): 5995761762304 / 5630701182976 / 93
+2018-07-04 08:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] Storage files: (filename : modification date - size)
+2018-07-04 08:59:53.291+0000 INFO [o.n.k.i.DiagnosticsManager]   index:
+2018-07-04 08:59:53.292+0000 INFO [o.n.k.i.DiagnosticsManager]   - Total: 2018-07-04T16:31:43+0800 - 0.00 B
+2018-07-04 08:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.counts.db.a: 2018-07-04T16:31:43+0800 - 96.00 B
+2018-07-04 08:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labelscanstore.db: 2018-07-04T16:59:52+0800 - 40.00 kB
+2018-07-04 08:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db.names: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db.names.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db.labels: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db.labels.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.arrays: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.arrays.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index.keys: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index.keys.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.strings: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.strings.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipgroupstore.db: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipgroupstore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipstore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipstore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db.names: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db.names.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.schemastore.db: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 08:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.schemastore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 08:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.transaction.db.0: 2018-07-04T16:58:15+0800 - 88.00 B
+2018-07-04 08:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   store_lock: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 08:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager] Storage summary:
+2018-07-04 08:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager]   Total size of store: 112.31 kB
+2018-07-04 08:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager]   Total size of mapped files: 112.00 kB
+2018-07-04 08:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for KernelDiagnostics:StoreFiles END ---
+2018-07-04 08:59:54.850+0000 INFO [o.n.k.i.DiagnosticsManager] --- SERVER STARTED START ---
+2018-07-04 08:59:55.649+0000 INFO [o.n.k.i.DiagnosticsManager] --- SERVER STARTED END ---
+2018-07-04 09:02:17.230+0000 ERROR [o.n.b.r.DefaultBoltConnection] Unexpected error detected in bolt session '1402ecfffe7d5b64-00001f8c-00000001-a464075b467c9fad-e3b5926d'. The client is unauthorized due to authentication failure.
+org.neo4j.bolt.v1.runtime.BoltConnectionFatality: The client is unauthorized due to authentication failure.
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.handleFailure(BoltStateMachine.java:742)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.handleFailure(BoltStateMachine.java:728)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.access$500(BoltStateMachine.java:62)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine$State$1.init(BoltStateMachine.java:435)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.init(BoltStateMachine.java:145)
+        at org.neo4j.bolt.v1.messaging.BoltMessageRouter.lambda$onInit$0(BoltMessageRouter.java:70)
+        at org.neo4j.bolt.runtime.DefaultBoltConnection.processNextBatch(DefaultBoltConnection.java:195)
+        at org.neo4j.bolt.runtime.DefaultBoltConnection.processNextBatch(DefaultBoltConnection.java:143)
+        at org.neo4j.bolt.runtime.ExecutorBoltScheduler.executeBatch(ExecutorBoltScheduler.java:170)
+        at org.neo4j.bolt.runtime.ExecutorBoltScheduler.lambda$scheduleBatchOrHandleError$2(ExecutorBoltScheduler.java:153)
+        at java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1590)
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+        at java.lang.Thread.run(Thread.java:745)
+
+
+[wkq@wkq logs]$ tail -100 debug.utc.log
+2018-07-04 16:59:53.285+0000 INFO [o.n.k.i.DiagnosticsManager] Id usage:
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   ArrayPropertyStore: used=1 high=0
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   NodeStore: used=0 high=-1
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   PropertyIndexStore: used=0 high=-1
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   ArrayPropertyStore: used=1 high=0
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   PropertyStore: used=0 high=-1
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   RelationshipStore: used=0 high=-1
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   RelationshipTypeStore: used=0 high=-1
+2018-07-04 16:59:53.286+0000 INFO [o.n.k.i.DiagnosticsManager]   StringPropertyStore: used=1 high=0
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   LabelTokenStore: used=0 high=-1
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   SchemaStore: used=1 high=0
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   RelationshipGroupStore: used=1 high=0
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager]   NeoStore: used=15 high=14
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for NEO_STORE_ID_USAGE END ---
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for NEO_STORE_RECORDS START ---
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] Neostore records:
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] TIME (Creation time): 1530693102899
+2018-07-04 16:59:53.287+0000 INFO [o.n.k.i.DiagnosticsManager] RANDOM_NUMBER (Random number for store id): 8927400069693653901
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LOG_VERSION (Current log version): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_TRANSACTION_ID (Last committed transaction): 1
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] STORE_VERSION (Store format version): 16094931155187206
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] FIRST_GRAPH_PROPERTY (First property record containing graph properties): -1
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_CONSTRAINT_TRANSACTION (Last committed transaction containing constraint changes): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TRANSACTION_ID (Transaction id most recent upgrade was performed at): 1
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TIME (Time of last upgrade): 1530693102899
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_TRANSACTION_CHECKSUM (Checksum of last committed transaction): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TRANSACTION_CHECKSUM (Checksum of transaction id the most recent upgrade was performed at): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_CLOSED_TRANSACTION_LOG_VERSION (Log version where the last transaction commit entry has been written into): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET (Byte offset in the log file where the last transaction commit entry has been written into): 16
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] LAST_TRANSACTION_COMMIT_TIMESTAMP (Commit time timestamp for last committed transaction): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] UPGRADE_TRANSACTION_COMMIT_TIMESTAMP (Commit timestamp of transaction the most recent upgrade was performed at): 0
+2018-07-04 16:59:53.288+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for NEO_STORE_RECORDS END ---
+2018-07-04 16:59:53.289+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for TRANSACTION_RANGE START ---
+2018-07-04 16:59:53.289+0000 INFO [o.n.k.i.DiagnosticsManager] Transaction log:
+2018-07-04 16:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] Oldest transaction 2 found in log with version 0
+2018-07-04 16:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for TRANSACTION_RANGE END ---
+2018-07-04 16:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for KernelDiagnostics:StoreFiles START ---
+2018-07-04 16:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] Disk space on partition (Total / Free / Free %): 5995761762304 / 5630701182976 / 93
+2018-07-04 16:59:53.290+0000 INFO [o.n.k.i.DiagnosticsManager] Storage files: (filename : modification date - size)
+2018-07-04 16:59:53.291+0000 INFO [o.n.k.i.DiagnosticsManager]   index:
+2018-07-04 16:59:53.292+0000 INFO [o.n.k.i.DiagnosticsManager]   - Total: 2018-07-04T16:31:43+0800 - 0.00 B
+2018-07-04 16:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.counts.db.a: 2018-07-04T16:31:43+0800 - 96.00 B
+2018-07-04 16:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.293+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labelscanstore.db: 2018-07-04T16:59:52+0800 - 40.00 kB
+2018-07-04 16:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db.names: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.294+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.labeltokenstore.db.names.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db.labels: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.295+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.nodestore.db.labels.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.arrays: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.arrays.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.296+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index.keys: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.index.keys.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.strings: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.propertystore.db.strings.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.297+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipgroupstore.db: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipgroupstore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipstore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshipstore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.298+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db.names: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.relationshiptypestore.db.names.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.schemastore.db: 2018-07-04T16:31:42+0800 - 8.00 kB
+2018-07-04 16:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.schemastore.db.id: 2018-07-04T16:59:52+0800 - 9.00 B
+2018-07-04 16:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   neostore.transaction.db.0: 2018-07-04T16:58:15+0800 - 88.00 B
+2018-07-04 16:59:53.299+0000 INFO [o.n.k.i.DiagnosticsManager]   store_lock: 2018-07-04T16:31:42+0800 - 0.00 B
+2018-07-04 16:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager] Storage summary:
+2018-07-04 16:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager]   Total size of store: 112.31 kB
+2018-07-04 16:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager]   Total size of mapped files: 112.00 kB
+2018-07-04 16:59:53.300+0000 INFO [o.n.k.i.DiagnosticsManager] --- STARTED diagnostics for KernelDiagnostics:StoreFiles END ---
+2018-07-04 16:59:54.850+0000 INFO [o.n.k.i.DiagnosticsManager] --- SERVER STARTED START ---
+2018-07-04 16:59:55.649+0000 INFO [o.n.k.i.DiagnosticsManager] --- SERVER STARTED END ---
+2018-07-04 17:02:17.230+0000 ERROR [o.n.b.r.DefaultBoltConnection] Unexpected error detected in bolt session '1402ecfffe7d5b64-00001f8c-00000001-a464075b467c9fad-e3b5926d'. The client is unauthorized due to authentication failure.
+org.neo4j.bolt.v1.runtime.BoltConnectionFatality: The client is unauthorized due to authentication failure.
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.handleFailure(BoltStateMachine.java:742)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.handleFailure(BoltStateMachine.java:728)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.access$500(BoltStateMachine.java:62)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine$State$1.init(BoltStateMachine.java:435)
+        at org.neo4j.bolt.v1.runtime.BoltStateMachine.init(BoltStateMachine.java:145)
+        at org.neo4j.bolt.v1.messaging.BoltMessageRouter.lambda$onInit$0(BoltMessageRouter.java:70)
+        at org.neo4j.bolt.runtime.DefaultBoltConnection.processNextBatch(DefaultBoltConnection.java:195)
+        at org.neo4j.bolt.runtime.DefaultBoltConnection.processNextBatch(DefaultBoltConnection.java:143)
+        at org.neo4j.bolt.runtime.ExecutorBoltScheduler.executeBatch(ExecutorBoltScheduler.java:170)
+        at org.neo4j.bolt.runtime.ExecutorBoltScheduler.lambda$scheduleBatchOrHandleError$2(ExecutorBoltScheduler.java:153)
+        at java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1590)
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+        at java.lang.Thread.run(Thread.java:745)
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="References："><a href="#References：" class="headerlink" title="References："></a>References：</h1><p>[1] <a target="_blank" rel="noopener" href="https://neo4j.com/docs/operations-manual/3.5/reference/configuration-settings/#config_dbms.db.timezone">config_dbms.db.timezone</a><br>[2] <a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/41292912/timezone-setting-for-neo4j-log">timezone-setting-for-neo4j-log</a><br>[3] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/kb/how-do-i-convert-neo4j-logs-from-base-utc-to-local-timezone/">how-do-i-convert-neo4j-logs-from-base-utc-to-local-timezone</a><br>[4] <a target="_blank" rel="noopener" href="https://www.jianshu.com/p/d86f41a77e88">neo4j 日志的时区问题</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/neo4j/" rel="tag"># neo4j</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/03/22/markdown-notes/" rel="prev" title="markdown 使用 笔记">
+                  <i class="fa fa-chevron-left"></i> markdown 使用 笔记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/03/25/maven-notes/" rel="next" title="maven 笔记">
+                  maven 笔记 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="(1) Java 内存分配？ Java虚拟机在执行Java的过程中会把管理的内存划分为若干个不同的数据区域。这些区域有各自的用途，以及创建和销毁的时间，有的区域随着虚拟机进程的启动而存在，而有的区域则依赖线程的启动和结束而创建和销毁。程序计数器、java虚拟机栈、本地方法栈、堆、方法区、常量池Java内存区域划分、内存分配原理   Java 内存分配全面浅析    (2) Java 堆的结构是什么">
+<meta property="og:type" content="article">
+<meta property="og:title" content="jvm 常见面试题">
+<meta property="og:url" content="http://weikeqin.com/2018/04/20/jvm-question/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="(1) Java 内存分配？ Java虚拟机在执行Java的过程中会把管理的内存划分为若干个不同的数据区域。这些区域有各自的用途，以及创建和销毁的时间，有的区域随着虚拟机进程的启动而存在，而有的区域则依赖线程的启动和结束而创建和销毁。程序计数器、java虚拟机栈、本地方法栈、堆、方法区、常量池Java内存区域划分、内存分配原理   Java 内存分配全面浅析    (2) Java 堆的结构是什么">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-04-20T01:31:31.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.244Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="interview">
+<meta property="article:tag" content="jvm">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2018/04/20/jvm-question/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2018/04/20/jvm-question/","path":"2018/04/20/jvm-question/","title":"jvm 常见面试题"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>jvm 常见面试题 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Java-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">(1) Java 内存分配？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Java-%E5%A0%86%E7%9A%84%E7%BB%93%E6%9E%84%E6%98%AF%E4%BB%80%E4%B9%88%E6%A0%B7%E5%AD%90%E7%9A%84%EF%BC%9F"><span class="nav-number">2.</span> <span class="nav-text">(2) Java 堆的结构是什么样子的？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E5%A0%86%E4%B8%AD%E7%9A%84%E6%B0%B8%E4%B9%85%E4%BB%A3%EF%BC%88Perm-Gen-space%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">什么是堆中的永久代（Perm Gen space）?</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AF%B4%E8%AF%B4%E5%90%84%E4%B8%AA%E5%8C%BA%E5%9F%9F%E7%9A%84%E4%BD%9C%E7%94%A8%EF%BC%9F"><span class="nav-number">4.</span> <span class="nav-text">说说各个区域的作用？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Java-%E4%B8%AD%E4%BC%9A%E5%AD%98%E5%9C%A8%E5%86%85%E5%AD%98%E6%B3%84%E6%BC%8F%E5%90%97%EF%BC%8C%E7%AE%80%E8%BF%B0%E4%B8%80%E4%B8%8B%EF%BC%9F"><span class="nav-number">5.</span> <span class="nav-text">Java 中会存在内存泄漏吗，简述一下？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Java-%E7%B1%BB%E5%8A%A0%E8%BD%BD%E8%BF%87%E7%A8%8B%EF%BC%9F"><span class="nav-number">6.</span> <span class="nav-text">Java 类加载过程？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8F%8F%E8%BF%B0%E4%B8%80%E4%B8%8B-JVM-%E5%8A%A0%E8%BD%BD-Class-%E6%96%87%E4%BB%B6%E7%9A%84%E5%8E%9F%E7%90%86%E6%9C%BA%E5%88%B6"><span class="nav-number">7.</span> <span class="nav-text">描述一下 JVM 加载 Class 文件的原理机制?</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%EF%BC%9F"><span class="nav-number">8.</span> <span class="nav-text">什么是类加载器？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E6%9C%89%E5%93%AA%E4%BA%9B%EF%BC%9F"><span class="nav-number">9.</span> <span class="nav-text">类加载器有哪些？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AFtomcat%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6%EF%BC%9F"><span class="nav-number">10.</span> <span class="nav-text">什么是tomcat类加载机制？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%A8%A1%E5%9E%8B%E6%9C%BA%E5%88%B6%EF%BC%9F"><span class="nav-number">11.</span> <span class="nav-text">类加载器双亲委派模型机制？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AFGC-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E6%9C%89-GC%EF%BC%9F"><span class="nav-number">12.</span> <span class="nav-text">什么是GC? 为什么要有 GC？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%AE%80%E8%BF%B0%E4%B8%80%E4%B8%8BJava-%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%BA%E5%88%B6%EF%BC%9F"><span class="nav-number">13.</span> <span class="nav-text">简述一下Java 垃圾回收机制？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%88%A4%E6%96%AD%E4%B8%80%E4%B8%AA%E5%AF%B9%E8%B1%A1%E6%98%AF%E5%90%A6%E5%AD%98%E6%B4%BB%EF%BC%9F"><span class="nav-number">14.</span> <span class="nav-text">如何判断一个对象是否存活？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E7%9A%84%E4%BC%98%E7%82%B9%E5%92%8C%E5%8E%9F%E7%90%86%EF%BC%8C%E5%B9%B6%E8%80%83%E8%99%91-2-%E7%A7%8D%E5%9B%9E%E6%94%B6%E6%9C%BA%E5%88%B6%EF%BC%9F"><span class="nav-number">15.</span> <span class="nav-text">垃圾回收的优点和原理，并考虑 2 种回收机制？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%99%A8%E7%9A%84%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-number">16.</span> <span class="nav-text">垃圾回收器的基本原理是什么？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%99%A8%E5%8F%AF%E4%BB%A5%E9%A9%AC%E4%B8%8A%E5%9B%9E%E6%94%B6%E5%86%85%E5%AD%98%E5%90%97%EF%BC%9F%E6%9C%89%E4%BB%80%E4%B9%88%E5%8A%9E%E6%B3%95%E4%B8%BB%E5%8A%A8%E9%80%9A%E7%9F%A5%E8%99%9A%E6%8B%9F%E6%9C%BA%E8%BF%9B%E8%A1%8C%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%9F"><span class="nav-number">17.</span> <span class="nav-text">垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B7%B1%E6%8B%B7%E8%B4%9D%E5%92%8C%E6%B5%85%E6%8B%B7%E8%B4%9D%EF%BC%9F"><span class="nav-number">18.</span> <span class="nav-text">深拷贝和浅拷贝？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#System-gc-%E5%92%8C-Runtime-gc-%E4%BC%9A%E5%81%9A%E4%BA%9B%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-number">19.</span> <span class="nav-text">System.gc() 和 Runtime.gc() 会做些什么？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E5%88%86%E5%B8%83%E5%BC%8F%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%88DGC%EF%BC%89%EF%BC%9F%E5%AE%83%E6%98%AF%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%E7%9A%84%EF%BC%9F"><span class="nav-number">20.</span> <span class="nav-text">什么是分布式垃圾回收（DGC）？它是如何工作的？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%B2%E8%A1%8C%EF%BC%88serial%EF%BC%89%E6%94%B6%E9%9B%86%E5%99%A8%E5%92%8C%E5%90%9E%E5%90%90%E9%87%8F%EF%BC%88throughput%EF%BC%89%E6%94%B6%E9%9B%86%E5%99%A8%E7%9A%84%E5%8C%BA%E5%88%AB%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-number">21.</span> <span class="nav-text">串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9C%A8-Java-%E4%B8%AD%EF%BC%8C%E5%AF%B9%E8%B1%A1%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E5%8F%AF%E4%BB%A5%E8%A2%AB%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%EF%BC%9F"><span class="nav-number">22.</span> <span class="nav-text">在 Java 中，对象什么时候可以被垃圾回收？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%AE%80%E8%BF%B0Minor-GC-%E5%92%8C-Major-GC%EF%BC%9F"><span class="nav-number">23.</span> <span class="nav-text">简述Minor GC 和 Major GC？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Java-%E4%B8%AD%E5%9E%83%E5%9C%BE%E6%94%B6%E9%9B%86%E7%9A%84%E6%96%B9%E6%B3%95%E6%9C%89%E5%93%AA%E4%BA%9B%EF%BC%9F"><span class="nav-number">24.</span> <span class="nav-text">Java 中垃圾收集的方法有哪些？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AE%B2%E8%AE%B2%E4%BD%A0%E7%90%86%E8%A7%A3%E7%9A%84%E6%80%A7%E8%83%BD%E8%AF%84%E4%BB%B7%E5%8F%8A%E6%B5%8B%E8%AF%95%E6%8C%87%E6%A0%87%EF%BC%9F"><span class="nav-number">25.</span> <span class="nav-text">讲讲你理解的性能评价及测试指标？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B8%B8%E7%94%A8%E7%9A%84%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E6%96%B9%E5%BC%8F%E6%9C%89%E5%93%AA%E4%BA%9B%EF%BC%9F"><span class="nav-number">26.</span> <span class="nav-text">常用的性能优化方式有哪些？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AF%B4%E8%AF%B4%E5%88%86%E5%B8%83%E5%BC%8F%E7%BC%93%E5%AD%98%E5%92%8C%E4%B8%80%E8%87%B4%E6%80%A7%E5%93%88%E5%B8%8C%EF%BC%9F"><span class="nav-number">27.</span> <span class="nav-text">说说分布式缓存和一致性哈希？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%90%8C%E6%AD%A5%E4%B8%8E%E5%BC%82%E6%AD%A5%EF%BC%9F%E9%98%BB%E5%A1%9E%E4%B8%8E%E9%9D%9E%E9%98%BB%E5%A1%9E%EF%BC%9F"><span class="nav-number">28.</span> <span class="nav-text">同步与异步？阻塞与非阻塞？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AFGC%E8%B0%83%E4%BC%98%EF%BC%9F"><span class="nav-number">29.</span> <span class="nav-text">什么是GC调优？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E5%BC%82%E6%AD%A5%E7%9A%84%E6%89%8B%E6%AE%B5%E6%9C%89%E5%93%AA%E4%BA%9B%EF%BC%9F"><span class="nav-number">30.</span> <span class="nav-text">常见异步的手段有哪些？</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/jvm-question/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          jvm 常见面试题
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-04-20 09:31:31" itemprop="dateCreated datePublished" datetime="2018-04-20T09:31:31+08:00">2018-04-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2018/04/20/jvm-question/" class="post-meta-item leancloud_visitors" data-flag-title="jvm 常见面试题" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="1-Java-内存分配？"><a href="#1-Java-内存分配？" class="headerlink" title="(1) Java 内存分配？"></a>(1) Java 内存分配？</h1><ol>
+<li>Java虚拟机在执行Java的过程中会把管理的内存划分为若干个不同的数据区域。这些区域有各自的用途，以及创建和销毁的时间，有的区域随着虚拟机进程的启动而存在，而有的区域则依赖线程的启动和结束而创建和销毁。<br>程序计数器、java虚拟机栈、本地方法栈、堆、方法区、常量池<br><a target="_blank" rel="noopener" href="https://blog.csdn.net/OyangYujun/article/details/41173747">Java内存区域划分、内存分配原理</a>  </li>
+<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/shimiso/article/details/8595564">Java 内存分配全面浅析</a>  </li>
+</ol>
+<h1 id="2-Java-堆的结构是什么样子的？"><a href="#2-Java-堆的结构是什么样子的？" class="headerlink" title="(2) Java 堆的结构是什么样子的？"></a>(2) Java 堆的结构是什么样子的？</h1><p>  站在垃圾收集器的角度来看，可以把内存分为新生代与老年代。</p>
+<h1 id="什么是堆中的永久代（Perm-Gen-space）"><a href="#什么是堆中的永久代（Perm-Gen-space）" class="headerlink" title="什么是堆中的永久代（Perm Gen space）?"></a>什么是堆中的永久代（Perm Gen space）?</h1><h1 id="说说各个区域的作用？"><a href="#说说各个区域的作用？" class="headerlink" title="说说各个区域的作用？"></a>说说各个区域的作用？</h1><p>  程序计数器<br>  java虚拟机栈<br>  本地方法栈<br>  堆<br>  方法区<br>  常量池</p>
+<h1 id="Java-中会存在内存泄漏吗，简述一下？"><a href="#Java-中会存在内存泄漏吗，简述一下？" class="headerlink" title="Java 中会存在内存泄漏吗，简述一下？"></a>Java 中会存在内存泄漏吗，简述一下？</h1><p>  在 Java 中，内存泄漏就是存在一些被分配的对象，这些对象有下面两个特点，首先，这些对象是可达的，即在有向图中，存在通路可以与其相连（也就是说仍存在该内存对象的引用）；其次，这些对象是无用的，即程序以后不会再使用这些对象。如果对象满足这两个条件，这些对象就可以判定为 Java 中的内存泄漏，这些对象不会被 GC 所回收，然而它却占用内存。</p>
+<h1 id="Java-类加载过程？"><a href="#Java-类加载过程？" class="headerlink" title="Java 类加载过程？"></a>Java 类加载过程？</h1><h1 id="描述一下-JVM-加载-Class-文件的原理机制"><a href="#描述一下-JVM-加载-Class-文件的原理机制" class="headerlink" title="描述一下 JVM 加载 Class 文件的原理机制?"></a>描述一下 JVM 加载 Class 文件的原理机制?</h1><h1 id="什么是类加载器？"><a href="#什么是类加载器？" class="headerlink" title="什么是类加载器？"></a>什么是类加载器？</h1><h1 id="类加载器有哪些？"><a href="#类加载器有哪些？" class="headerlink" title="类加载器有哪些？"></a>类加载器有哪些？</h1><h1 id="什么是tomcat类加载机制？"><a href="#什么是tomcat类加载机制？" class="headerlink" title="什么是tomcat类加载机制？"></a>什么是tomcat类加载机制？</h1><h1 id="类加载器双亲委派模型机制？"><a href="#类加载器双亲委派模型机制？" class="headerlink" title="类加载器双亲委派模型机制？"></a>类加载器双亲委派模型机制？</h1><h1 id="什么是GC-为什么要有-GC？"><a href="#什么是GC-为什么要有-GC？" class="headerlink" title="什么是GC? 为什么要有 GC？"></a>什么是GC? 为什么要有 GC？</h1><h1 id="简述一下Java-垃圾回收机制？"><a href="#简述一下Java-垃圾回收机制？" class="headerlink" title="简述一下Java 垃圾回收机制？"></a>简述一下Java 垃圾回收机制？</h1><h1 id="如何判断一个对象是否存活？"><a href="#如何判断一个对象是否存活？" class="headerlink" title="如何判断一个对象是否存活？"></a>如何判断一个对象是否存活？</h1><h1 id="垃圾回收的优点和原理，并考虑-2-种回收机制？"><a href="#垃圾回收的优点和原理，并考虑-2-种回收机制？" class="headerlink" title="垃圾回收的优点和原理，并考虑 2 种回收机制？"></a>垃圾回收的优点和原理，并考虑 2 种回收机制？</h1><h1 id="垃圾回收器的基本原理是什么？"><a href="#垃圾回收器的基本原理是什么？" class="headerlink" title="垃圾回收器的基本原理是什么？"></a>垃圾回收器的基本原理是什么？</h1><h1 id="垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？"><a href="#垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？" class="headerlink" title="垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？"></a>垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？</h1><h1 id="深拷贝和浅拷贝？"><a href="#深拷贝和浅拷贝？" class="headerlink" title="深拷贝和浅拷贝？"></a>深拷贝和浅拷贝？</h1><h1 id="System-gc-和-Runtime-gc-会做些什么？"><a href="#System-gc-和-Runtime-gc-会做些什么？" class="headerlink" title="System.gc() 和 Runtime.gc() 会做些什么？"></a>System.gc() 和 Runtime.gc() 会做些什么？</h1><h1 id="什么是分布式垃圾回收（DGC）？它是如何工作的？"><a href="#什么是分布式垃圾回收（DGC）？它是如何工作的？" class="headerlink" title="什么是分布式垃圾回收（DGC）？它是如何工作的？"></a>什么是分布式垃圾回收（DGC）？它是如何工作的？</h1><h1 id="串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？"><a href="#串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？" class="headerlink" title="串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？"></a>串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？</h1><h1 id="在-Java-中，对象什么时候可以被垃圾回收？"><a href="#在-Java-中，对象什么时候可以被垃圾回收？" class="headerlink" title="在 Java 中，对象什么时候可以被垃圾回收？"></a>在 Java 中，对象什么时候可以被垃圾回收？</h1><h1 id="简述Minor-GC-和-Major-GC？"><a href="#简述Minor-GC-和-Major-GC？" class="headerlink" title="简述Minor GC 和 Major GC？"></a>简述Minor GC 和 Major GC？</h1><h1 id="Java-中垃圾收集的方法有哪些？"><a href="#Java-中垃圾收集的方法有哪些？" class="headerlink" title="Java 中垃圾收集的方法有哪些？"></a>Java 中垃圾收集的方法有哪些？</h1><h1 id="讲讲你理解的性能评价及测试指标？"><a href="#讲讲你理解的性能评价及测试指标？" class="headerlink" title="讲讲你理解的性能评价及测试指标？"></a>讲讲你理解的性能评价及测试指标？</h1><h1 id="常用的性能优化方式有哪些？"><a href="#常用的性能优化方式有哪些？" class="headerlink" title="常用的性能优化方式有哪些？"></a>常用的性能优化方式有哪些？</h1><h1 id="说说分布式缓存和一致性哈希？"><a href="#说说分布式缓存和一致性哈希？" class="headerlink" title="说说分布式缓存和一致性哈希？"></a>说说分布式缓存和一致性哈希？</h1><h1 id="同步与异步？阻塞与非阻塞？"><a href="#同步与异步？阻塞与非阻塞？" class="headerlink" title="同步与异步？阻塞与非阻塞？"></a>同步与异步？阻塞与非阻塞？</h1><h1 id="什么是GC调优？"><a href="#什么是GC调优？" class="headerlink" title="什么是GC调优？"></a>什么是GC调优？</h1><h1 id="常见异步的手段有哪些？"><a href="#常见异步的手段有哪些？" class="headerlink" title="常见异步的手段有哪些？"></a>常见异步的手段有哪些？</h1><p>内存模型以及分区，每个区放什么<br>一个对象从创建到销毁都是怎么在这些部分里存活和转移的<br>内存的哪些部分会参与GC的回收，回收策略是什么<br>Java的内存模型是怎么设计的，为什么要这么设计<br>结合内存模型的设计谈谈volatile关键字的作用</p>
+<p>深入Java虚拟机的内存结构<br>Java底层字节码分析<br>类加载机制详细讲解<br>个内存区域垃圾回收机制<br>深入讲解垃圾收集器<br>JDK调优工具</p>
+<p>1、什么是Java虚拟机？为什么Java被称作是“平台无关的编程语言”？</p>
+<p>2、Java代码是怎么运行的？</p>
+<p>3、Java虚拟机是如何加载Java类的?</p>
+<p>4、JVM运行内存的分类</p>
+<p>5、如何监控和诊断JVM堆内和堆外内存使用？</p>
+<p>6、Java四引用是什么？</p>
+<p>7、如何理解JVM内置的编译或GC日志？</p>
+<p>8、JVM的永久代中会发生垃圾回收么？</p>
+<p>9、Java中的两种异常类型是什么？他们有什么区别？</p>
+<p>10、JVM是如何实现同步的？</p>
+<p>11、Java内存模型是什么？</p>
+<p>12、即时编译器有哪些优化？</p>
+<p>13、在什么情况下重复读写操作会被优化？</p>
+<p>14、什么样的垃圾才被回收？</p>
+<p>15、什么时候会导致垃圾回收？</p>
+<p>16、如何利用JFR和JMC监控Java程序？</p>
+<p>17、如何利用Unsafe API 绕开 JVM的控制？</p>
+<p>18、如何利用字节码注入为已有代码加料？</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/interview/" rel="tag"># interview</a>
+              <a href="/tags/jvm/" rel="tag"># jvm</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2018/04/20/concurrent-question/" rel="prev" title="并发 常见面试题">
+                  <i class="fa fa-chevron-left"></i> 并发 常见面试题
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2018/04/20/spring-question/" rel="next" title="spring 常见面试题">
+                  spring 常见面试题 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

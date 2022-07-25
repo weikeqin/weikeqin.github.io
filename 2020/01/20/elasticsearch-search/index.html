@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="search 最基本的工具   Elasticsearch 不只会_存储（stores）_ 文档，为了能被搜索到也会为文档添加_索引（indexes）_ ，这也是为什么我们使用结构化的 JSON 文档，而不是无结构的二进制数据。   文档中的每个字段都将被索引并且可以被查询 。不仅如此，在简单查询时，Elasticsearch 可以使用 所有（all） 这些索引字段，以惊人的速度返回结果。 搜索">
+<meta property="og:type" content="article">
+<meta property="og:title" content="elasticsearch-search">
+<meta property="og:url" content="http://weikeqin.com/2020/01/20/elasticsearch-search/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="search 最基本的工具   Elasticsearch 不只会_存储（stores）_ 文档，为了能被搜索到也会为文档添加_索引（indexes）_ ，这也是为什么我们使用结构化的 JSON 文档，而不是无结构的二进制数据。   文档中的每个字段都将被索引并且可以被查询 。不仅如此，在简单查询时，Elasticsearch 可以使用 所有（all） 这些索引字段，以惊人的速度返回结果。 搜索">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-01-20T10:22:49.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.229Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="elasticsearch">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/01/20/elasticsearch-search/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/01/20/elasticsearch-search/","path":"2020/01/20/elasticsearch-search/","title":"elasticsearch-search"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>elasticsearch-search | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E7%A9%BA%E6%90%9C%E7%B4%A2"><span class="nav-number">1.</span> <span class="nav-text">(1) 空搜索</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-hits"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) hits</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-took"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) took</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-shards"><span class="nav-number">1.3.</span> <span class="nav-text">(1.3) shards</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-timeout"><span class="nav-number">1.4.</span> <span class="nav-text">(1.4) timeout</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%A4%9A%E7%B4%A2%E5%BC%95%EF%BC%8C%E5%A4%9A%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">(2) 多索引，多类型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%88%86%E9%A1%B5"><span class="nav-number">3.</span> <span class="nav-text">(3) 分页</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%9C%A8%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E4%B8%AD%E6%B7%B1%E5%BA%A6%E5%88%86%E9%A1%B5"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 在分布式系统中深度分页</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E8%BD%BB%E9%87%8F%E6%90%9C%E7%B4%A2"><span class="nav-number">4.</span> <span class="nav-text">(4) 轻量搜索</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E6%9F%A5%E8%AF%A2%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%90%9C%E7%B4%A2"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 查询字符串搜索</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-1-%E6%9D%A1%E4%BB%B6%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.1.1.</span> <span class="nav-text">(4.1.1) 条件查询</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-2-%E5%A4%9A%E6%9D%A1%E4%BB%B6%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.1.2.</span> <span class="nav-text">(4.1.2) 多条件查询</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-3-%E5%85%A8%E5%AD%97%E6%AE%B5%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.1.3.</span> <span class="nav-text">(4.1.3) 全字段查询</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E6%9B%B4%E5%A4%8D%E6%9D%82%E7%9A%84%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 更复杂的查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">5.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/01/20/elasticsearch-search/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          elasticsearch-search
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-01-20 18:22:49" itemprop="dateCreated datePublished" datetime="2020-01-20T18:22:49+08:00">2020-01-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/01/20/elasticsearch-search/" class="post-meta-item leancloud_visitors" data-flag-title="elasticsearch-search" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p> search 最基本的工具</p>
+<p>  Elasticsearch 不只会_存储（stores）_ 文档，为了能被搜索到也会为文档添加_索引（indexes）_ ，这也是为什么我们使用结构化的 JSON 文档，而不是无结构的二进制数据。</p>
+<p>  文档中的每个字段都将被索引并且可以被查询 。不仅如此，在简单查询时，Elasticsearch 可以使用 所有（all） 这些索引字段，以惊人的速度返回结果。</p>
+<p>搜索（search） 可以做到：<br>    在类似于 gender 或者 age 这样的字段上使用结构化查询，join_date 这样的字段上使用排序，就像SQL的结构化查询一样。<br>    全文检索，找出所有匹配关键字的文档并按照_相关性（relevance）_ 排序后返回结果。<br>    以上二者兼而有之。</p>
+<p>很多搜索都是开箱即用的，为了充分挖掘 Elasticsearch 的潜力，你需要理解以下三个概念：</p>
+<p>映射（Mapping）<br>    描述数据在每个字段内如何存储<br>分析（Analysis）<br>    全文是如何处理使之可以被搜索的<br>领域特定查询语言（Query DSL）<br>    Elasticsearch 中强大灵活的查询语言 </p>
+<span id="more"></span> 
+
+
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl -XPOST &#39;http:&#x2F;&#x2F;localhost:9200&#x2F;_bulk?pretty&#39; -H &#39;Content-Type: application&#x2F;json&#39; -d &#39;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;user&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;1&quot; &#125;&#125;
+&#123; &quot;email&quot; : &quot;john@smith.com&quot;, &quot;name&quot; : &quot;John Smith&quot;, &quot;username&quot; : &quot;@john&quot; &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;user&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;2&quot; &#125;&#125;
+&#123; &quot;email&quot; : &quot;mary@jones.com&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;username&quot; : &quot;@mary&quot; &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;3&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-13&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;tweet&quot; : &quot;Elasticsearch means full text search has never been so easy&quot;, &quot;user_id&quot; : 2 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;4&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-14&quot;, &quot;name&quot; : &quot;John Smith&quot;, &quot;tweet&quot; : &quot;@mary it is not just text, it does everything&quot;, &quot;user_id&quot; : 1 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;5&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-15&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;tweet&quot; : &quot;However did I manage before Elasticsearch?&quot;, &quot;user_id&quot; : 2 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;6&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-16&quot;, &quot;name&quot; : &quot;John Smith&quot;,  &quot;tweet&quot; : &quot;The Elasticsearch API is really easy to use&quot;, &quot;user_id&quot; : 1 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;7&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-17&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;tweet&quot; : &quot;The Query DSL is really powerful and flexible&quot;, &quot;user_id&quot; : 2 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;8&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-18&quot;, &quot;name&quot; : &quot;John Smith&quot;, &quot;user_id&quot; : 1 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;9&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-19&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;tweet&quot; : &quot;Geo-location aggregations are really cool&quot;, &quot;user_id&quot; : 2 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;10&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-20&quot;, &quot;name&quot; : &quot;John Smith&quot;, &quot;tweet&quot; : &quot;Elasticsearch surely is one of the hottest new NoSQL products&quot;, &quot;user_id&quot; : 1 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;11&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-21&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;tweet&quot; : &quot;Elasticsearch is built for the cloud, easy to scale&quot;, &quot;user_id&quot; : 2 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;12&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-22&quot;, &quot;name&quot; : &quot;John Smith&quot;, &quot;tweet&quot; : &quot;Elasticsearch and I have left the honeymoon stage, and I still love her.&quot;, &quot;user_id&quot; : 1 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;13&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-23&quot;, &quot;name&quot; : &quot;Mary Jones&quot;, &quot;tweet&quot; : &quot;So yes, I am an Elasticsearch fanboy&quot;, &quot;user_id&quot; : 2 &#125;
+&#123; &quot;create&quot;: &#123; &quot;_index&quot;: &quot;tweet&quot;, &quot;_type&quot;: &quot;doc&quot;, &quot;_id&quot;: &quot;14&quot; &#125;&#125;
+&#123; &quot;date&quot; : &quot;2014-09-24&quot;, &quot;name&quot; : &quot;John Smith&quot;, &quot;tweet&quot; : &quot;How many more cheesy tweets do I have to write?&quot;, &quot;user_id&quot; : 1 &#125;
+&#39;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="1-空搜索"><a href="#1-空搜索" class="headerlink" title="(1) 空搜索"></a>(1) 空搜索</h1><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">$ curl -X GET &quot;localhost:9200&#x2F;_search?pretty&quot;
+&#123;
+  &quot;took&quot; : 16,
+  &quot;timed_out&quot; : false,
+  &quot;_shards&quot; : &#123;
+    &quot;total&quot; : 13,
+    &quot;successful&quot; : 13,
+    &quot;skipped&quot; : 0,
+    &quot;failed&quot; : 0
+  &#125;,
+  &quot;hits&quot; : &#123;
+    &quot;total&quot; : 8,
+    &quot;max_score&quot; : 1.0,
+    &quot;hits&quot; : [
+      &#123;
+        &quot;_index&quot; : &quot;website&quot;,
+        &quot;_type&quot; : &quot;blog&quot;,
+        &quot;_id&quot; : &quot;123&quot;,
+        &quot;_score&quot; : 1.0,
+        &quot;_source&quot; : &#123;
+          &quot;title&quot; : &quot;My updated blog post&quot;
+        &#125;
+      &#125;,
+      &#123;
+        &quot;_index&quot; : &quot;megacorp&quot;,
+        &quot;_type&quot; : &quot;employee&quot;,
+        &quot;_id&quot; : &quot;2&quot;,
+        &quot;_score&quot; : 1.0,
+        &quot;_source&quot; : &#123;
+          &quot;first_name&quot; : &quot;Jane&quot;,
+          &quot;last_name&quot; : &quot;Smith&quot;,
+          &quot;age&quot; : 32,
+          &quot;about&quot; : &quot;I like to collect rock albums&quot;,
+          &quot;interests&quot; : [
+            &quot;music&quot;
+          ]
+        &#125;
+      &#125;,
+ 
+...
+
+      &#123;
+        &quot;_index&quot; : &quot;website&quot;,
+        &quot;_type&quot; : &quot;blog&quot;,
+        &quot;_id&quot; : &quot;1qMXwm8BXjhxAah64Ysk&quot;,
+        &quot;_score&quot; : 1.0,
+        &quot;_source&quot; : &#123;
+          &quot;title&quot; : &quot;My second blog post&quot;
+        &#125;
+      &#125;
+    ]
+  &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="1-1-hits"><a href="#1-1-hits" class="headerlink" title="(1.1) hits"></a>(1.1) hits</h2><p>  返回结果中最重要的部分是 hits ，它包含 total 字段来表示匹配到的文档总数，并且一个 hits 数组包含所查询结果的前十个文档。</p>
+<p>  在 hits 数组中每个结果包含文档的 _index 、 _type 、 _id ，加上 _source 字段。这意味着我们可以直接从返回的搜索结果中使用整个文档。这不像其他的搜索引擎，仅仅返回文档的ID，需要你单独去获取文档。</p>
+<p>  每个结果还有一个 _score ，它衡量了文档与查询的匹配程度。默认情况下，首先返回最相关的文档结果，就是说，返回的文档是按照 _score 降序排列的。在这个例子中，我们没有指定任何查询，故所有的文档具有相同的相关性，因此对所有的结果而言 1 是中性的 _score 。</p>
+<p>  max_score 值是与查询所匹配文档的 _score 的最大值。</p>
+<h2 id="1-2-took"><a href="#1-2-took" class="headerlink" title="(1.2) took"></a>(1.2) took</h2><p>  took 值告诉我们执行整个搜索请求耗费了多少毫秒。</p>
+<h2 id="1-3-shards"><a href="#1-3-shards" class="headerlink" title="(1.3) shards"></a>(1.3) shards</h2><p>  _shards 部分告诉我们在查询中参与分片的总数，以及这些分片成功了多少个失败了多少个。正常情况下我们不希望分片失败，但是分片失败是可能发生的。如果我们遭遇到一种灾难级别的故障，在这个故障中丢失了相同分片的原始数据和副本，那么对这个分片将没有可用副本来对搜索请求作出响应。假若这样，Elasticsearch 将报告这个分片是失败的，但是会继续返回剩余分片的结果。</p>
+<h2 id="1-4-timeout"><a href="#1-4-timeout" class="headerlink" title="(1.4) timeout"></a>(1.4) timeout</h2><p>  timed_out 值告诉我们查询是否超时。默认情况下，搜索请求不会超时。如果低响应时间比完成结果更重要，你可以指定 timeout 为 10 或者 10ms（10毫秒），或者 1s（1秒）:<br> <code>$ curl -X GET &quot;localhost:9200/_search?timeout=10ms&amp;pretty&quot;</code></p>
+<p>  在请求超时之前，Elasticsearch 将会返回已经成功从每个分片获取的结果。</p>
+<p>  应当注意的是 timeout 不是停止执行查询，它仅仅是告知正在协调的节点返回到目前为止收集的结果并且关闭连接。在后台，其他的分片可能仍在执行查询即使是结果已经被发送了。</p>
+<p>  使用超时是因为 SLA(服务等级协议)对你是很重要的，而不是因为想去中止长时间运行的查询。</p>
+<h1 id="2-多索引，多类型"><a href="#2-多索引，多类型" class="headerlink" title="(2) 多索引，多类型"></a>(2) 多索引，多类型</h1><p>如果不对某一特殊的索引或者类型做限制，就会搜索集群中的所有文档。Elasticsearch 转发搜索请求到每一个主分片或者副本分片，汇集查询出的前10个结果，并且返回给我们。</p>
+<p>然而，经常的情况下，你想在一个或多个特殊的索引并且在一个或者多个特殊的类型中进行搜索。我们可以通过在URL中指定特殊的索引和类型达到这种效果，如下所示：</p>
+<p>/_search<br>    在所有的索引中搜索所有的类型<br>/gb/_search<br>    在 gb 索引中搜索所有的类型<br>/gb,us/_search<br>    在 gb 和 us 索引中搜索所有的文档<br>/g*,u*/_search<br>    在任何以 g 或者 u 开头的索引中搜索所有的类型<br>/gb/user/_search<br>    在 gb 索引中搜索 user 类型<br>/gb,us/user,tweet/_search<br>    在 gb 和 us 索引中搜索 user 和 tweet 类型<br>/_all/user,tweet/_search<br>    在所有的索引中搜索 user 和 tweet 类型 </p>
+<p>当在单一的索引下进行搜索的时候，Elasticsearch 转发请求到索引的每个分片中，可以是主分片也可以是副本分片，然后从每个分片中收集结果。多索引搜索恰好也是用相同的方式工作的—​只是会涉及到更多的分片。</p>
+<p> 搜索一个索引有五个主分片和搜索五个索引各有一个分片准确来所说是等价的。</p>
+<h1 id="3-分页"><a href="#3-分页" class="headerlink" title="(3) 分页"></a>(3) 分页</h1><p>  和 SQL 使用 LIMIT 关键字返回单个 page 结果的方法相同，Elasticsearch 接受 from 和 size 参数：</p>
+<p>size<br>    显示应该返回的结果数量，默认是 10<br>from<br>    显示应该跳过的初始结果数量，默认是 0 </p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">curl -X GET "localhost:9200/_search?size=5&amp;pretty"
+curl -X GET "localhost:9200/_search?size=5&amp;from=5&amp;pretty"
+curl -X GET "localhost:9200/_search?size=5&amp;from=10&amp;pretty"<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>  考虑到分页过深以及一次请求太多结果的情况，结果集在返回之前先进行排序。 但请记住一个请求经常跨越多个分片，每个分片都产生自己的排序结果，这些结果需要进行集中排序以保证整体顺序是正确的。</p>
+<h2 id="3-1-在分布式系统中深度分页"><a href="#3-1-在分布式系统中深度分页" class="headerlink" title="(3.1) 在分布式系统中深度分页"></a>(3.1) 在分布式系统中深度分页</h2><p>  理解为什么深度分页是有问题的，我们可以假设在一个有 5 个主分片的索引中搜索。 当我们请求结果的第一页（结果从 1 到 10 ），每一个分片产生前 10 的结果，并且返回给 协调节点 ，协调节点对 50 个结果排序得到全部结果的前 10 个。</p>
+<p>  现在假设我们请求第 1000 页—​结果从 10001 到 10010 。所有都以相同的方式工作除了每个分片不得不产生前10010个结果以外。 然后协调节点对全部 50050 个结果排序最后丢弃掉这些结果中的 50040 个结果。</p>
+<p>  可以看到，在分布式系统中，对结果排序的成本随分页的深度成指数上升。这就是 web 搜索引擎对任何查询都不要返回超过 1000 个结果的原因。</p>
+<h1 id="4-轻量搜索"><a href="#4-轻量搜索" class="headerlink" title="(4) 轻量搜索"></a>(4) 轻量搜索</h1><p>  有两种形式的 搜索 API：一种是 “轻量的” 查询字符串 版本，要求在查询字符串中传递所有的参数，另一种是更完整的 请求体 版本，要求使用 JSON 格式和更丰富的查询表达式作为搜索语言。</p>
+<h2 id="4-1-查询字符串搜索"><a href="#4-1-查询字符串搜索" class="headerlink" title="(4.1) 查询字符串搜索"></a>(4.1) 查询字符串搜索</h2><p>  查询字符串搜索非常适用于通过命令行做即席查询。</p>
+<h3 id="4-1-1-条件查询"><a href="#4-1-1-条件查询" class="headerlink" title="(4.1.1) 条件查询"></a>(4.1.1) 条件查询</h3><p>  例如，查询在 tweet 类型中 tweet 字段包含 elasticsearch 单词的所有文档：</p>
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl -X GET &quot;localhost:9200&#x2F;_all&#x2F;tweet&#x2F;_search?q&#x3D;tweet:elasticsearch&amp;pretty&quot;
+&#123;
+  &quot;took&quot; : 156,
+  &quot;timed_out&quot; : false,
+  &quot;_shards&quot; : &#123;
+    &quot;total&quot; : 13,
+    &quot;successful&quot; : 13,
+    &quot;skipped&quot; : 0,
+    &quot;failed&quot; : 0
+  &#125;,
+  &quot;hits&quot; : &#123;
+    &quot;total&quot; : 0,
+    &quot;max_score&quot; : null,
+    &quot;hits&quot; : [ ]
+  &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-1-2-多条件查询"><a href="#4-1-2-多条件查询" class="headerlink" title="(4.1.2) 多条件查询"></a>(4.1.2) 多条件查询</h3><p>下一个查询在 name 字段中包含 john 并且在 tweet 字段中包含 mary 的文档。实际的查询就是这样</p>
+<p> <code>+name:john +tweet:mary</code></p>
+<p>但是查询字符串参数所需要的 百分比编码 （译者注：URL编码）实际上更加难懂：</p>
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">curl -X GET &quot;localhost:9200&#x2F;_search?q&#x3D;%2Bname%3Ajohn+%2Btweet%3Amary&amp;pretty&quot;
+&#123;
+  &quot;took&quot; : 21,
+  &quot;timed_out&quot; : false,
+  &quot;_shards&quot; : &#123;
+    &quot;total&quot; : 13,
+    &quot;successful&quot; : 13,
+    &quot;skipped&quot; : 0,
+    &quot;failed&quot; : 0
+  &#125;,
+  &quot;hits&quot; : &#123;
+    &quot;total&quot; : 0,
+    &quot;max_score&quot; : null,
+    &quot;hits&quot; : [ ]
+  &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<ul>
+<li>前缀表示必须与查询条件匹配。类似地， - 前缀表示一定不与查询条件匹配。没有 + 或者 - 的所有其他条件都是可选的——匹配的越多，文档就越相关。</li>
+</ul>
+<h3 id="4-1-3-全字段查询"><a href="#4-1-3-全字段查询" class="headerlink" title="(4.1.3) 全字段查询"></a>(4.1.3) 全字段查询</h3><p>  这个简单搜索返回包含 mary 的所有文档：</p>
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">$ curl -X GET &quot;localhost:9200&#x2F;_search?q&#x3D;mary&amp;pretty&quot;
+&#123;
+  &quot;took&quot; : 38,
+  &quot;timed_out&quot; : false,
+  &quot;_shards&quot; : &#123;
+    &quot;total&quot; : 13,
+    &quot;successful&quot; : 13,
+    &quot;skipped&quot; : 0,
+    &quot;failed&quot; : 0
+  &#125;,
+  &quot;hits&quot; : &#123;
+    &quot;total&quot; : 0,
+    &quot;max_score&quot; : null,
+    &quot;hits&quot; : [ ]
+  &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>Elasticsearch 是如何在三个不同的字段中查找到结果的呢？</p>
+<p>当索引一个文档的时候，Elasticsearch 取出所有字段的值拼接成一个大的字符串，作为 _all 字段进行索引。例如，当索引这个文档时：</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+    <span class="token property">"tweet"</span><span class="token operator">:</span>    <span class="token string">"However did I manage before Elasticsearch?"</span><span class="token punctuation">,</span>
+    <span class="token property">"date"</span><span class="token operator">:</span>     <span class="token string">"2014-09-14"</span><span class="token punctuation">,</span>
+    <span class="token property">"name"</span><span class="token operator">:</span>     <span class="token string">"Mary Jones"</span><span class="token punctuation">,</span>
+    <span class="token property">"user_id"</span><span class="token operator">:</span>  <span class="token number">1</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  这就好似增加了一个名叫 _all 的额外字段：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">"However did I manage before Elasticsearch? 2014-09-14 Mary Jones 1"<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>  除非设置特定字段，否则查询字符串就使用 _all 字段进行搜索。</p>
+<p>  在刚开始开发一个应用时，_all 字段是一个很实用的特性。之后，你会发现如果搜索时用指定字段来代替 _all 字段，将会更好控制搜索结果。当 _all 字段不再有用的时候，可以将它置为失效，正如在 元数据: _all 字段 中所解释的。</p>
+<h2 id="4-2-更复杂的查询"><a href="#4-2-更复杂的查询" class="headerlink" title="(4.2) 更复杂的查询"></a>(4.2) 更复杂的查询</h2><p>下面的查询针对tweents类型，并使用以下的条件：</p>
+<pre><code>name 字段中包含 mary 或者 john
+date 值大于 2014-09-10
+_all 字段包含 aggregations 或者 geo
+</code></pre>
+<p>  查询字符串搜索允许任何用户在索引的任意字段上执行可能较慢且重量级的查询，这可能会暴露隐私信息，甚至将集群拖垮。</p>
+<p>  因为这些原因，不推荐直接向用户暴露查询字符串搜索功能，除非对于集群和数据来说非常信任他们。</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[0] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/search.html">最基本的工具</a><br>[1] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/empty-search.html">空搜索</a><br>[2] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/multi-index-multi-type.html">多索引，多类型</a><br>[3] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/pagination.html">分页</a><br>[4] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/search-lite.html">轻量搜索</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/elasticsearch/" rel="tag"># elasticsearch</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/01/20/elasticsearch-distributed-docs/" rel="prev" title="elasticsearch 分布式文档存储">
+                  <i class="fa fa-chevron-left"></i> elasticsearch 分布式文档存储
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/01/21/elasticsearch-mapping-analysis/" rel="next" title="elasticsearch 映射和分析">
+                  elasticsearch 映射和分析 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

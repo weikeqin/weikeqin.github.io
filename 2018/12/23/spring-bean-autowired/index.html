@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="1、@Autowired注解是如何实现自动装配的？2、当为类型为OrderService的Bean装配类型为UserService的属性时，如果此时Spring容器中存在多个类型为UserService的bean，此时Spring是如何处理的？3、自动装配的模型是什么？有哪几种？和Autowired注解有什么关联？  @Autowired 自动装配是通过后置处理器来完成的。这个后置处理器就是 Au">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spring @Autowired注解的实现原理">
+<meta property="og:url" content="http://weikeqin.com/2018/12/23/spring-bean-autowired/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="1、@Autowired注解是如何实现自动装配的？2、当为类型为OrderService的Bean装配类型为UserService的属性时，如果此时Spring容器中存在多个类型为UserService的bean，此时Spring是如何处理的？3、自动装配的模型是什么？有哪几种？和Autowired注解有什么关联？  @Autowired 自动装配是通过后置处理器来完成的。这个后置处理器就是 Au">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-12-22T23:27:40.000Z">
+<meta property="article:modified_time" content="2022-06-07T10:24:33.966Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="spring">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2018/12/23/spring-bean-autowired/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2018/12/23/spring-bean-autowired/","path":"2018/12/23/spring-bean-autowired/","title":"Spring @Autowired注解的实现原理"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Spring @Autowired注解的实现原理 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Autowirte%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D"><span class="nav-number">1.</span> <span class="nav-text">@Autowirte如何实现自动装配</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Autowirte%E8%87%AA%E5%8A%A8%E8%A3%85%E9%85%8D%E6%BA%90%E7%A0%81%E8%AF%A6%E8%A7%A3"><span class="nav-number">2.</span> <span class="nav-text">@Autowirte自动装配源码详解</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E5%AE%B9%E5%99%A8%E5%90%AF%E5%8A%A8%E5%89%8D%E6%B3%A8%E5%86%8C%E5%86%85%E7%BD%AEBeanPostProcessor"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 容器启动前注册内置BeanPostProcessor</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">3.</span> <span class="nav-text">参考</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/12/23/spring-bean-autowired/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spring @Autowired注解的实现原理
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-12-23 07:27:40" itemprop="dateCreated datePublished" datetime="2018-12-23T07:27:40+08:00">2018-12-23</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-06-07 18:24:33" itemprop="dateModified" datetime="2022-06-07T18:24:33+08:00">2022-06-07</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/spring/" itemprop="url" rel="index"><span itemprop="name">spring</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2018/12/23/spring-bean-autowired/" class="post-meta-item leancloud_visitors" data-flag-title="Spring @Autowired注解的实现原理" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>1、@Autowired注解是如何实现自动装配的？<br>2、当为类型为OrderService的Bean装配类型为UserService的属性时，如果此时Spring容器中存在多个类型为UserService的bean，此时Spring是如何处理的？<br>3、自动装配的模型是什么？有哪几种？和Autowired注解有什么关联？</p>
+<p> <code>@Autowired</code> 自动装配是通过后置处理器来完成的。这个后置处理器就是 AutowiredAnnotationBeanPostProcessor </p>
+<span id="more"></span>
+
+<p>  要解决上面说的问题，就要了解 Spring Bean生命周期 以及 @AutoWirte的原理，这块需要看对应的源码</p>
+<h1 id="Autowirte如何实现自动装配"><a href="#Autowirte如何实现自动装配" class="headerlink" title="@Autowirte如何实现自动装配"></a>@Autowirte如何实现自动装配</h1><p> // TODO 流程图 </p>
+<h1 id="Autowirte自动装配源码详解"><a href="#Autowirte自动装配源码详解" class="headerlink" title="@Autowirte自动装配源码详解"></a>@Autowirte自动装配源码详解</h1><p> <code>@Autowired</code> 自动装配是通过AutowiredAnnotationBeanPostProcessor这个后置处理器来完成的。具体是怎么实现的呢？<br>1、在容器启动前会注册内置<code>AutowiredAnnotationBeanPostProcessor</code>后置处理器<br>2、在容器启动时refresh()时，调用 <code>registerBeanPostProcessors(beanFactory)</code> 方法获取并把<code>AutowiredAnnotationBeanPostProcessor</code>注册到beanFactory里<br>3、在创建bean执行到populateBean方法会调用<code>AutowiredAnnotationBeanPostProcessor</code>的<code>postProcessProperties</code>方法，在这个方法里会解析出带有@Autowired注解、@Inject和@Value的属性和方法，通过反射完成注入。</p>
+<h2 id="2-1-容器启动前注册内置BeanPostProcessor"><a href="#2-1-容器启动前注册内置BeanPostProcessor" class="headerlink" title="(2.1) 容器启动前注册内置BeanPostProcessor"></a>(2.1) 容器启动前注册内置BeanPostProcessor</h2><p>当我们调用AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfig.class)启动容器的时候，在构造方法中会调用到this()方法，<br>在this()方法中最终会调用 AnnotationConfigUtils 的 registerAnnotationConfigProcessors(BeanDefinitionRegistry) 方法，在该方法中，Spring会向容器注册7个Spring内置的Bean，其中就包括AutowiredAnnotationBeanPostProcessor。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+	* Register all relevant annotation post processors in the given registry.
+	* @param registry the registry to operate on
+	* @param source the configuration source element (already extracted)
+	* that this registration was triggered from. May be &#123;@code null&#125;.
+	* @return a Set of BeanDefinitionHolders, containing all bean definitions
+	* that have actually been registered by this call
+	*/</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">BeanDefinitionHolder</span><span class="token punctuation">></span></span> <span class="token function">registerAnnotationConfigProcessors</span><span class="token punctuation">(</span>
+		<span class="token class-name">BeanDefinitionRegistry</span> registry<span class="token punctuation">,</span> <span class="token annotation punctuation">@Nullable</span> <span class="token class-name">Object</span> source<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+	<span class="token comment">// 省略部分代码...</span>
+
+	<span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">BeanDefinitionHolder</span><span class="token punctuation">></span></span> beanDefs <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LinkedHashSet</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// 注册 AutowiredAnnotationBeanPostProcessor,这个bean的后置处理器用来处理@Autowired的注入 </span>
+	<span class="token comment">// 处理 @Autowired 以及 @Value 注解</span>
+	<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>registry<span class="token punctuation">.</span><span class="token function">containsBeanDefinition</span><span class="token punctuation">(</span>AUTOWIRED_ANNOTATION_PROCESSOR_BEAN_NAME<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token class-name">RootBeanDefinition</span> def <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RootBeanDefinition</span><span class="token punctuation">(</span><span class="token class-name">AutowiredAnnotationBeanPostProcessor</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		def<span class="token punctuation">.</span><span class="token function">setSource</span><span class="token punctuation">(</span>source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+		beanDefs<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span><span class="token function">registerPostProcessor</span><span class="token punctuation">(</span>registry<span class="token punctuation">,</span> def<span class="token punctuation">,</span> AUTOWIRED_ANNOTATION_PROCESSOR_BEAN_NAME<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">// 注册CommonAnnotationBeanPostProcessor，用来处理如@Resource等符合JSR-250规范的注解</span>
+	<span class="token comment">// Check for JSR-250 support, and if present add the CommonAnnotationBeanPostProcessor.</span>
+	<span class="token keyword">if</span> <span class="token punctuation">(</span>jsr250Present <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>registry<span class="token punctuation">.</span><span class="token function">containsBeanDefinition</span><span class="token punctuation">(</span>COMMON_ANNOTATION_PROCESSOR_BEAN_NAME<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token class-name">RootBeanDefinition</span> def <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RootBeanDefinition</span><span class="token punctuation">(</span><span class="token class-name">CommonAnnotationBeanPostProcessor</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		def<span class="token punctuation">.</span><span class="token function">setSource</span><span class="token punctuation">(</span>source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+		beanDefs<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span><span class="token function">registerPostProcessor</span><span class="token punctuation">(</span>registry<span class="token punctuation">,</span> def<span class="token punctuation">,</span> COMMON_ANNOTATION_PROCESSOR_BEAN_NAME<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">// 省略部分代码</span>
+
+	<span class="token keyword">return</span> beanDefs<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  在这个方法中可以看到会注册 AutowiredAnnotationBeanPostProcessor 和 CommonAnnotationBeanPostProcessor 两个处理器 </p>
+<p>  然后在 Spring 应用上下文刷新阶段会将其初始化并添加至 AbstractBeanFactory 的 beanPostProcessors 集合中</p>
+<p>当一个 Bean 被构建时，核心包括两个基本步骤：<br>1、执行 AbstractAutowireCapableBeanFactory#createBeanInstance 方法：通过构造器反射构造出这个 Bean<br>2、执行 AbstractAutowireCapableBeanFactory#populate 方法：填充（即设置）这个 Bean</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// Invoke factory processors registered as beans in the context.</span>
+<span class="token class-name">AbstractApplicationContext</span><span class="token operator">::</span><span class="token function">refresh</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+ 
+<span class="token class-name">AbstractAutowireCapableBeanFactory</span><span class="token operator">::</span><span class="token function">doCreateBean</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                                    <span class="token function">populateBean</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  在构建appConfig bean时会走到 populateBean方法</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+	* Populate the bean instance in the given BeanWrapper with the property values
+	* from the bean definition.
+	* @param beanName the name of the bean
+	* @param mbd the bean definition for the bean
+	* @param bw the BeanWrapper with bean instance
+	*/</span>
+<span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"deprecation"</span><span class="token punctuation">)</span>  <span class="token comment">// for postProcessPropertyValues</span>
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">populateBean</span><span class="token punctuation">(</span><span class="token class-name">String</span> beanName<span class="token punctuation">,</span> <span class="token class-name">RootBeanDefinition</span> mbd<span class="token punctuation">,</span> <span class="token annotation punctuation">@Nullable</span> <span class="token class-name">BeanWrapper</span> bw<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+	<span class="token comment">//省略部分非关键代码</span>
+
+	<span class="token keyword">if</span> <span class="token punctuation">(</span>hasInstAwareBpps<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">if</span> <span class="token punctuation">(</span>pvs <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			pvs <span class="token operator">=</span> mbd<span class="token punctuation">.</span><span class="token function">getPropertyValues</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token punctuation">&#125;</span>
+		<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">BeanPostProcessor</span> bp <span class="token operator">:</span> <span class="token function">getBeanPostProcessors</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">if</span> <span class="token punctuation">(</span>bp <span class="token keyword">instanceof</span> <span class="token class-name">InstantiationAwareBeanPostProcessor</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+				<span class="token class-name">InstantiationAwareBeanPostProcessor</span> ibp <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">InstantiationAwareBeanPostProcessor</span><span class="token punctuation">)</span> bp<span class="token punctuation">;</span>
+				<span class="token comment">// 执行后置处理器，填充属性，完成自动装配</span>
+				<span class="token comment">// 在这里会调用到AutowiredAnnotationBeanPostProcessor</span>
+				<span class="token class-name">PropertyValues</span> pvsToUse <span class="token operator">=</span> ibp<span class="token punctuation">.</span><span class="token function">postProcessProperties</span><span class="token punctuation">(</span>pvs<span class="token punctuation">,</span> bw<span class="token punctuation">.</span><span class="token function">getWrappedInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> beanName<span class="token punctuation">)</span><span class="token punctuation">;</span>
+				<span class="token keyword">if</span> <span class="token punctuation">(</span>pvsToUse <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+					<span class="token keyword">if</span> <span class="token punctuation">(</span>filteredPds <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+						filteredPds <span class="token operator">=</span> <span class="token function">filterPropertyDescriptorsForDependencyCheck</span><span class="token punctuation">(</span>bw<span class="token punctuation">,</span> mbd<span class="token punctuation">.</span>allowCaching<span class="token punctuation">)</span><span class="token punctuation">;</span>
+					<span class="token punctuation">&#125;</span>
+					pvsToUse <span class="token operator">=</span> ibp<span class="token punctuation">.</span><span class="token function">postProcessPropertyValues</span><span class="token punctuation">(</span>pvs<span class="token punctuation">,</span> filteredPds<span class="token punctuation">,</span> bw<span class="token punctuation">.</span><span class="token function">getWrappedInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> beanName<span class="token punctuation">)</span><span class="token punctuation">;</span>
+					<span class="token keyword">if</span> <span class="token punctuation">(</span>pvsToUse <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+						<span class="token keyword">return</span><span class="token punctuation">;</span>
+					<span class="token punctuation">&#125;</span>
+				<span class="token punctuation">&#125;</span>
+				pvs <span class="token operator">=</span> pvsToUse<span class="token punctuation">;</span>
+			<span class="token punctuation">&#125;</span>
+		<span class="token punctuation">&#125;</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">//省略部分非关键代码</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  因为 StudentController 含有标记为 Autowired 的成员属性 dataService，所以会使用到 AutowiredAnnotationBeanPostProcessor（BeanPostProcessor 中的一种）来完成“装配”过程：找出合适的 DataService 的 bean 并设置给 StudentController#dataService。<br>这个装配过程，又可以细分为两个步骤：<br>1、AutowiredAnnotationBeanPostProcessor::postProcessProperties </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">PropertyValues</span> <span class="token function">postProcessPropertyValues</span><span class="token punctuation">(</span>
+			<span class="token class-name">PropertyValues</span> pvs<span class="token punctuation">,</span> <span class="token class-name">PropertyDescriptor</span><span class="token punctuation">[</span><span class="token punctuation">]</span> pds<span class="token punctuation">,</span> <span class="token class-name">Object</span> bean<span class="token punctuation">,</span> <span class="token class-name">String</span> beanName<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">BeanCreationException</span> <span class="token punctuation">&#123;</span>
+	<span class="token comment">// 解析出bean中带有@Autowired注解、@Inject和@Value注解的属性和方法</span>
+	<span class="token comment">// 对于本文的demo而言，在此处就会解析出OrderServiceImpl类上的userService属性</span>
+	<span class="token class-name">InjectionMetadata</span> metadata <span class="token operator">=</span> <span class="token function">findAutowiringMetadata</span><span class="token punctuation">(</span>beanName<span class="token punctuation">,</span> bean<span class="token punctuation">.</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> pvs<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+		<span class="token comment">// 自动装配，实现依赖注入</span>
+		metadata<span class="token punctuation">.</span><span class="token function">inject</span><span class="token punctuation">(</span>bean<span class="token punctuation">,</span> beanName<span class="token punctuation">,</span> pvs<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">BeanCreationException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">throw</span> ex<span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">BeanCreationException</span><span class="token punctuation">(</span>beanName<span class="token punctuation">,</span> <span class="token string">"Injection of autowired dependencies failed"</span><span class="token punctuation">,</span> ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">return</span> pvs<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>2、根据依赖信息寻找出依赖并完成注入，以字段注入为例 AutowiredFieldElement#inject<br>  备注 AutowiredFieldElement 是 AutowiredAnnotationBeanPostProcessor 的一个内部类 </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">inject</span><span class="token punctuation">(</span><span class="token class-name">Object</span> bean<span class="token punctuation">,</span> <span class="token annotation punctuation">@Nullable</span> <span class="token class-name">String</span> beanName<span class="token punctuation">,</span> <span class="token annotation punctuation">@Nullable</span> <span class="token class-name">PropertyValues</span> pvs<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Throwable</span> <span class="token punctuation">&#123;</span>
+	<span class="token class-name">Field</span> field <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">Field</span><span class="token punctuation">)</span> <span class="token keyword">this</span><span class="token punctuation">.</span>member<span class="token punctuation">;</span>
+	<span class="token class-name">Object</span> value<span class="token punctuation">;</span>
+	<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>cached<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		value <span class="token operator">=</span> <span class="token function">resolvedCachedArgument</span><span class="token punctuation">(</span>beanName<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cachedFieldValue<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+		<span class="token class-name">DependencyDescriptor</span> desc <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DependencyDescriptor</span><span class="token punctuation">(</span>field<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>required<span class="token punctuation">)</span><span class="token punctuation">;</span>
+		desc<span class="token punctuation">.</span><span class="token function">setContainingClass</span><span class="token punctuation">(</span>bean<span class="token punctuation">.</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> autowiredBeanNames <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LinkedHashSet</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token class-name">Assert</span><span class="token punctuation">.</span><span class="token function">state</span><span class="token punctuation">(</span>beanFactory <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token string">"No BeanFactory available"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token class-name">TypeConverter</span> typeConverter <span class="token operator">=</span> beanFactory<span class="token punctuation">.</span><span class="token function">getTypeConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+			<span class="token comment">// 寻找“依赖”，desc为"xxxService"的DependencyDescriptor</span>
+			value <span class="token operator">=</span> beanFactory<span class="token punctuation">.</span><span class="token function">resolveDependency</span><span class="token punctuation">(</span>desc<span class="token punctuation">,</span> beanName<span class="token punctuation">,</span> autowiredBeanNames<span class="token punctuation">,</span> typeConverter<span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token punctuation">&#125;</span>
+		<span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">BeansException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">UnsatisfiedDependencyException</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> beanName<span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">InjectionPoint</span><span class="token punctuation">(</span>field<span class="token punctuation">)</span><span class="token punctuation">,</span> ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token punctuation">&#125;</span>
+		
+	<span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+
+
+<h1 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6844903957135884295">@Autowired注解的实现原理</a><br>[2] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/lifullmoon/p/14453011.html">死磕Spring之IoC篇 - @Autowired 等注解的实现原理</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/366170">02｜Spring Bean 依赖注入常见错误（上）</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/spring/" rel="tag"># spring</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2018/12/08/spring-notes/" rel="prev" title="Spring学习">
+                  <i class="fa fa-chevron-left"></i> Spring学习
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2018/12/23/spring-dependency-injection/" rel="next" title="Spring依赖注入">
+                  Spring依赖注入 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

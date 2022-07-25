@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="最近有一个需求，需要测试一下新数据库(mysql优化版)某个表的写入速度和查询速度，需要从我们的测试环境数据库查数据，插入到新的测试环境的新数据库。 本地连不上测试的数据库 有很多应用服务器，但是所有的服务器不能连外网，只能访问公司内网。 测试环境的应用可以连测试的数据库 想写个python脚本，但是服务器上python是2.7的，而且很多包没有。 想了想，应用服务器部署了java程序，jav">
+<meta property="og:type" content="article">
+<meta property="og:title" content="jdk javac 使用笔记">
+<meta property="og:url" content="http://weikeqin.com/2020/05/14/javac-notes/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="最近有一个需求，需要测试一下新数据库(mysql优化版)某个表的写入速度和查询速度，需要从我们的测试环境数据库查数据，插入到新的测试环境的新数据库。 本地连不上测试的数据库 有很多应用服务器，但是所有的服务器不能连外网，只能访问公司内网。 测试环境的应用可以连测试的数据库 想写个python脚本，但是服务器上python是2.7的，而且很多包没有。 想了想，应用服务器部署了java程序，jav">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-05-14T02:27:20.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.242Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="jvm">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/05/14/javac-notes/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/05/14/javac-notes/","path":"2020/05/14/javac-notes/","title":"jdk javac 使用笔记"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>jdk javac 使用笔记 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E6%83%B3%E8%B1%A1%E4%B8%AD%E8%BF%90%E8%A1%8Cjava%E6%96%87%E4%BB%B6%E7%9A%84%E6%A0%B7%E5%AD%90"><span class="nav-number">1.</span> <span class="nav-text">(1) 想象中运行java文件的样子</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E6%9F%A5%E7%9C%8Bjdk%E7%89%88%E6%9C%AC"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 查看jdk版本</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E6%96%B0%E5%BB%BA%E4%B8%80%E4%B8%AAHelloWord-java%E6%96%87%E4%BB%B6%E6%B5%8B%E8%AF%95"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 新建一个HelloWord.java文件测试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-%E7%BC%96%E8%AF%91HelloWorld-java"><span class="nav-number">1.3.</span> <span class="nav-text">(1.3) 编译HelloWorld.java</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-%E8%BF%90%E8%A1%8CHelloWorld"><span class="nav-number">1.4.</span> <span class="nav-text">(1.4) 运行HelloWorld</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-5-%E8%A2%AB%E6%89%93%E8%84%B8%E7%9A%84%E4%B8%80%E5%B9%95"><span class="nav-number">1.5.</span> <span class="nav-text">(1.5) 被打脸的一幕</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%A4%8D%E7%9B%98"><span class="nav-number">2.</span> <span class="nav-text">(2) 复盘</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E6%9F%A5%E7%9C%8Bjdk%E7%89%88%E6%9C%AC"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 查看jdk版本</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E6%96%B0%E5%BB%BAMysqlLoadDataTest-java"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 新建MysqlLoadDataTest.java</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E7%BC%96%E8%AF%91"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) 编译</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-%E8%BF%90%E8%A1%8C"><span class="nav-number">2.4.</span> <span class="nav-text">(2.4) 运行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-%E6%B3%A8%E9%87%8A%E6%8E%89%E7%AC%AC%E4%B8%80%E8%A1%8C%E5%8C%85%E5%90%8D%E9%87%8D%E6%96%B0%E8%BF%90%E8%A1%8C"><span class="nav-number">2.5.</span> <span class="nav-text">(2.5) 注释掉第一行包名重新运行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-6-%E4%B8%8D%E6%B3%A8%E9%87%8A%E7%AC%AC%E4%B8%80%E8%A1%8C%E5%8C%85%E5%90%8D%EF%BC%8C%E6%8A%8AMySqlLoadDataTest-class%E6%8D%A2%E4%B8%AA%E7%9B%AE%E5%BD%95"><span class="nav-number">2.6.</span> <span class="nav-text">(2.6) 不注释第一行包名，把MySqlLoadDataTest.class换个目录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91java%E6%96%87%E4%BB%B6%E5%88%B0%E6%8C%87%E5%AE%9A%E7%9B%AE%E5%BD%95"><span class="nav-number">2.7.</span> <span class="nav-text">编译java文件到指定目录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E5%8F%91%E5%B7%A5%E5%85%B7idea%E6%98%AF%E6%80%8E%E4%B9%88%E7%BC%96%E8%AF%91%E4%BB%A3%E7%A0%81%E7%9A%84"><span class="nav-number">2.8.</span> <span class="nav-text">开发工具idea是怎么编译代码的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E5%8F%91%E5%B7%A5%E5%85%B7idea%E6%98%AF%E6%80%8E%E4%B9%88%E8%BF%90%E8%A1%8C%E4%BB%A3%E7%A0%81%E7%9A%84"><span class="nav-number">2.9.</span> <span class="nav-text">开发工具idea是怎么运行代码的</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#javac%E5%91%BD%E4%BB%A4"><span class="nav-number">3.</span> <span class="nav-text">javac命令</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#java%E5%91%BD%E4%BB%A4"><span class="nav-number">4.</span> <span class="nav-text">java命令</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">5.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/14/javac-notes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          jdk javac 使用笔记
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-05-14 10:27:20" itemprop="dateCreated datePublished" datetime="2020-05-14T10:27:20+08:00">2020-05-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/05/14/javac-notes/" class="post-meta-item leancloud_visitors" data-flag-title="jdk javac 使用笔记" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <blockquote>
+<p> 最近有一个需求，需要测试一下新数据库(mysql优化版)某个表的写入速度和查询速度，需要从我们的测试环境数据库查数据，插入到新的测试环境的新数据库。<br> 本地连不上测试的数据库<br> 有很多应用服务器，但是所有的服务器不能连外网，只能访问公司内网。<br> 测试环境的应用可以连测试的数据库<br> 想写个python脚本，但是服务器上python是2.7的，而且很多包没有。<br> 想了想，应用服务器部署了java程序，java的包都有，想写一个java脚本来测试。(没错是java脚本)</p>
+</blockquote>
+<blockquote>
+<p> 测试环境数据库     db_test_old  192.168.1.10<br> 新测试环境新数据库  db_test_new  192.168.2.11<br> 测试环境应用       test-java    192.168.3.12</p>
+</blockquote>
+<blockquote>
+<p> 在idea里写完脚本，运行没问题，然后在 terminal 运行，被啪啪的打脸</p>
+</blockquote>
+<span id="more"></span>
+
+<h1 id="1-想象中运行java文件的样子"><a href="#1-想象中运行java文件的样子" class="headerlink" title="(1) 想象中运行java文件的样子"></a>(1) 想象中运行java文件的样子</h1><h2 id="1-1-查看jdk版本"><a href="#1-1-查看jdk版本" class="headerlink" title="(1.1) 查看jdk版本"></a>(1.1) 查看jdk版本</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>version
+java version <span class="token string">"1.8.0_172"</span>
+Java<span class="token operator">(</span>TM<span class="token operator">)</span> SE Runtime Environment <span class="token operator">(</span>build 1<span class="token punctuation">.</span>8<span class="token punctuation">.</span>0_172<span class="token operator">-</span>b11<span class="token operator">)</span>
+Java HotSpot<span class="token operator">(</span>TM<span class="token operator">)</span> <span class="token number">64</span><span class="token operator">-</span>Bit Server VM <span class="token operator">(</span>build <span class="token number">25.172</span><span class="token operator">-</span>b11<span class="token punctuation">,</span> mixed mode<span class="token operator">)</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="1-2-新建一个HelloWord-java文件测试"><a href="#1-2-新建一个HelloWord-java文件测试" class="headerlink" title="(1.2) 新建一个HelloWord.java文件测试"></a>(1.2) 新建一个HelloWord.java文件测试</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> pwd
+<span class="token file-path string">/home/wkq/workspaces/java_test</span>
+vi HelloWorld<span class="token punctuation">.</span>java<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">public class HelloWorld<span class="token operator">&#123;</span>
+	public static void main<span class="token operator">(</span>String<span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token operator">)</span><span class="token operator">&#123;</span>
+		System<span class="token punctuation">.</span>out<span class="token punctuation">.</span>println<span class="token operator">(</span><span class="token string">"Hello, World!"</span><span class="token operator">)</span><span class="token operator">;</span>
+	<span class="token operator">&#125;</span>
+<span class="token operator">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="1-3-编译HelloWorld-java"><a href="#1-3-编译HelloWorld-java" class="headerlink" title="(1.3) 编译HelloWorld.java"></a>(1.3) 编译HelloWorld.java</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac HelloWorld<span class="token punctuation">.</span>java
+
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="1-4-运行HelloWorld"><a href="#1-4-运行HelloWorld" class="headerlink" title="(1.4) 运行HelloWorld"></a>(1.4) 运行HelloWorld</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> pwd
+<span class="token file-path string">/home/wkq/workspaces/java_test</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> ll
+total <span class="token number">8</span>
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq <span class="token date number">427 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">48</span> HelloWorld<span class="token punctuation">.</span>class
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq <span class="token date number">112 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">47</span> HelloWorld<span class="token punctuation">.</span>java
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java HelloWorld
+Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> 没问题，很完美</p>
+</blockquote>
+<h2 id="1-5-被打脸的一幕"><a href="#1-5-被打脸的一幕" class="headerlink" title="(1.5) 被打脸的一幕"></a>(1.5) 被打脸的一幕</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java HelloWorld<span class="token punctuation">.</span>class
+<span class="token property">Error:</span> Could not find or load main class HelloWorld<span class="token punctuation">.</span>class
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> 竟然不能运行 class文件<br> 被打脸后才明白，java的参数，传入的是main函数所在的类的名字，而不是class文件；java会根据类名自动去找class文件。</p>
+</blockquote>
+<br>
+
+
+<h1 id="2-复盘"><a href="#2-复盘" class="headerlink" title="(2) 复盘"></a>(2) 复盘</h1><h2 id="2-1-查看jdk版本"><a href="#2-1-查看jdk版本" class="headerlink" title="(2.1) 查看jdk版本"></a>(2.1) 查看jdk版本</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>version
+java version <span class="token string">"1.8.0_172"</span>
+Java<span class="token operator">(</span>TM<span class="token operator">)</span> SE Runtime Environment <span class="token operator">(</span>build 1<span class="token punctuation">.</span>8<span class="token punctuation">.</span>0_172<span class="token operator">-</span>b11<span class="token operator">)</span>
+Java HotSpot<span class="token operator">(</span>TM<span class="token operator">)</span> <span class="token number">64</span><span class="token operator">-</span>Bit Server VM <span class="token operator">(</span>build <span class="token number">25.172</span><span class="token operator">-</span>b11<span class="token punctuation">,</span> mixed mode<span class="token operator">)</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="2-2-新建MysqlLoadDataTest-java"><a href="#2-2-新建MysqlLoadDataTest-java" class="headerlink" title="(2.2) 新建MysqlLoadDataTest.java"></a>(2.2) 新建MysqlLoadDataTest.java</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">vi MySqlLoadDataTest<span class="token punctuation">.</span>java<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">package cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token operator">;</span>
+
+import java<span class="token punctuation">.</span>sql<span class="token punctuation">.</span><span class="token operator">*</span><span class="token operator">;</span>
+import java<span class="token punctuation">.</span>util<span class="token punctuation">.</span><span class="token operator">*</span><span class="token operator">;</span>
+
+<span class="token operator">/</span><span class="token operator">*</span><span class="token operator">*</span>
+ <span class="token operator">*</span> MySqlLoadDataTest
+ <span class="token operator">*</span>
+ <span class="token operator">*</span> <span class="token operator">@</span>author<span class="token operator">:</span> <span class="token email url">weikeqin.cn@gmail.com</span>
+ <span class="token operator">*</span> <span class="token operator">@</span>date<span class="token operator">:</span> <span class="token date number">2020-05-13</span> <span class="token number">20</span><span class="token operator">:</span><span class="token number">06</span>
+ <span class="token operator">*</span><span class="token operator">*</span><span class="token operator">/</span>
+public class MySqlLoadDataTest <span class="token operator">&#123;</span>
+
+
+    <span class="token operator">/</span><span class="token operator">*</span><span class="token operator">*</span>
+     <span class="token operator">*</span> <span class="token operator">@</span>param args
+     <span class="token operator">*</span><span class="token operator">/</span>
+    public static void main<span class="token operator">(</span>String<span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token operator">)</span> <span class="token operator">&#123;</span>
+        MySqlLoadDataTest t <span class="token operator">=</span> new MySqlLoadDataTest<span class="token operator">(</span><span class="token operator">)</span><span class="token operator">;</span>
+        t<span class="token punctuation">.</span>loadData<span class="token operator">(</span><span class="token operator">)</span><span class="token operator">;</span>
+        System<span class="token punctuation">.</span>out<span class="token punctuation">.</span>println<span class="token operator">(</span><span class="token string">"执行完了。"</span><span class="token operator">)</span><span class="token operator">;</span>
+    <span class="token operator">&#125;</span>
+
+
+    <span class="token operator">/</span><span class="token operator">*</span><span class="token operator">*</span>
+     <span class="token operator">*</span>
+     <span class="token operator">*</span><span class="token operator">/</span>
+    public void loadData<span class="token operator">(</span><span class="token operator">)</span> <span class="token operator">&#123;</span>
+
+        int batchSize <span class="token operator">=</span> <span class="token number">100</span><span class="token operator">;</span>
+        <span class="token operator">/</span><span class="token operator">/</span> 
+        String driverClassName <span class="token operator">=</span> <span class="token string">"com.mysql.jdbc.Driver"</span><span class="token operator">;</span>
+
+        try <span class="token operator">&#123;</span>
+            Class<span class="token punctuation">.</span>forName<span class="token operator">(</span>driverClassName<span class="token operator">)</span><span class="token operator">;</span>
+        <span class="token operator">&#125;</span> catch <span class="token operator">(</span>ClassNotFoundException e<span class="token operator">)</span> <span class="token operator">&#123;</span>
+            e<span class="token punctuation">.</span>printStackTrace<span class="token operator">(</span><span class="token operator">)</span><span class="token operator">;</span>
+        <span class="token operator">&#125;</span>
+
+        <span class="token operator">/</span><span class="token operator">/</span> 省略其它逻辑
+
+    <span class="token operator">&#125;</span>
+
+<span class="token operator">&#125;</span>    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="2-3-编译"><a href="#2-3-编译" class="headerlink" title="(2.3) 编译"></a>(2.3) 编译</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> pwd
+<span class="token file-path string">/home/wkq/workspaces/java_test</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac <span class="token operator">-</span>encoding <span class="token string">"utf-8"</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="2-4-运行"><a href="#2-4-运行" class="headerlink" title="(2.4) 运行"></a>(2.4) 运行</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java MySqlLoadDataTest
+<span class="token property">Error:</span> Could not find or load main class MySqlLoadDataTest
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+<span class="token property">Error:</span> Could not find or load main class cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="2-5-注释掉第一行包名重新运行"><a href="#2-5-注释掉第一行包名重新运行" class="headerlink" title="(2.5) 注释掉第一行包名重新运行"></a>(2.5) 注释掉第一行包名重新运行</h2><blockquote>
+<p> 如果把 文件的第一行注释掉，重新编译运行会出现 </p>
+</blockquote>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> vi MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> 
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac <span class="token operator">-</span>encoding <span class="token string">"utf-8"</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java MySqlLoadDataTest
+<span class="token exception javastacktrace language-javastacktrace">java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ClassNotFoundException<span class="token punctuation">:</span> com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span>Driver
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>net<span class="token punctuation">.</span>URLClassLoader<span class="token punctuation">.</span><span class="token function">findClass</span><span class="token punctuation">(</span>URLClassLoader<span class="token punctuation">.</span>java<span class="token punctuation">:</span>381<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ClassLoader<span class="token punctuation">.</span><span class="token function">loadClass</span><span class="token punctuation">(</span>ClassLoader<span class="token punctuation">.</span>java<span class="token punctuation">:</span>424<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> sun<span class="token punctuation">.</span>misc<span class="token punctuation">.</span>Launcher$AppClassLoader<span class="token punctuation">.</span><span class="token function">loadClass</span><span class="token punctuation">(</span>Launcher<span class="token punctuation">.</span>java<span class="token punctuation">:</span>349<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ClassLoader<span class="token punctuation">.</span><span class="token function">loadClass</span><span class="token punctuation">(</span>ClassLoader<span class="token punctuation">.</span>java<span class="token punctuation">:</span>357<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>Class<span class="token punctuation">.</span><span class="token function">forName0</span><span class="token punctuation">(</span>Native Method<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>Class<span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span>Class<span class="token punctuation">.</span>java<span class="token punctuation">:</span>264<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> MySqlLoadDataTest<span class="token punctuation">.</span><span class="token function">loadData</span><span class="token punctuation">(</span>MySqlLoadDataTest<span class="token punctuation">.</span>java<span class="token punctuation">:</span>35<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> MySqlLoadDataTest<span class="token punctuation">.</span><span class="token function">main</span><span class="token punctuation">(</span>MySqlLoadDataTest<span class="token punctuation">.</span>java<span class="token punctuation">:</span>20<span class="token punctuation">)</span></span>
+<span class="token operator">?</span><span class="token operator">?</span><span class="token operator">?</span><span class="token operator">?</span><span class="token operator">?</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> pwd
+<span class="token file-path string">/home/wkq/workspaces/java_test</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> cd <span class="token file-path string">/home/wkq/lib/</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos lib<span class="token punctuation">]</span><span class="token operator">$</span> wget <span class="token string">"https://repo1.maven.org/maven2/mysql/mysql-connector-java/5.1.47/mysql-connector-java-5.1.47.jar"</span>
+<span class="token operator">-</span><span class="token operator">-</span><span class="token date number">2020-05-17</span> <span class="token time number">21:59:08</span><span class="token operator">-</span><span class="token operator">-</span>  <span class="token url">https://repo1.maven.org/maven2/mysql/mysql-connector-java/5.1.47/mysql-connector-java-5.1.47.jar</span>
+Resolving <span class="token domain constant">repo1.maven.org</span> <span class="token operator">(</span>repo1<span class="token punctuation">.</span>maven<span class="token punctuation">.</span>org<span class="token operator">)</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> <span class="token ip-address constant">151.101.24.209</span>
+Connecting to <span class="token domain constant">repo1.maven.org</span> <span class="token operator">(</span>repo1<span class="token punctuation">.</span>maven<span class="token punctuation">.</span>org<span class="token operator">)</span><span class="token operator">|</span><span class="token ip-address constant">151.101.24.209</span><span class="token operator">|</span><span class="token operator">:</span><span class="token number">443</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> connected<span class="token punctuation">.</span>
+HTTP request sent<span class="token punctuation">,</span> awaiting response<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> <span class="token number">200</span> OK
+<span class="token property">Length:</span> <span class="token number">1007502</span> <span class="token operator">(</span><span class="token number">984K</span><span class="token operator">)</span> <span class="token punctuation">[</span>application<span class="token operator">/</span>java<span class="token operator">-</span>archive<span class="token punctuation">]</span>
+<span class="token property">Saving to:</span> <span class="token string">'mysql-connector-java-5.1.47.jar'</span>
+
+<span class="token number">100</span><span class="token operator">%</span><span class="token punctuation">[</span><span class="token separator comment">=====================================================================================</span><span class="token operator">></span><span class="token punctuation">]</span> <span class="token number">1</span><span class="token punctuation">,</span><span class="token number">007</span><span class="token punctuation">,</span><span class="token number">502</span>   <span class="token number">10.1KB</span><span class="token operator">/</span>s   in <span class="token number">85s</span>
+
+<span class="token date number">2020-05-17</span> <span class="token time number">22:00:34</span> <span class="token operator">(</span><span class="token number">11.6</span> KB<span class="token operator">/</span>s<span class="token operator">)</span> <span class="token operator">-</span> <span class="token string">'mysql-connector-java-5.1.47.jar'</span> saved <span class="token punctuation">[</span><span class="token number">1007502</span><span class="token operator">/</span><span class="token number">1007502</span><span class="token punctuation">]</span>
+
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos lib<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos lib<span class="token punctuation">]</span><span class="token operator">$</span> ll
+total <span class="token number">988</span>
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq <span class="token number">1007502</span> <span class="token date number">Aug  7</span>  <span class="token number">2018</span> mysql<span class="token operator">-</span>connector<span class="token operator">-</span>java<span class="token operator">-</span>5<span class="token punctuation">.</span>1<span class="token punctuation">.</span>47<span class="token punctuation">.</span>jar
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos lib<span class="token punctuation">]</span><span class="token operator">$</span> pwd
+<span class="token file-path string">/home/wkq/lib</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>classpath <span class="token file-path string">/home/wkq/lib/mysql-connector-java-5.1.47.jar</span><span class="token operator">:</span><span class="token file-path string">/home/wkq/workspaces/java_test</span> MySqlLoadDataTest
+执行完了。
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> 在注释了第一行包路径后，重新编译<br> 指定了classpath后就可以运行成功。<br> 但是现在还有一个问题，测试的时候可以写一个java文件，但是实际开发的时候肯定不能不带包名</p>
+</blockquote>
+<h2 id="2-6-不注释第一行包名，把MySqlLoadDataTest-class换个目录"><a href="#2-6-不注释第一行包名，把MySqlLoadDataTest-class换个目录" class="headerlink" title="(2.6) 不注释第一行包名，把MySqlLoadDataTest.class换个目录"></a>(2.6) 不注释第一行包名，把MySqlLoadDataTest.class换个目录</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> ll
+total <span class="token number">16</span>
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">427 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">48</span> HelloWorld<span class="token punctuation">.</span>class
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">112 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">47</span> HelloWorld<span class="token punctuation">.</span>java
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">752 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">17</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+drwxrwxr<span class="token operator">-</span>x <span class="token number">3</span> wkq wkq <span class="token date number">4096 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">17</span> cn
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> pwd
+<span class="token file-path string">/home/wkq/workspaces/java_test</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+<span class="token exception javastacktrace language-javastacktrace">java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ClassNotFoundException<span class="token punctuation">:</span> com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span>Driver
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>net<span class="token punctuation">.</span>URLClassLoader<span class="token punctuation">.</span><span class="token function">findClass</span><span class="token punctuation">(</span>URLClassLoader<span class="token punctuation">.</span>java<span class="token punctuation">:</span>381<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ClassLoader<span class="token punctuation">.</span><span class="token function">loadClass</span><span class="token punctuation">(</span>ClassLoader<span class="token punctuation">.</span>java<span class="token punctuation">:</span>424<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> sun<span class="token punctuation">.</span>misc<span class="token punctuation">.</span>Launcher$AppClassLoader<span class="token punctuation">.</span><span class="token function">loadClass</span><span class="token punctuation">(</span>Launcher<span class="token punctuation">.</span>java<span class="token punctuation">:</span>349<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>ClassLoader<span class="token punctuation">.</span><span class="token function">loadClass</span><span class="token punctuation">(</span>ClassLoader<span class="token punctuation">.</span>java<span class="token punctuation">:</span>357<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>Class<span class="token punctuation">.</span><span class="token function">forName0</span><span class="token punctuation">(</span>Native Method<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>Class<span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span>Class<span class="token punctuation">.</span>java<span class="token punctuation">:</span>264<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest<span class="token punctuation">.</span><span class="token function">loadData</span><span class="token punctuation">(</span>MySqlLoadDataTest<span class="token punctuation">.</span>java<span class="token punctuation">:</span>35<span class="token punctuation">)</span>
+	<span class="token keyword">at</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest<span class="token punctuation">.</span><span class="token function">main</span><span class="token punctuation">(</span>MySqlLoadDataTest<span class="token punctuation">.</span>java<span class="token punctuation">:</span>20<span class="token punctuation">)</span></span>
+<span class="token operator">?</span><span class="token operator">?</span><span class="token operator">?</span><span class="token operator">?</span><span class="token operator">?</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>classpath <span class="token file-path string">/home/wkq/lib/mysql-connector-java-5.1.47.jar</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+<span class="token property">Error:</span> Could not find or load main class cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>classpath <span class="token file-path string">/home/wkq/lib/mysql-connector-java-5.1.47.jar</span><span class="token operator">:</span><span class="token file-path string">/home/wkq/workspaces/java_test</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+执行完了。
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+```  
+
+<span class="token operator">></span>  可以看到，运行成功了，果然是加了包名以后，编译的main方法放到了对应目录下。
+<span class="token operator">></span>  终于用教训理解了全限定类名
+<span class="token operator">></span>  用教训理解了 Java 会根据包名对应出目录结构，并从class path搜索该目录去找class文件。 <span class="token operator">(</span>默认是当前目录，如果运行时不在当前目录需要指定 classpath<span class="token operator">)</span>
+
+
+<span class="token operator">#</span><span class="token operator">#</span> <span class="token operator">(</span><span class="token number">2.7</span><span class="token operator">)</span> 不注释第一行包名，不换目录 
+
+<span class="token operator">></span>  正常情况下，我们写完java代码，直接编译后就可以运行，不可能再对每个文件创建目录。所以得换个办法。
+
+```log
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> rm <span class="token operator">-</span>rf cn<span class="token operator">/</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>d MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token property">javac:</span> <span class="token property">invalid flag:</span> <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span>
+<span class="token property">Usage:</span> javac <span class="token operator">&lt;</span>options<span class="token operator">></span> <span class="token operator">&lt;</span>source files<span class="token operator">></span>
+use <span class="token operator">-</span>help for a list of possible options
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>d <span class="token punctuation">.</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token property">javac:</span> <span class="token property">invalid flag:</span> <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span>
+<span class="token property">Usage:</span> javac <span class="token operator">&lt;</span>options<span class="token operator">></span> <span class="token operator">&lt;</span>source files<span class="token operator">></span>
+use <span class="token operator">-</span>help for a list of possible options
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac <span class="token operator">-</span>encoding <span class="token string">"utf-8"</span> <span class="token operator">-</span>d <span class="token punctuation">.</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> ll
+total <span class="token number">16</span>
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">427 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">48</span> HelloWorld<span class="token punctuation">.</span>class
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">112 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">47</span> HelloWorld<span class="token punctuation">.</span>java
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">752 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">17</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+drwxrwxr<span class="token operator">-</span>x <span class="token number">3</span> wkq wkq <span class="token date number">4096 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">29</span> cn
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>classpath <span class="token file-path string">/home/wkq/lib/mysql-connector-java-5.1.47.jar</span><span class="token operator">:</span><span class="token file-path string">/home/wkq/workspaces/java_test</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+执行完了。
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> 果然可以运行</p>
+</blockquote>
+<h2 id="编译java文件到指定目录"><a href="#编译java文件到指定目录" class="headerlink" title="编译java文件到指定目录"></a>编译java文件到指定目录</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> javac <span class="token operator">-</span>encoding <span class="token string">"utf-8"</span> <span class="token operator">-</span>d <span class="token file-path string">/home/wkq/workspaces/test_target/</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> ll
+total <span class="token number">16</span>
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">427 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">48</span> HelloWorld<span class="token punctuation">.</span>class
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">112 May 17</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">47</span> HelloWorld<span class="token punctuation">.</span>java
+<span class="token operator">-</span>rw<span class="token operator">-</span>rw<span class="token operator">-</span>r<span class="token operator">-</span><span class="token operator">-</span> <span class="token number">1</span> wkq wkq  <span class="token date number">752 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">17</span> MySqlLoadDataTest<span class="token punctuation">.</span>java
+drwxrwxr<span class="token operator">-</span>x <span class="token number">3</span> wkq wkq <span class="token date number">4096 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">29</span> cn
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos java_test<span class="token punctuation">]</span><span class="token operator">$</span> cd <span class="token file-path string">/home/wkq/workspaces/test_target/</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos test_target<span class="token punctuation">]</span><span class="token operator">$</span> ll
+total <span class="token number">4</span>
+drwxrwxr<span class="token operator">-</span>x <span class="token number">3</span> wkq wkq <span class="token date number">4096 May 17</span> <span class="token number">22</span><span class="token operator">:</span><span class="token number">32</span> cn
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos test_target<span class="token punctuation">]</span><span class="token operator">$</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos test_target<span class="token punctuation">]</span><span class="token operator">$</span> java <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>classpath <span class="token file-path string">/home/wkq/lib/mysql-connector-java-5.1.47.jar</span><span class="token operator">:</span><span class="token file-path string">/home/wkq/workspaces/java_test</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest
+执行完了。
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos test_target<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="开发工具idea是怎么编译代码的"><a href="#开发工具idea是怎么编译代码的" class="headerlink" title="开发工具idea是怎么编译代码的"></a>开发工具idea是怎么编译代码的</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">javac <span class="token operator">-</span>d target src<span class="token operator">/</span>cn<span class="token operator">/</span>wkq<span class="token operator">/</span>java<span class="token operator">/</span>test<span class="token operator">/</span><span class="token operator">*</span><span class="token punctuation">.</span>java<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token file-path string">/home/wkq/software/jdk1.8.0_172/bin/javac</span> <span class="token operator">-</span>encoding <span class="token string">"utf-8"</span> <span class="token operator">-</span>d <span class="token file-path string">/home/wkq/workspaces/java_test/target/</span> <span class="token file-path string">/home/wkq/workspaces/java_test/src/*.java</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<blockquote>
+<p>jdk目录 /home/wkq/software/jdk1.8.0_172/bin/<br>java代码目录  /home/wkq/workspaces/java_test/src/<br>编译后存放目录 /home/wkq/workspaces/java_test/target/</p>
+</blockquote>
+<h2 id="开发工具idea是怎么运行代码的"><a href="#开发工具idea是怎么运行代码的" class="headerlink" title="开发工具idea是怎么运行代码的"></a>开发工具idea是怎么运行代码的</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token file-path string">/home/wkq/software/jdk1.8.0_172/bin/java</span> <span class="token operator">-</span>Dfile<span class="token punctuation">.</span>encoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span> <span class="token operator">-</span>classpath <span class="token file-path string">/home/wkq/lib/mysql-connector-java-5.1.47.jar</span><span class="token operator">:</span><span class="token file-path string">/home/wkq/workspaces/java_test</span> cn<span class="token punctuation">.</span>wkq<span class="token punctuation">.</span>java<span class="token punctuation">.</span>test<span class="token punctuation">.</span>MySqlLoadDataTest<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<blockquote>
+<p>jdk目录 /home/wkq/software/jdk1.8.0_172/bin/<br>指定 classpath目录 -classpath /home/wkq/lib/mysql-connector-java-5.1.47.jar:/home/wkq/workspaces/java_test<br>运行main方法 cn.wkq.java.test.MySqlLoadDataTest</p>
+</blockquote>
+<h1 id="javac命令"><a href="#javac命令" class="headerlink" title="javac命令"></a>javac命令</h1><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> <span class="token file-path string">/home/wkq/software/jdk1.8.0_172/bin/javac</span>
+<span class="token property">Usage:</span> javac <span class="token operator">&lt;</span>options<span class="token operator">></span> <span class="token operator">&lt;</span>source files<span class="token operator">></span>
+<span class="token property">where possible options include:</span>
+  <span class="token operator">-</span>g                         Generate all debugging info
+  <span class="token operator">-</span>g<span class="token operator">:</span>none                    Generate no debugging info
+  <span class="token operator">-</span>g<span class="token operator">:</span><span class="token operator">&#123;</span>lines<span class="token punctuation">,</span>vars<span class="token punctuation">,</span>source<span class="token operator">&#125;</span>     Generate only some debugging info
+  <span class="token operator">-</span>nowarn                    Generate no warnings
+  <span class="token operator">-</span>verbose                   Output messages about what the compiler is doing
+  <span class="token operator">-</span>deprecation               Output source locations where deprecated APIs are used
+  <span class="token operator">-</span>classpath <span class="token operator">&lt;</span>path<span class="token operator">></span>          Specify where to find user class files and annotation processors
+  <span class="token operator">-</span>cp <span class="token operator">&lt;</span>path<span class="token operator">></span>                 Specify where to find user class files and annotation processors
+  <span class="token operator">-</span>sourcepath <span class="token operator">&lt;</span>path<span class="token operator">></span>         Specify where to find input source files
+  <span class="token operator">-</span>bootclasspath <span class="token operator">&lt;</span>path<span class="token operator">></span>      Override location of bootstrap class files
+  <span class="token operator">-</span>extdirs <span class="token operator">&lt;</span>dirs<span class="token operator">></span>            Override location of installed extensions
+  <span class="token operator">-</span>endorseddirs <span class="token operator">&lt;</span>dirs<span class="token operator">></span>       Override location of endorsed standards path
+  <span class="token operator">-</span>proc<span class="token operator">:</span><span class="token operator">&#123;</span>none<span class="token punctuation">,</span>only<span class="token operator">&#125;</span>          Control whether annotation processing and<span class="token operator">/</span>or compilation is done<span class="token punctuation">.</span>
+  <span class="token operator">-</span>processor <span class="token operator">&lt;</span>class1<span class="token operator">></span><span class="token punctuation">[</span><span class="token punctuation">,</span><span class="token operator">&lt;</span>class2<span class="token operator">></span><span class="token punctuation">,</span><span class="token operator">&lt;</span>class3<span class="token operator">></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">]</span> Names of the annotation processors to run<span class="token operator">;</span> bypasses default discovery process
+  <span class="token operator">-</span>processorpath <span class="token operator">&lt;</span>path<span class="token operator">></span>      Specify where to find annotation processors
+  <span class="token operator">-</span>parameters                Generate metadata for reflection on method parameters
+  <span class="token operator">-</span>d <span class="token operator">&lt;</span>directory<span class="token operator">></span>             Specify where to place generated class files
+  <span class="token operator">-</span>s <span class="token operator">&lt;</span>directory<span class="token operator">></span>             Specify where to place generated source files
+  <span class="token operator">-</span>h <span class="token operator">&lt;</span>directory<span class="token operator">></span>             Specify where to place generated native header files
+  <span class="token operator">-</span>implicit<span class="token operator">:</span><span class="token operator">&#123;</span>none<span class="token punctuation">,</span>class<span class="token operator">&#125;</span>     Specify whether or not to generate class files for implicitly referenced files
+  <span class="token operator">-</span>encoding <span class="token operator">&lt;</span>encoding<span class="token operator">></span>       Specify character encoding used by source files
+  <span class="token operator">-</span>source <span class="token operator">&lt;</span>release<span class="token operator">></span>          Provide source compatibility with specified release
+  <span class="token operator">-</span>target <span class="token operator">&lt;</span>release<span class="token operator">></span>          Generate class files for specific VM version
+  <span class="token operator">-</span>profile <span class="token operator">&lt;</span>profile<span class="token operator">></span>         Check that API used is available in the specified profile
+  <span class="token operator">-</span>version                   Version information
+  <span class="token operator">-</span>help                      Print a synopsis of standard options
+  <span class="token operator">-</span>Akey<span class="token punctuation">[</span><span class="token operator">=</span>value<span class="token punctuation">]</span>              Options to pass to annotation processors
+  <span class="token operator">-</span>X                         Print a synopsis of nonstandard options
+  <span class="token operator">-</span>J<span class="token operator">&lt;</span>flag<span class="token operator">></span>                   Pass <span class="token operator">&lt;</span>flag<span class="token operator">></span> directly to the runtime system
+  <span class="token operator">-</span>Werror                    Terminate compilation if warnings occur
+  <span class="token operator">@</span><span class="token operator">&lt;</span>filename<span class="token operator">></span>                Read options and filenames from file
+
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="java命令"><a href="#java命令" class="headerlink" title="java命令"></a>java命令</h1><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> <span class="token file-path string">/home/wkq/software/jdk1.8.0_172/bin/java</span>
+<span class="token property">Usage:</span> java <span class="token punctuation">[</span><span class="token operator">-</span>options<span class="token punctuation">]</span> class <span class="token punctuation">[</span>args<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">]</span>
+           <span class="token operator">(</span>to execute a class<span class="token operator">)</span>
+   or  java <span class="token punctuation">[</span><span class="token operator">-</span>options<span class="token punctuation">]</span> <span class="token operator">-</span>jar jarfile <span class="token punctuation">[</span>args<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">]</span>
+           <span class="token operator">(</span>to execute a jar file<span class="token operator">)</span>
+<span class="token property">where options include:</span>
+    <span class="token operator">-</span>d32	  use a <span class="token number">32</span><span class="token operator">-</span>bit data model if available
+    <span class="token operator">-</span>d64	  use a <span class="token number">64</span><span class="token operator">-</span>bit data model if available
+    <span class="token operator">-</span>server	  to select the <span class="token string">"server"</span> VM
+                  The default VM is server<span class="token punctuation">.</span>
+
+    <span class="token operator">-</span>cp <span class="token operator">&lt;</span>class search path of directories and zip<span class="token operator">/</span>jar files<span class="token operator">></span>
+    <span class="token operator">-</span>classpath <span class="token operator">&lt;</span>class search path of directories and zip<span class="token operator">/</span>jar files<span class="token operator">></span>
+                  A <span class="token operator">:</span> separated list of directories<span class="token punctuation">,</span> JAR archives<span class="token punctuation">,</span>
+                  and ZIP archives to search for class files<span class="token punctuation">.</span>
+    <span class="token operator">-</span>D<span class="token operator">&lt;</span>name<span class="token operator">></span><span class="token operator">=</span><span class="token operator">&lt;</span>value<span class="token operator">></span>
+                  set a system property
+    <span class="token operator">-</span>verbose<span class="token operator">:</span><span class="token punctuation">[</span>class<span class="token operator">|</span>gc<span class="token operator">|</span>jni<span class="token punctuation">]</span>
+                  enable verbose output
+    <span class="token operator">-</span>version      print product version and exit
+    <span class="token operator">-</span>version<span class="token operator">:</span><span class="token operator">&lt;</span>value<span class="token operator">></span>
+                  <span class="token property">Warning:</span> this feature is deprecated and will be removed
+                  in a future release<span class="token punctuation">.</span>
+                  require the specified version to run
+    <span class="token operator">-</span>showversion  print product version and continue
+    <span class="token operator">-</span>jre<span class="token operator">-</span>restrict<span class="token operator">-</span>search <span class="token operator">|</span> <span class="token operator">-</span>no<span class="token operator">-</span>jre<span class="token operator">-</span>restrict<span class="token operator">-</span>search
+                  <span class="token property">Warning:</span> this feature is deprecated and will be removed
+                  in a future release<span class="token punctuation">.</span>
+                  include<span class="token operator">/</span>exclude user private JREs in the version search
+    <span class="token operator">-</span><span class="token operator">?</span> <span class="token operator">-</span>help      print this help message
+    <span class="token operator">-</span>X            print help on non<span class="token operator">-</span>standard options
+    <span class="token operator">-</span>ea<span class="token punctuation">[</span><span class="token operator">:</span><span class="token operator">&lt;</span>packagename<span class="token operator">></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token operator">|</span><span class="token operator">:</span><span class="token operator">&lt;</span>classname<span class="token operator">></span><span class="token punctuation">]</span>
+    <span class="token operator">-</span>enableassertions<span class="token punctuation">[</span><span class="token operator">:</span><span class="token operator">&lt;</span>packagename<span class="token operator">></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token operator">|</span><span class="token operator">:</span><span class="token operator">&lt;</span>classname<span class="token operator">></span><span class="token punctuation">]</span>
+                  enable assertions with specified granularity
+    <span class="token operator">-</span>da<span class="token punctuation">[</span><span class="token operator">:</span><span class="token operator">&lt;</span>packagename<span class="token operator">></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token operator">|</span><span class="token operator">:</span><span class="token operator">&lt;</span>classname<span class="token operator">></span><span class="token punctuation">]</span>
+    <span class="token operator">-</span>disableassertions<span class="token punctuation">[</span><span class="token operator">:</span><span class="token operator">&lt;</span>packagename<span class="token operator">></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token operator">|</span><span class="token operator">:</span><span class="token operator">&lt;</span>classname<span class="token operator">></span><span class="token punctuation">]</span>
+                  disable assertions with specified granularity
+    <span class="token operator">-</span>esa <span class="token operator">|</span> <span class="token operator">-</span>enablesystemassertions
+                  enable system assertions
+    <span class="token operator">-</span>dsa <span class="token operator">|</span> <span class="token operator">-</span>disablesystemassertions
+                  disable system assertions
+    <span class="token operator">-</span>agentlib<span class="token operator">:</span><span class="token operator">&lt;</span>libname<span class="token operator">></span><span class="token punctuation">[</span><span class="token operator">=</span><span class="token operator">&lt;</span>options<span class="token operator">></span><span class="token punctuation">]</span>
+                  load native agent library <span class="token operator">&lt;</span>libname<span class="token operator">></span><span class="token punctuation">,</span> e<span class="token punctuation">.</span>g<span class="token punctuation">.</span> <span class="token operator">-</span>agentlib<span class="token operator">:</span>hprof
+                  see also<span class="token punctuation">,</span> <span class="token operator">-</span>agentlib<span class="token operator">:</span>jdwp<span class="token operator">=</span>help and <span class="token operator">-</span>agentlib<span class="token operator">:</span>hprof<span class="token operator">=</span>help
+    <span class="token operator">-</span>agentpath<span class="token operator">:</span><span class="token operator">&lt;</span>pathname<span class="token operator">></span><span class="token punctuation">[</span><span class="token operator">=</span><span class="token operator">&lt;</span>options<span class="token operator">></span><span class="token punctuation">]</span>
+                  load native agent library by full pathname
+    <span class="token operator">-</span>javaagent<span class="token operator">:</span><span class="token operator">&lt;</span>jarpath<span class="token operator">></span><span class="token punctuation">[</span><span class="token operator">=</span><span class="token operator">&lt;</span>options<span class="token operator">></span><span class="token punctuation">]</span>
+                  load Java programming language agent<span class="token punctuation">,</span> see <span class="token domain constant">java.lang.instrument</span>
+    <span class="token operator">-</span>splash<span class="token operator">:</span><span class="token operator">&lt;</span>imagepath<span class="token operator">></span>
+                  show splash screen with specified image
+See <span class="token url">http://www.oracle.com/technetwork/java/javase/documentation/index.html</span> for more details<span class="token punctuation">.</span>
+<span class="token punctuation">[</span>wkq<span class="token operator">@</span>VM_77_25_centos <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/8/docs/technotes/tools/windows/javac.html">javac</a><br>[2] <a target="_blank" rel="noopener" href="https://imshuai.com/using-javac">第1期：抛开IDE，了解一下javac如何编译</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/jvm/" rel="tag"># jvm</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/05/13/guava-cache/" rel="prev" title="guava缓存">
+                  <i class="fa fa-chevron-left"></i> guava缓存
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/05/16/elk-notes/" rel="next" title="Elasticsearch Logstash Kibana 笔记">
+                  Elasticsearch Logstash Kibana 笔记 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

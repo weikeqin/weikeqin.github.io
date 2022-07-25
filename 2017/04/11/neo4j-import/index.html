@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="1千万数据(数字 英文，没有中文)导入花费 27s 932ms  1千万数据(包含中文属性)导入花费 1m 50s 9ms  1.1亿数据(1.1亿节点 1.1亿关系 2.2亿属性) 15m 9s 37ms 温馨提示：  neo4j-import和neo4j-admin import虽然功能一样，但是参数还有很多区别，neo4j-import的参数更多一些，感觉用起来更方便。  不过官方会在以">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 官方 etl neo4j-import 导入 数据">
+<meta property="og:url" content="http://weikeqin.com/2017/04/11/neo4j-import/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="1千万数据(数字 英文，没有中文)导入花费 27s 932ms  1千万数据(包含中文属性)导入花费 1m 50s 9ms  1.1亿数据(1.1亿节点 1.1亿关系 2.2亿属性) 15m 9s 37ms 温馨提示：  neo4j-import和neo4j-admin import虽然功能一样，但是参数还有很多区别，neo4j-import的参数更多一些，感觉用起来更方便。  不过官方会在以">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-04-11T14:33:04.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.254Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="neo4j">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/04/11/neo4j-import/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/04/11/neo4j-import/","path":"2017/04/11/neo4j-import/","title":"使用 官方 etl neo4j-import 导入 数据"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>使用 官方 etl neo4j-import 导入 数据 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#2017-04-11-%E5%AF%BC%E5%85%A5%E6%B5%8B%E8%AF%95"><span class="nav-number">1.</span> <span class="nav-text">2017-04-11 导入测试</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#1-linux%E5%AF%BC%E5%85%A51000w%E6%95%B0%E6%8D%AE"><span class="nav-number">2.</span> <span class="nav-text">(1) linux导入1000w数据</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-windows%E5%AF%BC%E5%85%A53000%E6%9D%A1%E5%B7%A6%E5%8F%B3%E8%8A%82%E7%82%B9-%E4%BB%85%E8%8A%82%E7%82%B9"><span class="nav-number">3.</span> <span class="nav-text">(2) windows导入3000条左右节点(仅节点)</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-windows%E5%AF%BC%E5%85%A510w%E6%95%B0%E6%8D%AE-10%E4%B8%87%E8%8A%82%E7%82%B9-10%E4%B8%87%E5%85%B3%E7%B3%BB"><span class="nav-number">4.</span> <span class="nav-text">(3) windows导入10w数据 (10万节点 10万关系)</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%B6%E4%BB%96%E6%B5%8B%E8%AF%95"><span class="nav-number">5.</span> <span class="nav-text">其他测试</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E4%BD%BF%E7%94%A8%E7%9B%B8%E5%AF%B9%E8%B7%AF%E5%BE%84%EF%BC%8C%E5%AF%BC%E5%85%A5%E5%90%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E5%9C%A8bin%E7%9B%AE%E5%BD%95%E4%B8%8B"><span class="nav-number">5.1.</span> <span class="nav-text">如果使用相对路径，导入后数据库在bin目录下</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E4%BD%BF%E7%94%A8%E7%BB%9D%E5%AF%B9%E8%B7%AF%E5%BE%84%EF%BC%8C%E5%AF%BC%E5%85%A5%E5%90%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E5%9C%A8%E6%8C%87%E5%AE%9A%E7%9B%AE%E5%BD%95%E4%B8%8B"><span class="nav-number">5.2.</span> <span class="nav-text">如果使用绝对路径，导入后数据库在指定目录下</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2018-04-26-%E8%AF%95%E9%AA%8C"><span class="nav-number">5.3.</span> <span class="nav-text">2018-04-26 试验</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%81%87%E5%88%B0%E7%9A%84%E9%94%99%E8%AF%AF"><span class="nav-number">6.</span> <span class="nav-text">遇到的错误</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-39-nodes-39-to-have-at-least-1-valid-item-but-had-0"><span class="nav-number">6.1.</span> <span class="nav-text">(1) &#39;--nodes&#39; to have at least 1 valid item, but had 0 []</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Error-in-input-data-ERROR-in-input"><span class="nav-number">6.2.</span> <span class="nav-text">(2) Error in input data  ERROR in input</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#neo4j-import%E5%91%BD%E4%BB%A4%E4%B8%AD%E7%9A%84%E5%8F%82%E6%95%B0"><span class="nav-number">7.</span> <span class="nav-text">neo4j-import命令中的参数</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#neo4j-3-1-2-neo4j-import-help"><span class="nav-number">8.</span> <span class="nav-text">neo4j-3.1.2 neo4j-import help</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%98%E6%96%B9%E6%96%87%E6%A1%A3-10-1-Import"><span class="nav-number">9.</span> <span class="nav-text">官方文档 10.1. Import</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">10.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/04/11/neo4j-import/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          使用 官方 etl neo4j-import 导入 数据
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-04-11 22:33:04" itemprop="dateCreated datePublished" datetime="2017-04-11T22:33:04+08:00">2017-04-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/neo4j/" itemprop="url" rel="index"><span itemprop="name">neo4j</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/04/11/neo4j-import/" class="post-meta-item leancloud_visitors" data-flag-title="使用 官方 etl neo4j-import 导入 数据" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  1千万数据(数字 英文，没有中文)导入花费 27s 932ms<br>  1千万数据(包含中文属性)导入花费 1m 50s 9ms<br>  1.1亿数据(1.1亿节点 1.1亿关系 2.2亿属性) 15m 9s 37ms</p>
+<p>温馨提示：<br>  neo4j-import和neo4j-admin import虽然功能一样，但是参数还有很多区别，neo4j-import的参数更多一些，感觉用起来更方便。<br>  不过官方会在以后的版本里用neo4j-admin import替掉nep4j-import</p>
+<h1 id="2017-04-11-导入测试"><a href="#2017-04-11-导入测试" class="headerlink" title="2017-04-11 导入测试"></a>2017-04-11 导入测试</h1><!--
+在测试前修改配置文件neo4j.conf
+把所有的配置改成绝对路径，把调试的打开，把neo4j-shell配置打开
+-->
+
+
+
+<h1 id="1-linux导入1000w数据"><a href="#1-linux导入1000w数据" class="headerlink" title="(1) linux导入1000w数据"></a>(1) linux导入1000w数据</h1><p>  node.csv文件 数据样例</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid:ID(Person),name:String,:Label
+2a3e275d9abc4c45913d8e7e619db87a,"张忆耕",Label1
+db6ee76baff64db5956b6a5deb80acbf,"傅某评",Label2
+8d2f4a74e7e7429390b3389d64d77637,"王苏维",Label3
+4d0a5c3fa89a49e89f81a152f2aa259c,"蓝波",Label4<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  relationship.csv文件 数据样例</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">:START_ID(Person),:END_ID(Person),:TYPE
+2a3e275d9abc4c45913d8e7e619db87a,db6ee76baff64db5956b6a5deb80acbf,Relationship1
+8d2f4a74e7e7429390b3389d64d77637,4d0a5c3fa89a49e89f81a152f2aa259c,Relationship2<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<span id="more"></span>
+
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">[wkq@wkq bin]$ ./neo4j-import --into /home/wkq/neo4j/neo4j-community-3.1.0/data/databases/test_10000000_graph.db --nodes /home/wkq/neo4j/node.csv  --relationships /home/wkq/neo4j/relathionship.csv --trim-strings true --input-encoding UTF-8 --id-type INTEGER --stacktrace true --bad-tolerance 0 --skip-bad-relationships true --skip-duplicate-nodes false
+WARNING: neo4j-import is deprecated and support for it will be removed in a future
+version of Neo4j; please use neo4j-admin import instead.
+
+Neo4j version: 3.1.0
+Importing the contents of these files into /home/wkq/neo4j/neo4j-community-3.1.0/data/databases/test_10000000_graph.db:
+Nodes:
+  /home/wkq/neo4j/node.csv
+Relationships:
+  /home/wkq/neo4j/relathionship.csv
+
+Available resources:
+  Free machine memory: 28.05 GB
+  Max heap memory : 26.67 GB
+  Processors: 32
+
+Nodes
+[>:23.85 MB/s-|PROPERTIES-----|NODE:68.66 MB---|LABEL SCAN-----|*v:41.50 MB/s-----------------]8.38M
+Done in 10s 106ms
+Prepare node index
+[*SPLIT:209.81 MB-----------------------------------------------------------------------------]9.67M
+Done in 2s 162ms
+Calculate dense nodes
+[>:115.63 M|TYPE-----------|*PREPARE(32)========================|CALCULATE(2)=================] 5.5M
+Done in 2s 904ms
+Relationships [:Friend] (1/1)
+[>:47.30 MB|*PREPARE(10)==================|RECORDS-|P|RELATIONSHIP----------|v:61.33 MB/s-----]5.63M
+Done in 4s 591ms
+Node --> Relationship [:Friend] (1/1)
+
+Done in 10ms
+Relationship --> Relationship [:Friend] (1/1)
+[>:??----------------------------------|*LINK------------------------------------------------|]3.82M
+Done in 1s 605ms
+Node --> Relationship Sparse
+[>------------------------------------|LINK----|*v:140.00 MB/s--------------------------------]9.78M
+Done in 1s 65ms
+Relationship --> Relationship Sparse
+
+Done in 1s 503ms
+Count groups
+
+Done in 10ms
+Gather
+[*>:??----------------------------------------------------------------------------------------]    0
+Done in 1ms
+Write
+
+Done in 11ms
+Node --> Group
+
+Done in 10ms
+Node counts
+
+Done in 938ms
+Relationship counts
+
+Done in 779ms
+
+IMPORT DONE in 27s 932ms.
+Imported:
+  10000000 nodes
+  10000000 relationships
+  20000000 properties
+Peak memory usage: 209.81 MB
+[wkq@wkq bin]$<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="2-windows导入3000条左右节点-仅节点"><a href="#2-windows导入3000条左右节点-仅节点" class="headerlink" title="(2) windows导入3000条左右节点(仅节点)"></a>(2) windows导入3000条左右节点(仅节点)</h1><pre class="line-numbers language-text" data-language="text"><code class="language-text">C:\ProfessionSofware\Neo4j\neo4j-community-3.1.2\bin>neo4j-import --into test.db  --id-type string  --nodes:Test C:/User/wdb/2017-04-06_test.csv  --stacktrace truektrace true
+警告: This command does not appear to be running with administrative rights.  Some commands may fail e.g. Start/Stop
+WARNING: neo4j-import is deprecated and support for it will be removed in a future
+version of Neo4j; please use neo4j-admin import instead.
+
+Neo4j version: 3.1.2
+Importing the contents of these files into test.db:
+Nodes:
+  :Test
+  C:\User\wdb\2017-04-06_test.csv
+
+Available resources:
+  Free machine memory: 3.09 GB
+  Max heap memory : 1.77 GB
+  Processors: 4
+
+Nodes
+
+Done in 441ms
+Prepare node index
+
+Done in 30ms
+Calculate dense nodes
+
+Done in 11ms
+Node --> Relationship Sparse
+
+Done in 11ms
+Relationship --> Relationship Sparse
+
+Done in 1ms
+Count groups
+[*>:??----------------------------------------------------------------------------------------]    0
+Done in 15ms
+Gather
+
+Done in 2ms
+Write
+
+Done in
+Node --> Group
+
+Done in
+Node counts
+
+Done in 96ms
+Relationship counts
+
+Done in 3ms
+
+IMPORT DONE in 2s 234ms.
+Imported:
+  3466 nodes
+  0 relationships
+  17897 properties
+Peak memory usage: 33.85 kB
+
+C:\ProfessionSofware\Neo4j\neo4j-community-3.1.2\bin><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="3-windows导入10w数据-10万节点-10万关系"><a href="#3-windows导入10w数据-10万节点-10万关系" class="headerlink" title="(3) windows导入10w数据 (10万节点 10万关系)"></a>(3) windows导入10w数据 (10万节点 10万关系)</h1><p>  node.csv文件 数据样例</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">uuid:ID(Person),name:String,:Label
+2a3e275d9abc4c45913d8e7e619db87a,"张忆耕",Label1
+db6ee76baff64db5956b6a5deb80acbf,"傅某评",Label2
+8d2f4a74e7e7429390b3389d64d77637,"王苏维",Label3
+4d0a5c3fa89a49e89f81a152f2aa259c,"蓝波",Label4<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  relationship.csv文件 数据样例</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">:START_ID(Person),:END_ID(Person),:TYPE
+2a3e275d9abc4c45913d8e7e619db87a,db6ee76baff64db5956b6a5deb80acbf,Relationship1
+8d2f4a74e7e7429390b3389d64d77637,4d0a5c3fa89a49e89f81a152f2aa259c,Relationship2<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">D:\ProfessionalSoftWare\Neo4j\neo4j-community-3.4.1\bin
+λ neo4j-import --into D:/ProfessionalSoftWare/Neo4j/neo4j-community-3.4.1/data/databases/graph2.db --nodes D:/home/bonc/neo4j/node_uuid_10w.csv --relationships D:/home /bonc/neo4j/relathionship_uuid_10w.csv --trim-strings true --input-encoding UTF-8 --id-type String --stacktrace true --bad-tolerance 10000 --skip-bad-relationships true --skip-duplicate-nodes true
+警告: This command does not appear to be running with administrative rights.  Some commands may fail e.g. Start/Stop
+WARNING: neo4j-import is deprecated and support for it will be removed in a future
+version of Neo4j; please use neo4j-admin import instead.
+Neo4j version: 3.4.1
+Importing the contents of these files into D:\ProfessionalSoftWare\Neo4j\neo4j-community-3.4.1\data\databases\graph2.db:
+Nodes:
+  D:\home\bonc\neo4j\node_uuid_10w.csv
+Relationships:
+  D:\home\bonc\neo4j\relathionship_uuid_10w.csv
+
+Available resources:
+  Total machine memory: 7.95 GB
+  Free machine memory: 3.42 GB
+  Max heap memory : 1.77 GB
+  Processors: 4
+  Configured max memory: 5.56 GB
+  High-IO: false
+
+Import starting 2018-07-10 13:41:28.551+0800
+  Estimated number of nodes: 112.07 k
+  Estimated number of node properties: 224.14 k
+  Estimated number of relationships: 100.00 k
+  Estimated number of relationship properties: 0.00
+  Estimated disk space usage: 13.72 MB
+  Estimated required memory usage: 1021.42 MB
+
+InteractiveReporterInteractions command list (end with ENTER):
+  c: Print more detailed information about current stage
+  i: Print more detailed information
+
+(1/4) Node import 2018-07-10 13:41:28.669+0800
+  Estimated number of nodes: 112.07 k
+  Estimated disk space usage: 10.47 MB
+  Estimated required memory usage: 1021.42 MB
+.......... .......... .......... .......... .......... 5%
+.......... .......... .......... .......... .......... 10%
+.......... .......... .......... .......... .......... 15%
+.......... .......... .......... .......... .......... 20%
+.......... .......... .......... .......... .......... 25%
+.......... .......... .......... .......... .......... 30%
+.......... .......... .......... .......... .......... 35%
+.......... .......... .......... .......... .......... 40%
+.......... .......... .......... .......... .......... 45%
+.......... .......... .......... .......... .......... 50%
+.......... .......... .......... .......... .......... 55%
+.......... .......... .......... .......... .......... 60%
+.......... .......... .......... .......... .......... 65%
+.......... .......... .......... .......... .......... 70%
+.......... .......... .......... .......... .......... 75%
+.......... .......... .......... .......... .......... 80%
+.......... .......... .......... .......... .......... 85%
+.......... .......... .......... .......... .......... 90%
+.......... .......... .......... .......... .......... 95%
+.......... .......... .......... .......... .......... 100%
+
+(2/4) Relationship import 2018-07-10 13:41:30.376+0800
+  Estimated number of relationships: 100.00 k
+  Estimated disk space usage: 3.24 MB
+  Estimated required memory usage: 1.00 GB
+.......... .......... .......... .......... .......... 5%
+.......... .......... .......... .......... .......... 10%
+.......... .......... .......... .......... .......... 15%
+.......... .......... .......... .......... .......... 20%
+.......... .......... .......... .......... .......... 25%
+.......... .......... .......... .......... .......... 30%
+.......... .......... .......... .......... .......... 35%
+.......... .......... .......... .......... .......... 40%
+.......... .......... .......... .......... .......... 45%
+.......... .......... .......... .......... .......... 50%
+.......... .......... .......... .......... .......... 55%
+.......... .......... .......... .......... .......... 60%
+.......... .......... .......... .......... .......... 65%
+.......... .......... .......... .......... .......... 70%
+.......... .......... .......... .......... .......... 75%
+.......... .......... .......... .......... .......... 80%
+.......... .......... .......... .......... .......... 85%
+.......... .......... .......... .......... .......... 90%
+.......... .......... .......... .......... .......... 95%
+.......... .......... .......... .......... .......... 100%
+
+(3/4) Relationship linking 2018-07-10 13:41:30.787+0800
+  Estimated required memory usage: 1021.06 MB
+.......... .......... .......... .......... .......... 5%
+.......... .......... .......... .......... .......... 10%
+.......... .......... .......... .......... .......... 15%
+.......... .......... .......... .......... .......... 20%
+.......... .......... .......... .......... .......... 25%
+.......... .......... .......... .......... .......... 30%
+.......... .......... .......... .......... .......... 35%
+.......... .......... .......... .......... .......... 40%
+.......... .......... .......... .......... .......... 45%
+.......... .......... .......... .......... .......... 50%
+.......... .......... .......... .......... .......... 55%
+.......... .......... .......... .......... .......... 60%
+.......... .......... .......... .......... .......... 65%
+.......... .......... .......... .......... .......... 70%
+.......... .......... .......... .......... .......... 75%
+.......... .......... .......... .......... .......... 80%
+.......... .......... .......... .......... .......... 85%
+.......... .......... .......... .......... .......... 90%
+.......... .......... .......... .......... .......... 95%
+.......... .......... .......... .......... .......... 100%
+
+(4/4) Post processing 2018-07-10 13:41:31.445+0800
+  Estimated required memory usage: 1020.01 MB
+.......... .......... .......... .......... .......... 5%
+.......... .......... .......... .......... .......... 10%
+.......... .......... .......... .......... .......... 15%
+.......... .......... .......... .......... .......... 20%
+.......... .......... .......... .......... .......... 25%
+.......... .......... .......... .......... .......... 30%
+.......... .......... .......... .......... .......... 35%
+.......... .......... .......... .......... .......... 40%
+.......... .......... .......... .......... .......... 45%
+.......... .......... .......... .......... .......... 50%
+.......... .......... .......... .......... .......... 55%
+.......... .......... .......... .......... .......... 60%
+.......... .......... .......... .......... .......... 65%
+.......... .......... .......... .......... .......... 70%
+.......... .......... .......... .......... .......... 75%
+.......... .......... .......... .......... .......... 80%
+.......... .......... .......... .......... .......... 85%
+.......... .......... .......... .......... .......... 90%
+.......... .......... .......... .......... .......... 95%
+.......... .......... .......... .......... .......... 100%
+
+
+IMPORT DONE in 4s 585ms.
+Imported:
+  100000 nodes
+  100000 relationships
+  200000 properties
+Peak memory usage: 1.00 GB<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="其他测试"><a href="#其他测试" class="headerlink" title="其他测试"></a>其他测试</h1><h2 id="如果使用相对路径，导入后数据库在bin目录下"><a href="#如果使用相对路径，导入后数据库在bin目录下" class="headerlink" title="如果使用相对路径，导入后数据库在bin目录下"></a>如果使用相对路径，导入后数据库在bin目录下</h2><p><code>neo4j-import --into test.db  --id-type string  --nodes:Test C:/User/wdb/2017-04-06_test.csv  --stacktrace truektrace true</code></p>
+<h2 id="如果使用绝对路径，导入后数据库在指定目录下"><a href="#如果使用绝对路径，导入后数据库在指定目录下" class="headerlink" title="如果使用绝对路径，导入后数据库在指定目录下"></a>如果使用绝对路径，导入后数据库在指定目录下</h2><p><code>neo4j-import --into C:/ProfessionSofware/Neo4j/databases/test.db  --id-type string  --nodes:Test C:/User/wdb/2017-04-06_test.csv  --stacktrace truektrace true</code></p>
+<h2 id="2018-04-26-试验"><a href="#2018-04-26-试验" class="headerlink" title="2018-04-26 试验"></a>2018-04-26 试验</h2><p>winbdows 小数据测试<br><code>neo4j-import --into C:/ProfessionSofware/Neo4j/neo4j-community-3.1.0/data/databases/test_graph.db --nodes C:/tmp/neo4j/node.csv  --relationships C:/tmp/neo4j/relathionship.csv --trim-strings true --input-encoding UTF-8 --id-type INTEGER --stacktrace true --bad-tolerance 0 --skip-bad-relationships true --skip-duplicate-nodes false</code></p>
+<p>linux 实际导入1000w数据<br><code>neo4j-import --into /home/wkq/neo4j/neo4j-community-3.1.0/data/databases/test_10000000_graph.db --nodes /home/wkq/neo4j/node.csv  --relationships /home/wkq/neo4j/relathionship.csv --trim-strings true --input-encoding UTF-8 --id-type String --stacktrace true --bad-tolerance 0 --skip-bad-relationships true --skip-duplicate-nodes false </code></p>
+<h1 id="遇到的错误"><a href="#遇到的错误" class="headerlink" title="遇到的错误"></a>遇到的错误</h1><h2 id="1-39-nodes-39-to-have-at-least-1-valid-item-but-had-0"><a href="#1-39-nodes-39-to-have-at-least-1-valid-item-but-had-0" class="headerlink" title="(1) &#39;--nodes&#39; to have at least 1 valid item, but had 0 []"></a>(1) <code>&#39;--nodes&#39; to have at least 1 valid item, but had 0 []</code></h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">C:\ProfessionSofware\Neo4j\neo4j-community-3.1.2\bin>neo4j-import -into test.db  --id-type string  --nodes [:Customer] customers.csv
+警告: This command does not appear to be running with administrative rights.  Some commands may fail e.g. Start/Stop
+WARNING: neo4j-import is deprecated and support for it will be removed in a future
+version of Neo4j; please use neo4j-admin import instead.
+
+Input error: Expected '--nodes' to have at least 1 valid item, but had 0 []
+Caused by:Expected '--nodes' to have at least 1 valid item, but had 0 []
+java.lang.IllegalArgumentException: Expected '--nodes' to have at least 1 valid item, but had 0 []
+        at org.neo4j.kernel.impl.util.Validators.lambda$atLeast$6(Validators.java:125)
+        at org.neo4j.helpers.Args.validated(Args.java:640)
+        at org.neo4j.helpers.Args.interpretOptionsWithMetadata(Args.java:608)
+        at org.neo4j.tooling.ImportTool.extractInputFiles(ImportTool.java:503)
+        at org.neo4j.tooling.ImportTool.main(ImportTool.java:388)
+        at org.neo4j.tooling.ImportTool.main(ImportTool.java:334)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<ol>
+<li>文件头有问题，检查nodes.csv的文件头是否有<code>:ID</code>，relathionship.csv的文件头是否有 <code>:START_ID,:END_ID,:TYPE</code></li>
+<li><code>--nodes</code> 后面的参数有问题，<code>--nodes</code> 直接跟 csv路径 或者 <code>:Label csv绝对路径</code></li>
+<li>仔细检查路径，看路径是否写错，linux和windows路径统一用<code>/</code>作为目录</li>
+</ol>
+<h2 id="2-Error-in-input-data-ERROR-in-input"><a href="#2-Error-in-input-data-ERROR-in-input" class="headerlink" title="(2) Error in input data  ERROR in input"></a>(2) Error in input data  ERROR in input</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">C:\ProfessionSofware\Neo4j\neo4j-community-3.1.2\bin>neo4j-import -into test.db  --id-type string  --nodes:Test C:/User/wdb/2017-04-06_test.csv  --stacktrace truektrace true  --skip-duplicate-nodes true
+警告: This command does not appear to be running with administrative rights.  Some commands may fail e.g. Start/Stop
+WARNING: neo4j-import is deprecated and support for it will be removed in a future
+version of Neo4j; please use neo4j-admin import instead.
+
+Neo4j version: 3.1.2
+Importing the contents of these files into test.db:
+Nodes:
+  :Test
+  C:\User\wdb\2017-04-06_test.csv
+
+Available resources:
+  Free machine memory: 3.74 GB
+  Max heap memory : 1.77 GB
+  Processors: 4
+
+Nodes
+Error in input data
+Caused by:ERROR in input
+  data source: BufferedCharSeeker[source:C:\User\wdb\2017-04-06_test.csv, position:654, line:11]
+  in field: mobile:int:6
+  for header: [dep:string, uid:int, name:string, tel:int, fax:string, mobile:int, email:string, id:string]
+  raw field value: 13900001234
+  original error: Not supported a.t.m<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>csv文件的数据有问题，最后把tel的类型换成string解决了</p>
+<h1 id="neo4j-import命令中的参数"><a href="#neo4j-import命令中的参数" class="headerlink" title="neo4j-import命令中的参数"></a>neo4j-import命令中的参数</h1><pre class="line-numbers language-text" data-language="text"><code class="language-text">// 要导入的数据库存放位置，必须是空库
+--into &lt;store-dir>
+
+// 要导入的数据库
+--database &lt;database-name>
+
+// 节点文件，包含头和数据，第一个文件第一行必须是头，多个文件在逻辑上视为一个大文件，文件组必须用引号括起来
+--nodes[:Label1:Label2] "&lt;file1>,&lt;file2>,..."
+
+// 关系文件，包含头和数据，多个文件在逻辑上视为一个大文件，文件组必须用引号括起来
+--relationships[:RELATIONSHIP_TYPE] "&lt;file1>,&lt;file2>,..."
+
+// 数据分隔符，默认是逗号
+--delimiter &lt;delimiter-character>
+
+// 数组分隔符，默认是分号
+--array-delimiter &lt;array-delimiter-character>
+
+// 引用字符 注意转义
+--quote &lt;quotation-character>
+
+// 输入源中的字段是否可以跨越多行，即包含换行符。默认值：false
+--multiline-fields &lt;true/false>
+
+//  是否应该修剪空白字符串。默认值：false
+--trim-strings &lt;true/false>
+
+// csv文件编码，推荐使用UTF-8
+--input-encoding &lt;character set>
+
+// 忽略空字符串，默认是false
+--ignore-empty-strings &lt;true/false>
+
+// id类型，integer string actual, integer会比较快，string比较通用
+--id-type &lt;id-type>
+
+// 最大处理器数量，为了达到最佳性能，这个值不应该大于可用处理器的数量。
+--processors &lt;max processor count>
+
+// 启用错误堆栈跟踪的打印。默认值：false
+--stacktrace &lt;true/false>
+
+// 导入前的错误条目数被视为失败。这种宽容阈值是关于引用缺失节点的关系。格式化错误 输入数据仍被视为错误。默认值：1000
+--bad-tolerance &lt;max number of bad entries>
+
+// 是否跳过导入缺少节点ID的关系，即引用未指定节点的开始或结束节点ID /组 由节点输入数据。跳过的节点将被记录，最多包含数字 由不良容忍指定的实体。默认值：true
+--skip-bad-relationships &lt;true/false>
+
+// 是否跳过导入具有相同ID /组的节点。在事件中在同一组内的多个节点具有相同的ID，第一个遇到的将被导入，而连续的这样的节点将被跳过。跳过的节点将被记录，最多包含由指定的实体数量坏容忍。默认值：false
+--skip-duplicate-nodes &lt;true/false>
+
+// 是否忽略未由标题指定的数据中的额外列。默认值：false
+--ignore-extra-columns &lt;true/false>
+
+// 指定数据库特定配置的文件。
+--db-config
+
+// 指定数据库特定配置的文件
+--additional-config
+
+
+// 页面大小（以字节为单位）
+--page-size
+
+Example:
+        bin/neo4j-import --into retail.db --id-type string --nodes:Customer customers.csv
+        --nodes products.csv --nodes orders_header.csv,orders1.csv,orders2.csv
+        --relationships:CONTAINS order_details.csv
+        --relationships:ORDERED customer_orders_header.csv,orders1.csv,orders2.csv<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="neo4j-3-1-2-neo4j-import-help"><a href="#neo4j-3-1-2-neo4j-import-help" class="headerlink" title="neo4j-3.1.2 neo4j-import help"></a>neo4j-3.1.2 neo4j-import help</h1><pre class="line-numbers language-text" data-language="text"><code class="language-text">C:\ProfessionSofware\Neo4j\neo4j-community-3.1.2\bin
+λ neo4j-import
+WARNING: neo4j-import is deprecated and support for it will be removed in a future
+version of Neo4j; please use neo4j-admin import instead.
+
+Neo4j Import Tool
+        neo4j-import is used to create a new Neo4j database from data in CSV files. See
+        the chapter "Import Tool" in the Neo4j Manual for details on the CSV file format
+        - a special kind of header is required.
+Usage:
+--into &lt;store-dir>
+        Database directory to import into. Must not contain existing database.
+--database &lt;database-name>
+        Database name to import into. Must not contain existing database.
+--nodes[:Label1:Label2] "&lt;file1>,&lt;file2>,..."
+        Node CSV header and data. Multiple files will be logically seen as one big file
+        from the perspective of the importer. The first line must contain the header.
+        Multiple data sources like these can be specified in one import, where each data
+        source has its own header. Note that file groups must be enclosed in quotation
+        marks.
+--relationships[:RELATIONSHIP_TYPE] "&lt;file1>,&lt;file2>,..."
+        Relationship CSV header and data. Multiple files will be logically seen as one
+        big file from the perspective of the importer. The first line must contain the
+        header. Multiple data sources like these can be specified in one import, where
+        each data source has its own header. Note that file groups must be enclosed in
+        quotation marks.
+--delimiter &lt;delimiter-character>
+        Delimiter character, or 'TAB', between values in CSV data. The default option is
+        ,.
+--array-delimiter &lt;array-delimiter-character>
+        Delimiter character, or 'TAB', between array elements within a value in CSV
+        data. The default option is ;.
+--quote &lt;quotation-character>
+        Character to treat as quotation character for values in CSV data. The default
+        option is ". Quotes inside quotes escaped like """Go away"", he said." and "\"Go
+        away\", he said." are supported. If you have set "'" to be used as the quotation
+        character, you could write the previous example like this instead: '"Go away",
+        he said.'
+--multiline-fields &lt;true/false>
+        Whether or not fields from input source can span multiple lines, i.e. contain
+        newline characters. Default value: false
+--trim-strings &lt;true/false>
+        Whether or not strings should be trimmed for whitespaces. Default value: false
+--input-encoding &lt;character set>
+        Character set that input data is encoded in. Provided value must be one out of
+        the available character sets in the JVM, as provided by
+        Charset#availableCharsets(). If no input encoding is provided, the default
+        character set of the JVM will be used.
+--ignore-empty-strings &lt;true/false>
+        Whether or not empty string fields, i.e. "" from input source are ignored, i.e.
+        treated as null. Default value: false
+--id-type &lt;id-type>
+        One out of [STRING, INTEGER, ACTUAL] and specifies how ids in node/relationship
+        input files are treated.
+        STRING: arbitrary strings for identifying nodes.
+        INTEGER: arbitrary integer values for identifying nodes.
+        ACTUAL: (advanced) actual node ids. The default option is STRING. Default value:
+        STRING
+--processors &lt;max processor count>
+        (advanced) Max number of processors used by the importer. Defaults to the number
+        of available processors reported by the JVM (in your case 4). There is a certain
+        amount of minimum threads needed so for that reason there is no lower bound for
+        this value. For optimal performance this value shouldn't be greater than the
+        number of available processors.
+--stacktrace &lt;true/false>
+        Enable printing of error stack traces. Default value: false
+--bad-tolerance &lt;max number of bad entries>
+        Number of bad entries before the import is considered failed. This tolerance
+        threshold is about relationships refering to missing nodes. Format errors in
+        input data are still treated as errors. Default value: 1000
+--skip-bad-relationships &lt;true/false>
+        Whether or not to skip importing relationships that refers to missing node ids,
+        i.e. either start or end node id/group referring to node that wasn't specified
+        by the node input data. Skipped nodes will be logged, containing at most number
+        of entites specified by bad-tolerance. Default value: true
+--skip-duplicate-nodes &lt;true/false>
+        Whether or not to skip importing nodes that have the same id/group. In the event
+        of multiple nodes within the same group having the same id, the first
+        encountered will be imported whereas consecutive such nodes will be skipped.
+        Skipped nodes will be logged, containing at most number of entities specified by
+        bad-tolerance. Default value: false
+--ignore-extra-columns &lt;true/false>
+        Whether or not to ignore extra columns in the data not specified by the header.
+        Skipped columns will be logged, containing at most number of entities specified
+        by bad-tolerance. Default value: false
+--db-config &lt;path/to/neo4j.conf>
+        (advanced) File specifying database-specific configuration. For more information
+        consult manual about available configuration options for a neo4j configuration
+        file. Only configuration affecting store at time of creation will be read.
+        Examples of supported config are:
+        dbms.relationship_grouping_threshold
+        unsupported.dbms.block_size.strings
+        unsupported.dbms.block_size.array_properties
+--additional-config &lt;path/to/neo4j.conf>
+        (advanced) File specifying database-specific configuration. For more information
+        consult manual about available configuration options for a neo4j configuration
+        file. Only configuration affecting store at time of creation will be read.
+        Examples of supported config are:
+        dbms.relationship_grouping_threshold
+        unsupported.dbms.block_size.strings
+        unsupported.dbms.block_size.array_properties
+--legacy-style-quoting &lt;true/false>
+        Whether or not backslash-escaped quote e.g. \" is interpreted as inner quote.
+        Default value: true
+Example:
+        bin/neo4j-import --into retail.db --id-type string --nodes:Customer customers.csv
+        --nodes products.csv --nodes orders_header.csv,orders1.csv,orders2.csv
+        --relationships:CONTAINS order_details.csv
+        --relationships:ORDERED customer_orders_header.csv,orders1.csv,orders2.csv
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<h1 id="官方文档-10-1-Import"><a href="#官方文档-10-1-Import" class="headerlink" title="官方文档 10.1. Import"></a>官方文档 10.1. Import</h1><p>This chapter covers importing data into Neo4j.</p>
+<p>The import tool is used to create a new Neo4j database from data in CSV files.</p>
+<p>This chapter explains how to use the tool and format the input data. For in-depth examples of using the import tool, see Section B.4, “Use the Import tool”.</p>
+<p>These are some things you will need to keep in mind when creating your input files:</p>
+<pre><code>Fields are comma separated by default but a different delimiter can be specified.
+All files must use the same delimiter.
+Multiple data sources can be used for both nodes and relationships.
+A data source can optionally be provided using multiple files.
+A header which provides information on the data fields must be on the first row of each data source.
+Fields without corresponding information in the header will not be read.
+UTF-8 encoding is used.
+</code></pre>
+<p>Indexes are not created during the import. Instead, you will need to add indexes afterwards (see Developer Manual → Indexes).</p>
+<p>Data cannot be imported into an existing database using this tool. If you want to load small to medium sized CSV files use LOAD CSV (see Developer Manual → LOAD CSV).</p>
+<p>10.1.1. CSV file header format</p>
+<p>This section explains the header format of CSV files when using the Neo4j import tool.</p>
+<p>The header row of each data source specifies how the fields should be interpreted. The same delimiter is used for the header row as for the rest of the data.</p>
+<p>The header contains information for each field, with the format: <name>:<field_type>. The <name> is used as the property key for values, and ignored in other cases. The following <field_type> settings can be used for both nodes and relationships:</p>
+<p>Property value<br>    Use one of int, long, float, double, boolean, byte, short, char, string to designate the data type. If no data type is given, this defaults to string. To define an array type, append [] to the type. By default, array values are separated by ;. A different delimiter can be specified with –array-delimiter.<br>IGNORE<br>    Ignore this field completely.</p>
+<p>See below for the specifics of node and relationship data source headers.</p>
+<p>10.1.1.1. Nodes</p>
+<p>The following field types do additionally apply to node data sources:</p>
+<p>ID<br>    Each node must have a unique id which is used during the import. The ids are used to find the correct nodes when creating relationships. Note that the id has to be unique across all nodes in the import, even nodes with different labels.<br>LABEL<br>    Read one or more labels from this field. Like array values, multiple labels are separated by ;, or by the character specified with –array-delimiter.</p>
+<p>10.1.1.2. Relationships</p>
+<p>For relationship data sources, there are three mandatory fields:</p>
+<p>TYPE<br>    The relationship type to use for the relationship.<br>START_ID<br>    The id of the start node of the relationship to create.<br>END_ID<br>    The id of the end node of the relationship to create.</p>
+<p>10.1.1.3. ID spaces</p>
+<p>The import tool assumes that node identifiers are unique across node files. If this is not the case then we can define an id space. Id spaces are defined in the ID field of node files.</p>
+<p>For example, to specify the Person id space we would use the field type ID(Person) in our persons node file. We also need to reference that id space in our relationships file i.e. START_ID(Person) or END_ID(Person).</p>
+<p>10.1.2. Command line usage</p>
+<p>This section covers how to use the Neo4j import tool from the command line.</p>
+<p>10.1.2.1. Linux</p>
+<p>Under Unix/Linux/OSX, the command is named neo4j-import. Depending on the installation type, the tool is either available globally, or used by executing ./bin/neo4j-import from inside the installation directory.<br>10.1.2.2. Windows</p>
+<p>Under Windows, used by executing bin\neo4j-import from inside the installation directory.</p>
+<p>For help with running the import tool under Windows, see the reference in Windows.<br>10.1.2.3. Options</p>
+<p>–into <store-dir><br>    Database directory to import into. Must not contain existing database.</p>
+<p>–nodes[:Label1:Label2] “<file1>,<file2>,…​”<br>    Node CSV header and data. Multiple files will be logically seen as one big file from the perspective of the importer. The first line must contain the header. Multiple data sources like these can be specified in one import, where each data source has its own header. Note that file groups must be enclosed in quotation marks.</p>
+<p>–relationships[:RELATIONSHIP_TYPE] “<file1>,<file2>,…​”<br>    Relationship CSV header and data. Multiple files will be logically seen as one big file from the perspective of the importer. The first line must contain the header. Multiple data sources like these can be specified in one import, where each data source has its own header. Note that file groups must be enclosed in quotation marks.</p>
+<p>–delimiter <delimiter-character><br>    Delimiter character, or TAB, between values in CSV data. The default option is ,.</p>
+<p>–array-delimiter <array-delimiter-character><br>    Delimiter character, or TAB, between array elements within a value in CSV data. The default option is ;.</p>
+<p>–quote <quotation-character><br>    Character to treat as quotation character for values in CSV data. The default option is “. Quotes inside quotes escaped like “””Go away””, he said.” and “&quot;Go away&quot;, he said.” are supported. If you have set ‘ to be used as the quotation character, you could write the previous example like this instead: ‘“Go away”, he said.’</p>
+<p>–multiline-fields &lt;true/false&gt;<br>    Whether or not fields from input source can span multiple lines, i.e. contain newline characters. Default value: false</p>
+<p>–input-encoding <character set><br>    Character set that input data is encoded in. Provided value must be one out of the available character sets in the JVM, as provided by Charset#availableCharsets(). If no input encoding is provided, the default character set of the JVM will be used.</p>
+<p>–ignore-empty-strings &lt;true/false&gt;<br>    Whether or not empty string fields (“”) from input source are ignored, i.e. treated as null. Default value: false</p>
+<p>–id-type <id-type><br>    One out of [STRING, INTEGER, ACTUAL] and specifies how ids in node/relationship input files are treated. STRING: arbitrary strings for identifying nodes. INTEGER: arbitrary integer values for identifying nodes. ACTUAL: (advanced) actual node ids. Default value: STRING</p>
+<p>–processors <max processor count><br>    (advanced) Max number of processors used by the importer. Defaults to the number of available processors reported by the JVM. There is a certain amount of minimum threads needed so for that reason there is no lower bound for this value. For optimal performance this value shouldn’t be greater than the number of available processors.</p>
+<p>–stacktrace &lt;true/false&gt;<br>    Enable printing of error stack traces.</p>
+<p>–bad-tolerance <max number of bad entries><br>    Number of bad entries before the import is considered failed. This tolerance threshold is about relationships referring to missing nodes. Format errors in input data are still treated as errors. Default value: 1000</p>
+<p>–skip-bad-relationships &lt;true/false&gt;<br>    Whether or not to skip importing relationships that refers to missing node ids, i.e. either start or end node id/group referring to node that wasn’t specified by the node input data. Skipped nodes will be logged, containing at most number of entities specified by bad-tolerance. Default value: true</p>
+<p>–skip-duplicate-nodes &lt;true/false&gt;<br>    Whether or not to skip importing nodes that have the same id/group. In the event of multiple nodes within the same group having the same id, the first encountered will be imported whereas consecutive such nodes will be skipped. Skipped nodes will be logged, containing at most number of entities specified by bad-tolerance. Default value: false</p>
+<p>–ignore-extra-columns &lt;true/false&gt;<br>    Whether or not to ignore extra columns in the data not specified by the header. Skipped columns will be logged, containing at most number of entities specified by bad-tolerance. Default value: false</p>
+<p>–db-config &lt;path/to/neo4j.conf&gt;</p>
+<pre><code>(advanced) File specifying database-specific configuration. For more information consult manual about available configuration options for a neo4j configuration file. Only configuration affecting store at time of creation will be read. Examples of supported config are:
+
+    dbms.relationship_grouping_threshold
+    unsupported.dbms.block_size.strings
+    unsupported.dbms.block_size.array_properties
+</code></pre>
+<p>10.1.2.4. Verbose error information</p>
+<p>In some cases if an unexpected error occurs it might be useful to supply the command line option –stacktrace to the import (and rerun the import to actually see the additional information). This will have the error printed with additional debug information, useful for both developers and issue reporting.</p>
+<p>10.1.2.5. Output and statistics</p>
+<p>While an import is running through its different stages, some statistics and figures are printed in the console. The general interpretation of that output is to look at the horizontal line, which is divided up into sections, each section representing one type of work going on in parallel with the other sections. The wider a section is, the more time is spent there relative to the other sections, the widest being the bottleneck, also marked with *. If a section has a double line, instead of just a single line, it means that multiple threads are executing the work in that section. To the far right a number is displayed telling how many entities (nodes or relationships) have been processed by that stage.</p>
+<p>As an example:</p>
+<p>[*&gt;:20,25 MB/s——————|PREPARE(3)====================|RELATIONSHIP(2)===============] 16M</p>
+<p>Would be interpreted as:</p>
+<pre><code>&gt; data being read, and perhaps parsed, at 20,25 MB/s, data that is being passed on to …​
+PREPARE preparing the data for …​
+RELATIONSHIP creating actual relationship records and …​
+v writing the relationships to the store. This step is not visible in this example, because it is so cheap compared to the other sections.
+</code></pre>
+<p>Observing the section sizes can give hints about where performance can be improved. In the example above, the bottleneck is the data read section (marked with &gt;), which might indicate that the disk is being slow, or is poorly handling simultaneous read and write operations (since the last section often revolves around writing to disk).</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://neo4j.com/developer/guide-import-csv/">https://neo4j.com/developer/guide-import-csv/</a><br>[2] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/operations-manual/current/tools/import/">http://neo4j.com/docs/operations-manual/current/tools/import/</a><br>[3] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/operations-manual/current/tools/import/command-line-usage/">http://neo4j.com/docs/operations-manual/current/tools/import/command-line-usage/</a><br>[4] <a target="_blank" rel="noopener" href="http://neo4j.com/docs/operations-manual/current/tutorial/import-tool/">http://neo4j.com/docs/operations-manual/current/tutorial/import-tool/</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/neo4j/" rel="tag"># neo4j</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/04/11/neo4j-load-csv/" rel="prev" title="neo4j 使用 官方 ETL load-csv 导入 数据">
+                  <i class="fa fa-chevron-left"></i> neo4j 使用 官方 ETL load-csv 导入 数据
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/04/14/java-arraylist-source-code-learning/" rel="next" title="Java 集合 ArrayList 源码 学习 (JDK-1.8)">
+                  Java 集合 ArrayList 源码 学习 (JDK-1.8) <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

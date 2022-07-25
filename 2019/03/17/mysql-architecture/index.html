@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="转自  01 | 基础架构：一条SQL查询语句是如何执行的？ - MySQL实战45讲  02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲   问大家一个问题。SELECT * FROM t WHERE id &#x3D; 1 ; 以及  UPDATE t set c &#x3D; 2 where id &#x3D; 1 ; 这两个语句是怎么执行的。 假设表结构是 CREATE TABLE &#96;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="mysql 架构 及 语句执行流程">
+<meta property="og:url" content="http://weikeqin.com/2019/03/17/mysql-architecture/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="转自  01 | 基础架构：一条SQL查询语句是如何执行的？ - MySQL实战45讲  02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲   问大家一个问题。SELECT * FROM t WHERE id &#x3D; 1 ; 以及  UPDATE t set c &#x3D; 2 where id &#x3D; 1 ; 这两个语句是怎么执行的。 假设表结构是 CREATE TABLE &#96;">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/mysql/mysql-architecture.png">
+<meta property="article:published_time" content="2019-03-17T02:44:49.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.248Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="mysql">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/mysql/mysql-architecture.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2019/03/17/mysql-architecture/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2019/03/17/mysql-architecture/","path":"2019/03/17/mysql-architecture/","title":"mysql 架构 及 语句执行流程"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>mysql 架构 及 语句执行流程 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E8%BF%9E%E6%8E%A5%E5%99%A8"><span class="nav-number">1.</span> <span class="nav-text">(1)　连接器</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E6%9F%A5%E8%AF%A2%E7%BC%93%E5%AD%98"><span class="nav-number">2.</span> <span class="nav-text">(2) 查询缓存</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%88%86%E6%9E%90%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">(3) 分析器</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%BC%98%E5%8C%96%E5%99%A8"><span class="nav-number">4.</span> <span class="nav-text">(4) 优化器</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%89%A7%E8%A1%8C%E5%99%A8"><span class="nav-number">5.</span> <span class="nav-text">(5) 执行器</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E6%89%A7%E8%A1%8C%E4%B8%80%E6%9D%A1%E6%9F%A5%E8%AF%A2%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%B5%81%E7%A8%8B"><span class="nav-number">6.</span> <span class="nav-text">(6) 执行一条查询语句的流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E6%9B%B4%E6%96%B0%E4%B8%80%E6%9D%A1%E8%AF%AD%E5%8F%A5%E7%9A%84%E6%B5%81%E7%A8%8B"><span class="nav-number">7.</span> <span class="nav-text">(7) 更新一条语句的流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#8-%E7%89%9B%E5%88%80%E5%B0%8F%E8%AF%95"><span class="nav-number">8.</span> <span class="nav-text">(8) 牛刀小试</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#8-1-%E9%9D%A2%E8%AF%95%E9%A2%98"><span class="nav-number">8.1.</span> <span class="nav-text">(8.1) 面试题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-2-%E5%A6%82%E6%9E%9C%E8%A1%A8-T-%E4%B8%AD%E6%B2%A1%E6%9C%89%E5%AD%97%E6%AE%B5-k%EF%BC%8C%E8%80%8C%E4%BD%A0%E6%89%A7%E8%A1%8C%E4%BA%86%E8%BF%99%E4%B8%AA%E8%AF%AD%E5%8F%A5-select-from-T-where-k-1-%E9%82%A3%E8%82%AF%E5%AE%9A%E6%98%AF%E4%BC%9A%E6%8A%A5%E2%80%9C%E4%B8%8D%E5%AD%98%E5%9C%A8%E8%BF%99%E4%B8%AA%E5%88%97%E2%80%9D%E7%9A%84%E9%94%99%E8%AF%AF%EF%BC%9A-%E2%80%9CUnknown-column-%E2%80%98k%E2%80%99-in-%E2%80%98where-clause%E2%80%99%E2%80%9D%E3%80%82%E4%BD%A0%E8%A7%89%E5%BE%97%E8%BF%99%E4%B8%AA%E9%94%99%E8%AF%AF%E6%98%AF%E5%9C%A8%E6%88%91%E4%BB%AC%E4%B8%8A%E9%9D%A2%E6%8F%90%E5%88%B0%E7%9A%84%E5%93%AA%E4%B8%AA%E9%98%B6%E6%AE%B5%E6%8A%A5%E5%87%BA%E6%9D%A5%E7%9A%84%E5%91%A2%EF%BC%9F"><span class="nav-number">8.2.</span> <span class="nav-text">(8.2) 如果表 T 中没有字段 k，而你执行了这个语句 select * from T where k&#x3D;1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-3-%E5%90%84%E4%B8%AA%E6%A8%A1%E5%9D%97%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">8.3.</span> <span class="nav-text">(8.3) 各个模块的功能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-4-%E5%8A%A8%E7%94%BB%E6%8F%8F%E8%BF%B0%E5%90%84%E4%B8%AA%E6%A8%A1%E5%9D%97%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">8.4.</span> <span class="nav-text">(8.4) 动画描述各个模块的功能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-5-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%AF%B9%E6%9D%83%E9%99%90%E7%9A%84%E6%A3%80%E6%9F%A5%E4%B8%8D%E5%9C%A8%E4%BC%98%E5%8C%96%E5%99%A8%E4%B9%8B%E5%89%8D%E5%81%9A%EF%BC%9F"><span class="nav-number">8.5.</span> <span class="nav-text">(8.5) 为什么对权限的检查不在优化器之前做？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-6-%E5%9C%A8%E4%BB%80%E4%B9%88%E5%9C%BA%E6%99%AF%E4%B8%8B%EF%BC%8C%E4%B8%80%E5%A4%A9%E4%B8%80%E5%A4%87%E4%BC%9A%E6%AF%94%E4%B8%80%E5%91%A8%E4%B8%80%E5%A4%87%E6%9B%B4%E6%9C%89%E4%BC%98%E5%8A%BF%E5%91%A2%EF%BC%9F%E6%88%96%E8%80%85%E8%AF%B4%EF%BC%8C%E5%AE%83%E5%BD%B1%E5%93%8D%E4%BA%86%E8%BF%99%E4%B8%AA%E6%95%B0%E6%8D%AE%E5%BA%93%E7%B3%BB%E7%BB%9F%E7%9A%84%E5%93%AA%E4%B8%AA%E6%8C%87%E6%A0%87%EF%BC%9F"><span class="nav-number">8.6.</span> <span class="nav-text">(8.6) 在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-7-%E5%81%87%E5%A6%82%E8%A6%81%E6%8F%92%E5%85%A510%E4%B8%87%E6%9D%A1%E6%95%B0%E6%8D%AE%EF%BC%8C%E6%80%8E%E4%B9%88%E5%86%99%E6%8F%92%E5%85%A5%E8%AF%AD%E5%8F%A5%E6%AF%94%E8%BE%83%E5%A5%BD"><span class="nav-number">8.7.</span> <span class="nav-text">(8.7) 假如要插入10万条数据，怎么写插入语句比较好</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-8-%E5%81%87%E5%A6%82%E8%A6%81%E6%9B%B4%E6%96%B010%E4%B8%87%E6%9D%A1%E6%95%B0%E6%8D%AE%EF%BC%8C%E6%80%8E%E4%B9%88%E5%86%99%E6%8F%92%E5%85%A5%E8%AF%AD%E5%8F%A5%E6%AF%94%E8%BE%83%E5%A5%BD"><span class="nav-number">8.8.</span> <span class="nav-text">(8.8) 假如要更新10万条数据，怎么写插入语句比较好</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-9-%E8%AF%A6%E7%BB%86%E7%9A%84%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B"><span class="nav-number">8.9.</span> <span class="nav-text">(8.9) 详细的执行过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-10-%E5%86%99redo%E6%97%A5%E5%BF%97%E4%B9%9F%E6%98%AF%E5%86%99io%EF%BC%88%E6%88%91%E7%90%86%E8%A7%A3%E4%B9%9F%E6%98%AF%E5%A4%96%E9%83%A8%E5%AD%98%E5%82%A8%EF%BC%89%E3%80%82%E5%90%8C%E6%A0%B7%E8%80%97%E8%B4%B9%E6%80%A7%E8%83%BD%E3%80%82%E6%80%8E%E4%B9%88%E8%83%BD%E5%81%9A%E5%88%B0%E4%BC%98%E5%8C%96%E5%91%A2"><span class="nav-number">8.10.</span> <span class="nav-text">(8.10) 写redo日志也是写io（我理解也是外部存储）。同样耗费性能。怎么能做到优化呢</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-11-redo-log%E6%98%AF%E4%B8%BA%E4%BA%86%E5%BF%AB%E9%80%9F%E5%93%8D%E5%BA%94SQL%E5%85%85%E5%BD%93%E4%BA%86%E7%B2%89%E6%9D%BF"><span class="nav-number">8.11.</span> <span class="nav-text">(8.11) redo log是为了快速响应SQL充当了粉板</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-12-binlog%E4%B8%BA%E4%BB%80%E4%B9%88%E8%AF%B4%E6%98%AF%E9%80%BB%E8%BE%91%E6%97%A5%E5%BF%97%E5%91%A2%EF%BC%9F%E5%AE%83%E9%87%8C%E9%9D%A2%E6%9C%89%E5%86%85%E5%AE%B9%E4%B9%9F%E4%BC%9A%E5%AD%98%E5%82%A8%E6%88%90%E7%89%A9%E7%90%86%E6%96%87%E4%BB%B6%EF%BC%8C%E6%80%8E%E4%B9%88%E8%AF%B4%E6%98%AF%E9%80%BB%E8%BE%91%E8%80%8C%E4%B8%8D%E6%98%AF%E7%89%A9%E7%90%86"><span class="nav-number">8.12.</span> <span class="nav-text">(8.12) binlog为什么说是逻辑日志呢？它里面有内容也会存储成物理文件，怎么说是逻辑而不是物理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-13-redo-log-%E5%92%8C-bin-log-%E6%98%AF%E5%90%A6%E9%87%8D%E5%A4%8D"><span class="nav-number">8.13.</span> <span class="nav-text">(8.13) redo log 和 bin log 是否重复</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-14"><span class="nav-number">8.14.</span> <span class="nav-text">(8.14)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-15"><span class="nav-number">8.15.</span> <span class="nav-text">(8.15)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-16"><span class="nav-number">8.16.</span> <span class="nav-text">(8.16)</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">9.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/17/mysql-architecture/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          mysql 架构 及 语句执行流程
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-03-17 10:44:49" itemprop="dateCreated datePublished" datetime="2019-03-17T10:44:49+08:00">2019-03-17</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2019/03/17/mysql-architecture/" class="post-meta-item leancloud_visitors" data-flag-title="mysql 架构 及 语句执行流程" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  转自<br>  <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68319">01 | 基础架构：一条SQL查询语句是如何执行的？ - MySQL实战45讲</a><br>  <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲</a></p>
+<p>  问大家一个问题。<code>SELECT * FROM t WHERE id = 1 ;</code> 以及 <code> UPDATE t set c = 2 where id = 1 ;</code> 这两个语句是怎么执行的。</p>
+<p>假设表结构是</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>t<span class="token punctuation">`</span></span> <span class="token punctuation">(</span>
+  <span class="token identifier"><span class="token punctuation">`</span>id<span class="token punctuation">`</span></span> <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span><span class="token punctuation">,</span>
+  <span class="token identifier"><span class="token punctuation">`</span>c<span class="token punctuation">`</span></span> <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span> <span class="token keyword">DEFAULT</span> <span class="token boolean">NULL</span><span class="token punctuation">,</span>
+  <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span><span class="token identifier"><span class="token punctuation">`</span>id<span class="token punctuation">`</span></span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span> <span class="token keyword">ENGINE</span><span class="token operator">=</span><span class="token keyword">InnoDB</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  <img src="/img/database/mysql/mysql-architecture.png" alt="MySQL逻辑架构"></p>
+<p>  大体来说，MySQL 可以分为 Server 层和存储引擎层两部分。</p>
+<p>  第一层是连接处理、授权认证、安全等。这是大多数基于网络的客户端/服务器的工具或者服务都有的架构。</p>
+<p>  第二层是 Server 层，包括连接器、查询缓存、分析器、优化器、执行器等，涵盖 MySQL 的大多数核心服务功能，以及所有的内置函数（如日期、时间、数学和加密函数等），所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等。</p>
+<p>  第三层是 存储引擎层，负责数据的存储和提取。每个存储引擎都有它的优势和劣势。服务器通过API与存储引擎层通信。其架构模式是插件式的，支持 InnoDB、MyISAM、Memory 等多个存储引擎。现在最常用的存储引擎是 InnoDB，它从 MySQL 5.5.5 版本开始成为了默认存储引擎。</p>
+<span id="more"></span>
+
+<h1 id="1-连接器"><a href="#1-连接器" class="headerlink" title="(1)　连接器"></a>(1)　连接器</h1><p>  第一步，你会先连接到这个数据库上，这时候接待你的就是连接器。连接器负责跟客户端建立连接、获取权限、维持和管理连接。连接命令一般是这么写的：</p>
+<p>  <code>mysql -h $ip -P $port -u $user -p</code></p>
+<p>  连接命令中的 mysql 是客户端工具，用来跟服务端建立连接。在完成经典的 TCP 握手后，连接器就要开始认证你的身份，这个时候用的就是你输入的用户名和密码。</p>
+<p>  如果用户名或密码不对，你就会收到一个”Access denied for user”的错误，然后客户端程序结束执行。</p>
+<p>  如果用户名密码认证通过，连接器会到权限表里面查出你拥有的权限。之后，这个连接里面的权限判断逻辑，都将依赖于此时读到的权限。</p>
+<p>  这就意味着，一个用户成功建立连接后，即使你用管理员账号对这个用户的权限做了修改，也不会影响已经存在连接的权限。修改完成后，只有再新建的连接才会使用新的权限设置。</p>
+<p>  连接完成后，如果你没有后续的动作，这个连接就处于空闲状态，你可以在 <code>show processlist</code> 命令中看到它。其中的 Command 列显示为“Sleep”的这一行，就表示现在系统里面有一个空闲连接。</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">show</span> processlist <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-----------------+------+---------+------+--------------------------+------------------+----------+</span>
+<span class="token operator">|</span> Id <span class="token operator">|</span> <span class="token keyword">User</span>        <span class="token operator">|</span> Host            <span class="token operator">|</span> db   <span class="token operator">|</span> Command <span class="token operator">|</span> <span class="token keyword">Time</span> <span class="token operator">|</span> State                    <span class="token operator">|</span> Info             <span class="token operator">|</span> Progress <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-----------------+------+---------+------+--------------------------+------------------+----------+</span>
+<span class="token operator">|</span>  <span class="token number">1</span> <span class="token operator">|</span> system <span class="token keyword">user</span> <span class="token operator">|</span>                 <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> Daemon  <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token keyword">InnoDB</span> <span class="token keyword">purge</span> worker      <span class="token operator">|</span> <span class="token boolean">NULL</span>             <span class="token operator">|</span>    <span class="token number">0.000</span> <span class="token operator">|</span>
+<span class="token operator">|</span>  <span class="token number">2</span> <span class="token operator">|</span> system <span class="token keyword">user</span> <span class="token operator">|</span>                 <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> Daemon  <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token keyword">InnoDB</span> <span class="token keyword">purge</span> worker      <span class="token operator">|</span> <span class="token boolean">NULL</span>             <span class="token operator">|</span>    <span class="token number">0.000</span> <span class="token operator">|</span>
+<span class="token operator">|</span>  <span class="token number">3</span> <span class="token operator">|</span> system <span class="token keyword">user</span> <span class="token operator">|</span>                 <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> Daemon  <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token keyword">InnoDB</span> <span class="token keyword">purge</span> coordinator <span class="token operator">|</span> <span class="token boolean">NULL</span>             <span class="token operator">|</span>    <span class="token number">0.000</span> <span class="token operator">|</span>
+<span class="token operator">|</span>  <span class="token number">4</span> <span class="token operator">|</span> system <span class="token keyword">user</span> <span class="token operator">|</span>                 <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> Daemon  <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token keyword">InnoDB</span> <span class="token keyword">purge</span> worker      <span class="token operator">|</span> <span class="token boolean">NULL</span>             <span class="token operator">|</span>    <span class="token number">0.000</span> <span class="token operator">|</span>
+<span class="token operator">|</span>  <span class="token number">5</span> <span class="token operator">|</span> system <span class="token keyword">user</span> <span class="token operator">|</span>                 <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> Daemon  <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> <span class="token keyword">InnoDB</span> <span class="token keyword">shutdown</span> <span class="token keyword">handler</span>  <span class="token operator">|</span> <span class="token boolean">NULL</span>             <span class="token operator">|</span>    <span class="token number">0.000</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token number">15</span> <span class="token operator">|</span> root        <span class="token operator">|</span> localhost:<span class="token number">49914</span> <span class="token operator">|</span> <span class="token boolean">NULL</span> <span class="token operator">|</span> Query   <span class="token operator">|</span>    <span class="token number">0</span> <span class="token operator">|</span> Init                     <span class="token operator">|</span> <span class="token keyword">show</span> processlist <span class="token operator">|</span>    <span class="token number">0.000</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-----------------+------+---------+------+--------------------------+------------------+----------+</span>
+<span class="token number">6</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  客户端如果太长时间没动静，连接器就会自动将它断开。这个时间是由参数 wait_timeout 控制的，默认值是 8 小时。<br>  在用的时候一般会在程序的配置文件里配置 <code>validationQuery=SELECT 1</code> 就是因为这个原因。</p>
+<p>  如果在连接被断开之后，客户端再次发送请求的话，就会收到一个错误提醒： Lost connection to MySQL server during query。这时候如果你要继续，就需要重连，然后再执行请求了。</p>
+<p>  数据库里面，长连接是指连接成功后，如果客户端持续有请求，则一直使用同一个连接。短连接则是指每次执行完很少的几次查询就断开连接，下次查询再重新建立一个。</p>
+<p>  建立连接的过程通常是比较复杂的，所以我建议你在使用中要尽量减少建立连接的动作，也就是尽量使用长连接。</p>
+<p>  但是全部使用长连接后，你可能会发现，有些时候 MySQL 占用内存涨得特别快，这是因为 MySQL 在执行过程中临时使用的内存是管理在连接对象里面的。这些资源会在连接断开的时候才释放。所以如果长连接累积下来，可能导致内存占用太大，被系统强行杀掉（OOM），从现象看就是 MySQL 异常重启了。</p>
+<p>  怎么解决这个问题呢？你可以考虑以下两种方案。</p>
+<ol>
+<li>定期断开长连接。使用一段时间，或者程序里面判断执行过一个占用内存的大查询后，断开连接，之后要查询再重连。</li>
+<li>如果你用的是 MySQL 5.7 或更新版本，可以在每次执行一个比较大的操作后，通过执行 mysql_reset_connection 来重新初始化连接资源。这个过程不需要重连和重新做权限验证，但是会将连接恢复到刚刚创建完时的状态。</li>
+</ol>
+<h1 id="2-查询缓存"><a href="#2-查询缓存" class="headerlink" title="(2) 查询缓存"></a>(2) 查询缓存</h1><p>  连接建立完成后，你就可以执行 select 语句了。执行逻辑就会来到第二步：查询缓存。</p>
+<p>  MySQL 拿到一个查询请求后，会先到查询缓存看看，之前是不是执行过这条语句。之前执行过的语句及其结果可能会以 key-value 对的形式，被直接缓存在内存中。key 是查询的语句，value 是查询的结果。如果你的查询能够直接在这个缓存中找到 key，那么这个 value 就会被直接返回给客户端。</p>
+<p>  如果语句不在查询缓存中，就会继续后面的执行阶段。执行完成后，执行结果会被存入查询缓存中。你可以看到，如果查询命中缓存，MySQL 不需要执行后面的复杂操作，就可以直接返回结果，这个效率会很高。</p>
+<p>  但是大多数情况下我会建议你不要使用查询缓存，为什么呢？因为查询缓存往往弊大于利。</p>
+<p>  查询缓存的失效非常频繁，只要有对一个表的更新，这个表上所有的查询缓存都会被清空。因此很可能你费劲地把结果存起来，还没使用呢，就被一个更新全清空了。对于更新压力大的数据库来说，查询缓存的命中率会非常低。除非你的业务就是有一张静态表，很长时间才会更新一次。比如，一个系统配置表，那这张表上的查询才适合使用查询缓存。</p>
+<p>  好在 MySQL 也提供了这种“按需使用”的方式。你可以将参数 query_cache_type 设置成 DEMAND，这样对于默认的 SQL 语句都不使用查询缓存。而对于你确定要使用查询缓存的语句，可以用 SQL_CACHE 显式指定，像下面这个语句一样：</p>
+<p>  <code>select SQL_CACHE * from T where ID=10；</code></p>
+<p>  需要注意的是，MySQL 8.0 版本直接将查询缓存的整块功能删掉了，也就是说 8.0 开始彻底没有这个功能了。</p>
+<h1 id="3-分析器"><a href="#3-分析器" class="headerlink" title="(3) 分析器"></a>(3) 分析器</h1><p>  如果没有命中查询缓存，就要开始真正执行语句了。首先，MySQL 需要知道你要做什么，因此需要对 SQL 语句做解析。</p>
+<p>  分析器先会做“词法分析”。你输入的是由多个字符串和空格组成的一条 SQL 语句，MySQL 需要识别出里面的字符串分别是什么，代表什么。</p>
+<p>  MySQL 从你输入的”select”这个关键字识别出来，这是一个查询语句。它也要把字符串“T”识别成“表名 T”，把字符串“ID”识别成“列 ID”。</p>
+<p>  做完了这些识别以后，就要做“语法分析”。根据词法分析的结果，语法分析器会根据语法规则，判断你输入的这个 SQL 语句是否满足 MySQL 语法。</p>
+<p>  如果你的语句不对，就会收到“You have an error in your SQL syntax”的错误提醒，比如下面这个语句 select 少打了开头的字母“s”。</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> elect <span class="token operator">*</span> <span class="token keyword">from</span> t <span class="token keyword">where</span> ID<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+ERROR <span class="token number">1064</span> <span class="token punctuation">(</span><span class="token number">42000</span><span class="token punctuation">)</span>: You have an error <span class="token operator">in</span> your <span class="token keyword">SQL</span> syntax<span class="token punctuation">;</span> <span class="token keyword">check</span> the manual that corresponds <span class="token keyword">to</span> your MySQL server version <span class="token keyword">for</span> the <span class="token keyword">right</span> syntax <span class="token keyword">to</span> <span class="token keyword">use</span> near <span class="token string">'elect * from t where ID=1'</span> at line <span class="token number">1</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="4-优化器"><a href="#4-优化器" class="headerlink" title="(4) 优化器"></a>(4) 优化器</h1><p>  经过了分析器，MySQL 就知道你要做什么了。在开始执行之前，还要先经过优化器的处理。</p>
+<p>  优化器是在表里面有多个索引的时候，决定使用哪个索引；或者在一个语句有多表关联（join）的时候，决定各个表的连接顺序。比如你执行下面这样的语句，这个语句是执行两个表的 join：</p>
+<p> <code>mysql&gt; select * from t1 join t2 using(ID)  where t1.c=10 and t2.d=20;</code></p>
+<p> 既可以先从表 t1 里面取出 c=10 的记录的 ID 值，再根据 ID 值关联到表 t2，再判断 t2 里面 d 的值是否等于 20。</p>
+<p> 也可以先从表 t2 里面取出 d=20 的记录的 ID 值，再根据 ID 值关联到 t1，再判断 t1 里面 c 的值是否等于 10。</p>
+<p> 这两种执行方法的逻辑结果是一样的，但是执行的效率会有不同，而优化器的作用就是决定选择使用哪一个方案。</p>
+<h1 id="5-执行器"><a href="#5-执行器" class="headerlink" title="(5) 执行器"></a>(5) 执行器</h1><p>  MySQL 通过分析器知道了你要做什么，通过优化器知道了该怎么做，于是就进入了执行器阶段，开始执行语句。</p>
+<p>  开始执行的时候，要先判断一下你对这个表 T 有没有执行查询的权限，如果没有，就会返回没有权限的错误，如下所示 (在工程实现上，如果命中查询缓存，会在查询缓存返回结果的时候，做权限验证。查询也会在优化器之前调用 precheck 验证权限)。</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">select</span> <span class="token operator">*</span> <span class="token keyword">from</span> T <span class="token keyword">where</span> ID<span class="token operator">=</span><span class="token number">10</span><span class="token punctuation">;</span>
+
+ERROR <span class="token number">1142</span> <span class="token punctuation">(</span><span class="token number">42000</span><span class="token punctuation">)</span>: <span class="token keyword">SELECT</span> command denied <span class="token keyword">to</span> <span class="token keyword">user</span> <span class="token string">'b'</span><span class="token variable">@'localhost'</span> <span class="token keyword">for</span> <span class="token keyword">table</span> <span class="token string">'T'</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>  如果有权限，就打开表继续执行。打开表的时候，执行器就会根据表的引擎定义，去使用这个引擎提供的接口。</p>
+<blockquote>
+<ol>
+<li>调用 InnoDB 引擎接口取这个表的第一行，判断 ID 值是不是 10，如果不是则跳过，如果是则将这行存在结果集中；</li>
+<li>调用引擎接口取“下一行”，重复相同的判断逻辑，直到取到这个表的最后一行。</li>
+<li>执行器将上述遍历过程中所有满足条件的行组成的记录集作为结果集返回给客户端。</li>
+</ol>
+</blockquote>
+<p>  至此，这个语句就执行完成了。</p>
+<p>  对于有索引的表，执行的逻辑也差不多。第一次调用的是“取满足条件的第一行”这个接口，之后循环取“满足条件的下一行”这个接口，这些接口都是引擎中已经定义好的。</p>
+<p>  你会在数据库的慢查询日志中看到一个 rows_examined 的字段，表示这个语句执行过程中扫描了多少行。这个值就是在执行器每次调用引擎获取数据行的时候累加的。</p>
+<p>  在有些场景下，执行器调用一次，在引擎内部则扫描了多行，因此 引擎扫描行数跟 rows_examined 并不是完全相同的。 </p>
+<h1 id="6-执行一条查询语句的流程"><a href="#6-执行一条查询语句的流程" class="headerlink" title="(6) 执行一条查询语句的流程"></a>(6) 执行一条查询语句的流程</h1><ol>
+<li>连接器 连接数据库。</li>
+<li>查询缓存</li>
+<li>分析器 词法解析 语法解析</li>
+<li>优化器</li>
+<li>执行器</li>
+</ol>
+<h1 id="7-更新一条语句的流程"><a href="#7-更新一条语句的流程" class="headerlink" title="(7) 更新一条语句的流程"></a>(7) 更新一条语句的流程</h1><ol>
+<li>连接器 连接数据库。</li>
+<li>清空对应表缓存</li>
+<li>分析器 词法解析 语法解析</li>
+<li>优化器</li>
+<li>执行器</li>
+<li>更新  redo log（重做日志）和 binlog（归档日志）。</li>
+</ol>
+<h1 id="8-牛刀小试"><a href="#8-牛刀小试" class="headerlink" title="(8) 牛刀小试"></a>(8) 牛刀小试</h1><h2 id="8-1-面试题"><a href="#8-1-面试题" class="headerlink" title="(8.1) 面试题"></a>(8.1) 面试题</h2><ol>
+<li>MySQL的框架有几个组件, 各是什么作用?</li>
+<li>Server层和存储引擎层各是什么作用?</li>
+<li>you have an error in your SQL syntax 这个保存是在词法分析里还是在语法分析里报错?</li>
+<li>对于表的操作权限验证在哪里进行?</li>
+<li>执行器的执行查询语句的流程是什么样的?</li>
+</ol>
+<h2 id="8-2-如果表-T-中没有字段-k，而你执行了这个语句-select-from-T-where-k-1-那肯定是会报“不存在这个列”的错误：-“Unknown-column-‘k’-in-‘where-clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？"><a href="#8-2-如果表-T-中没有字段-k，而你执行了这个语句-select-from-T-where-k-1-那肯定是会报“不存在这个列”的错误：-“Unknown-column-‘k’-in-‘where-clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？" class="headerlink" title="(8.2) 如果表 T 中没有字段 k，而你执行了这个语句 select * from T where k=1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？"></a>(8.2) 如果表 T 中没有字段 k，而你执行了这个语句 <code>select * from T where k=1</code>, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？</h2><p>  答案是 分析器</p>
+<p>  办法：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">安装完MySQL之后,使用Debug模式启动
+mysqld --debug --console &amp;后，
+mysql> create database wxb;
+Query OK, 1 row affected (0.01 sec)
+
+mysql> use wxb;
+Database changed
+mysql> create table t(a int);
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> select * from t where k=1;
+ERROR 1054 (42S22): Unknown column 'k' in 'where clause'
+
+T@4: | | | | | | | | | error: error: 1054 message: 'Unknown column 'k' in 'where clause''
+
+Complete optimizer trace:
+答案就很清楚了<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="8-3-各个模块的功能"><a href="#8-3-各个模块的功能" class="headerlink" title="(8.3) 各个模块的功能"></a>(8.3) 各个模块的功能</h2><p>1，连接<br>  连接管理模块，接收请求；连接进程和用户模块，通过，连接线程和客户端对接<br>2，查询<br>  查询缓存 Query Cache<br>  分析器，内建解析树，对其语法检查，先from，再on，再join，再where……；检查权限，生成新的解析树，语义检查（没有字段k在这里）等<br>  优化器，将前面解析树转换成执行计划，并进行评估最优<br>  执行器，获取锁，打开表，通过meta数据，获取数据<br>3，返回结果<br>  返回给连接进程和用户模块，然后清理，重新等待新的请求。</p>
+<h2 id="8-4-动画描述各个模块的功能"><a href="#8-4-动画描述各个模块的功能" class="headerlink" title="(8.4) 动画描述各个模块的功能"></a>(8.4) 动画描述各个模块的功能</h2><p>连接器：门卫，想进请出示准入凭证（工牌、邀请证明一类）。“你好，你是普通员工，只能进入办公大厅，不能到高管区域”此为权限查询。<br>分析器：“您需要在公司里面找一张头发是黑色的桌子？桌子没有头发啊！臣妾做不到”<br>优化器：“要我在A B两个办公室找张三和李四啊？那我应该先去B办公室找李四，然后请李四帮我去A办公室找张三，因为B办公室比较近且李四知道张三具体工位在哪”<br>执行器：“好了，找人的计划方案定了，开始行动吧，走你！糟糕，刚门卫大哥说了，我没有权限进B办公室”</p>
+<h2 id="8-5-为什么对权限的检查不在优化器之前做？"><a href="#8-5-为什么对权限的检查不在优化器之前做？" class="headerlink" title="(8.5) 为什么对权限的检查不在优化器之前做？"></a>(8.5) 为什么对权限的检查不在优化器之前做？</h2><p>  有些时候，SQL语句要操作的表不只是SQL字面上那些。比如如果有个触发器，得在执行器阶段（过程中）才能确定。优化器阶段前是无能为力的</p>
+<h2 id="8-6-在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？"><a href="#8-6-在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？" class="headerlink" title="(8.6) 在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？"></a>(8.6) 在什么场景下，一天一备会比一周一备更有优势呢？或者说，它影响了这个数据库系统的哪个指标？</h2><h2 id="8-7-假如要插入10万条数据，怎么写插入语句比较好"><a href="#8-7-假如要插入10万条数据，怎么写插入语句比较好" class="headerlink" title="(8.7) 假如要插入10万条数据，怎么写插入语句比较好"></a>(8.7) 假如要插入10万条数据，怎么写插入语句比较好</h2><p> 批量插入 <code>insert into t (id, c) values (1,1), (2, 2)</code></p>
+<h2 id="8-8-假如要更新10万条数据，怎么写插入语句比较好"><a href="#8-8-假如要更新10万条数据，怎么写插入语句比较好" class="headerlink" title="(8.8) 假如要更新10万条数据，怎么写插入语句比较好"></a>(8.8) 假如要更新10万条数据，怎么写插入语句比较好</h2><p>  批量更新</p>
+<h2 id="8-9-详细的执行过程"><a href="#8-9-详细的执行过程" class="headerlink" title="(8.9) 详细的执行过程"></a>(8.9) 详细的执行过程</h2><p> 1.　首先客户端通过tcp/ip发送一条sql语句到server层的SQL interface</p>
+<p> 2.　SQL interface接到该请求后，先对该条语句进行解析，验证权限是否匹配</p>
+<p> 3.　验证通过以后，分析器会对该语句分析,是否语法有错误等</p>
+<p> 4.　接下来是优化器器生成相应的执行计划，选择最优的执行计划</p>
+<p> 5.　之后会是执行器根据执行计划执行这条语句。在这一步会去open table,如果该table上有MDL，则等待。如果没有，则加在该表上加短暂的MDL(S)。(如果opend_table太大,表明open_table_cache太小。需要不停的去打开frm文件)</p>
+<p> 6.　进入到引擎层，首先会去innodb_buffer_pool里的data dictionary(元数据信息)得到表信息</p>
+<p> 7.　通过元数据信息,去lock info里查出是否会有相关的锁信息，并把这条update语句需要的锁信息写入到lock info里(锁这里还有待补充)</p>
+<p> 8.　然后涉及到的老数据通过快照的方式存储到innodb_buffer_pool里的undo page里,并且记录undo log修改的redo (如果data page里有就直接载入到undo page里，如果没有，则需要去磁盘里取出相应page的数据，载入到undo page里)</p>
+<p> 9.　在innodb_buffer_pool的data page做update操作。并把操作的物理数据页修改记录到redo log buffer里。由于update这个事务会涉及到多个页面的修改，所以redo log buffer里会记录多条页面的修改信息。因为group commit的原因，这次事务所产生的redo log buffer可能会跟随其它事务一同flush并且sync到磁盘上</p>
+<p> 10.　同时修改的信息，会按照event的格式,记录到binlog_cache中。(这里注意binlog_cache_size是transaction级别的,不是session级别的参数,一旦commit之后，dump线程会从binlog_cache里把event主动发送给slave的I/O线程)</p>
+<p> 11.　之后把这条sql,需要在二级索引上做的修改，写入到change buffer page，等到下次有其他sql需要读取该二级索引时，再去与二级索引做merge (随机I/O变为顺序I/O,但是由于现在的磁盘都是SSD,所以对于寻址来说,随机I/O和顺序I/O差距不大)</p>
+<p> 12.　此时update语句已经完成，需要commit或者rollback。这里讨论commit的情况 </p>
+<p> 13.　commit操作，由于存储引擎层与server层之间采用的是内部XA(保证两个事务的一致性,这里主要保证redo log和binlog的原子性),所以提交分为prepare阶段与commit阶段</p>
+<p> 14.　prepare阶段,将事务的xid写入，将binlog_cache里的进行flush以及sync操作(大事务的话这步非常耗时)</p>
+<p> 15.　commit阶段，由于之前该事务产生的redo log已经sync到磁盘了。所以这步只是在redo log里标记commit</p>
+<p> 16.　当binlog和redo log都已经落盘以后，如果触发了刷新脏页的操作，先把该脏页复制到doublewrite buffer里，把doublewrite buffer里的刷新到共享表空间，然后才是通过page cleaner线程把脏页写入到磁盘中</p>
+<h2 id="8-10-写redo日志也是写io（我理解也是外部存储）。同样耗费性能。怎么能做到优化呢"><a href="#8-10-写redo日志也是写io（我理解也是外部存储）。同样耗费性能。怎么能做到优化呢" class="headerlink" title="(8.10) 写redo日志也是写io（我理解也是外部存储）。同样耗费性能。怎么能做到优化呢"></a>(8.10) 写redo日志也是写io（我理解也是外部存储）。同样耗费性能。怎么能做到优化呢</h2><p>1.写redo日志也是写io（我理解也是外部存储）。同样耗费性能。怎么能做到优化呢<br>2.数据库只有redo commit 之后才会真正提交到数据库吗</p>
+<blockquote>
+<ol>
+<li>Redolog是顺序写，并且可以组提交，还有别的一些优化，收益最大是是这两个因素；</li>
+<li>是这样，正常执行是要commit 才算完，但是崩溃恢复过程的话，可以接受“redolog prepare 并且binlog完整” 的情况</li>
+</ol>
+</blockquote>
+<h2 id="8-11-redo-log是为了快速响应SQL充当了粉板"><a href="#8-11-redo-log是为了快速响应SQL充当了粉板" class="headerlink" title="(8.11) redo log是为了快速响应SQL充当了粉板"></a>(8.11) redo log是为了快速响应SQL充当了粉板</h2><p>　1. redo log本身也是文件，记录文件的过程其实也是写磁盘，那和文中提到的离线写磁盘操作有何区别？<br>　2.响应一次SQL我理解是要同时操作两个日志文件？也就是写磁盘两次？</p>
+<blockquote>
+<ol>
+<li>写redo log是顺序写，不用去“找位置”，而更新数据需要找位置</li>
+<li>其实是3次（redolog两次 binlog 1次）。不过在并发更新的时候会合并写 </li>
+</ol>
+</blockquote>
+<h2 id="8-12-binlog为什么说是逻辑日志呢？它里面有内容也会存储成物理文件，怎么说是逻辑而不是物理"><a href="#8-12-binlog为什么说是逻辑日志呢？它里面有内容也会存储成物理文件，怎么说是逻辑而不是物理" class="headerlink" title="(8.12) binlog为什么说是逻辑日志呢？它里面有内容也会存储成物理文件，怎么说是逻辑而不是物理"></a>(8.12) binlog为什么说是逻辑日志呢？它里面有内容也会存储成物理文件，怎么说是逻辑而不是物理</h2><p>  这样理解</p>
+<p>  逻辑日志可以给别的数据库，别的引擎使用，已经大家都讲得通这个“逻辑”；</p>
+<p>  物理日志就只有“我”自己能用，别人没有共享我的“物理格式” </p>
+<h2 id="8-13-redo-log-和-bin-log-是否重复"><a href="#8-13-redo-log-和-bin-log-是否重复" class="headerlink" title="(8.13) redo log 和 bin log 是否重复"></a>(8.13) redo log 和 bin log 是否重复</h2><p> redo 是引擎提供的，binlog 是server 自带的，文中提到前者用在crash的恢复，后者用于库的恢复。两者是否在某种程度上是重复的？如果在都是追加写的情况下，是否两种日志都能用于 crash 与 库 的恢复呢？<br> Crash-safe是崩溃恢复，就是原地满血复活；binlog恢复是制造一个影分身（副本）出来。</p>
+<h2 id="8-14"><a href="#8-14" class="headerlink" title="(8.14)"></a>(8.14)</h2><ol>
+<li><p>如果把 <code>innodb_flush_log_at_trx_commit</code> 设置成1每次都写入到磁盘，那不就等于是掌柜的每次记账都记到账本上嘛，那还要小黑板干嘛呢？ </p>
+</li>
+<li><p>binlog是逻辑，redolog是物理，两者都能记录历史，如果发生异常情况binlog就可以恢复数据，为什么说只有redolog才能算是crash-safe了呢。</p>
+</li>
+<li><p>Redolog是顺序写，数据文件是随机写。虽然都写盘，顺序写还是快很多的</p>
+</li>
+</ol>
+<h2 id="8-15"><a href="#8-15" class="headerlink" title="(8.15)"></a>(8.15)</h2><p> 1、首先数据库更新操作都是基于内存页，更新的时候不会直接更新磁盘，如果内存有存在就直接更新内存，如果内存没有存在就从磁盘读取到内存，在更新内存，并且写redo log，目的是为了更新效率更快，等空闲时间在将其redo log所做的改变更新到磁盘中，innodb_flush_log_at_trx_commit设置为1时，也可以防止服务出现异常重启，数据不会丢失</p>
+<p> 2、redo log两阶段提交，是为了保证redo log和binlog的一致性，如果redo log写入成功处于prepare阶段，写binlog失败，事务回滚，redo log会回滚到操作之前的状态</p>
+<p> 3、redo log也是写磁盘，写redo log是顺序写，update直接更新磁盘，需要找到数据，再对此数据进行更新(随机写)。</p>
+<h2 id="8-16"><a href="#8-16" class="headerlink" title="(8.16)"></a>(8.16)</h2><p>  开启了半同步复制after_sync以后，假设一个事务在已经把binlog sync到磁盘了,在传输binlog到从库上时,主库挂了。如果这时发生了主从切换,从库是没有这个事务的.但是挂掉的主库重新启起来,由于binlog已经fsync到磁盘,虽然引擎层未commit,但是会根据binlog来恢复这个事务.这个时候就是主从不一致了,那么和after_commit那就没区别呀。请问这个事务是恢复还是回滚呢？如果是回滚,内部又是怎么判断的呢？</p>
+<blockquote>
+<p>如果你设置来双MM，启动以后binlog还会传到新主库的。<br>但是如果你设置的是单向的，那就会不一致了…</p>
+</blockquote>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68319">01 | 基础架构：一条SQL查询语句是如何执行的？ - MySQL实战45讲</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲</a><br>[3] 《高性能MySQL》 O’REILLY</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/mysql/" rel="tag"># mysql</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2019/03/08/mysql-optimization-notes/" rel="prev" title="MySQL优化点">
+                  <i class="fa fa-chevron-left"></i> MySQL优化点
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2019/03/26/kafka-install-use/" rel="next" title="kafka 安装 使用">
+                  kafka 安装 使用 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="重要参数SUID、SNUID、SUVSUID  SUID具体的含义可以自行百度，这里只讲述它生成的过程。当我们访问sogou搜索首页的时候，Set-Cookie中便会生成一个SUID参数的内容，除非重启浏览器，不然短时间内SUID并不会改变。SUID的值应该是sogou服务端随便分配的，只有当重新开启一个session时它的值才会更新。 SNUID  SNUID是sogou反爬虫的重点，sogou">
+<meta property="og:type" content="article">
+<meta property="og:title" content="爬取 搜狗">
+<meta property="og:url" content="http://weikeqin.com/2017/11/10/crawler-sogou/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="重要参数SUID、SNUID、SUVSUID  SUID具体的含义可以自行百度，这里只讲述它生成的过程。当我们访问sogou搜索首页的时候，Set-Cookie中便会生成一个SUID参数的内容，除非重启浏览器，不然短时间内SUID并不会改变。SUID的值应该是sogou服务端随便分配的，只有当重新开启一个session时它的值才会更新。 SNUID  SNUID是sogou反爬虫的重点，sogou">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-11-10T07:34:29.000Z">
+<meta property="article:modified_time" content="2022-07-09T14:22:11.213Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="tech,Java,MySQL,Redis,ElasticSearch,DDD">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/11/10/crawler-sogou/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/11/10/crawler-sogou/","path":"2017/11/10/crawler-sogou/","title":"爬取 搜狗"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>爬取 搜狗 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%87%8D%E8%A6%81%E5%8F%82%E6%95%B0SUID%E3%80%81SNUID%E3%80%81SUV"><span class="nav-number">1.</span> <span class="nav-text">重要参数SUID、SNUID、SUV</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#SUID"><span class="nav-number">1.1.</span> <span class="nav-text">SUID</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SNUID"><span class="nav-number">1.2.</span> <span class="nav-text">SNUID</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SUV"><span class="nav-number">1.3.</span> <span class="nav-text">SUV</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#sct"><span class="nav-number">1.4.</span> <span class="nav-text">sct</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ld"><span class="nav-number">1.5.</span> <span class="nav-text">ld</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%A2%AB%E5%B1%8F%E8%94%BD%E7%8E%B0%E8%B1%A1"><span class="nav-number">2.</span> <span class="nav-text">被屏蔽现象</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96SUID"><span class="nav-number">3.</span> <span class="nav-text">获取SUID</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96SNUID"><span class="nav-number">4.</span> <span class="nav-text">获取SNUID</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%90%9C%E7%8B%97%E9%87%8D%E6%96%B0%E7%94%9F%E6%88%90SNUID%E7%9A%84HTML%E6%BA%90%E7%A0%81"><span class="nav-number">4.1.</span> <span class="nav-text">搜狗重新生成SNUID的HTML源码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%80%9A%E8%BF%87%E8%AE%BF%E9%97%AE%E4%B8%80%E4%B8%AA%E6%90%9C%E7%8B%97url%EF%BC%8C%E8%8E%B7%E5%8F%96%E5%93%8D%E5%BA%94header%E9%87%8C%E9%9D%A2%E7%9A%84SNUID"><span class="nav-number">4.2.</span> <span class="nav-text">通过访问一个搜狗url，获取响应header里面的SNUID</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SUV-1"><span class="nav-number">5.</span> <span class="nav-text">SUV</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/11/10/crawler-sogou/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          爬取 搜狗
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-11-10 15:34:29" itemprop="dateCreated datePublished" datetime="2017-11-10T15:34:29+08:00">2017-11-10</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-09 22:22:11" itemprop="dateModified" datetime="2022-07-09T22:22:11+08:00">2022-07-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/other/" itemprop="url" rel="index"><span itemprop="name">other</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/11/10/crawler-sogou/" class="post-meta-item leancloud_visitors" data-flag-title="爬取 搜狗" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="重要参数SUID、SNUID、SUV"><a href="#重要参数SUID、SNUID、SUV" class="headerlink" title="重要参数SUID、SNUID、SUV"></a>重要参数SUID、SNUID、SUV</h1><h2 id="SUID"><a href="#SUID" class="headerlink" title="SUID"></a>SUID</h2><p>  SUID具体的含义可以自行百度，这里只讲述它生成的过程。当我们访问sogou搜索首页的时候，Set-Cookie中便会生成一个SUID参数的内容，除非重启浏览器，不然短时间内SUID并不会改变。SUID的值应该是sogou服务端随便分配的，只有当重新开启一个session时它的值才会更新。</p>
+<h2 id="SNUID"><a href="#SNUID" class="headerlink" title="SNUID"></a>SNUID</h2><p>  SNUID是sogou反爬虫的重点，sogou是对同一个SNUID访问次数做了限制，而超过限制后，会跳转到验证码页面，只有输入验证码重新验证以后，SNUID才会更新，访问才能继续进行。那么SNUID是如何生成的呢？经过测试，应该是由javascript生成的，当然前提是要有SUID，SUID是生成SNUID的基础。</p>
+<span id="more"></span>
+
+
+<h2 id="SUV"><a href="#SUV" class="headerlink" title="SUV"></a>SUV</h2><p>  SUV参数内容是由JavaScript生成的，测试并没有发现其对于反爬虫有何影响，故本文不做详细介绍。</p>
+<h2 id="sct"><a href="#sct" class="headerlink" title="sct"></a>sct</h2><p>  访问次数</p>
+<h2 id="ld"><a href="#ld" class="headerlink" title="ld"></a>ld</h2><p>  每次请求ld都会变化，但即使不对也能获取到内容</p>
+<!-- 
+注释
+
+2017-11-09
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SNUID=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+usid=_AoyXlXRG_2xmcaB; 
+taspeed=taspeedexist; 
+pgv_si=s5419669504; 
+ld=8Zllllllll2BdMBclllllVojdnklllllJimpYkllllDllllljllll5@@@@@@@@@@; 
+browerV=3; 
+osV=1; 
+LSTMV=326%2C428; 
+LCLKINT=23741; 
+sct=30
+
+
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+SNUID=7097893611144F6A4A16E2C012E2A3F8; 
+usid=_AoyXlXRG_2xmcaB; 
+ld=eZllllllll2BdMBclllllVoR7CtlllllJimpYkllllYllllljylll5@@@@@@@@@@; 
+browerV=3; 
+osV=1; 
+LSTMV=333%2C267; 
+LCLKINT=20511; 
+sct=35
+
+
+
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+SNUID=7097893611144F6A4A16E2C012E2A3F8; 
+usid=_AoyXlXRG_2xmcaB; 
+ld=eZllllllll2BdMBclllllVoR7CtlllllJimpYkllllYllllljylll5@@@@@@@@@@; 
+browerV=3; 
+osV=1; 
+LSTMV=333%2C267; 
+LCLKINT=20511; 
+sct=35
+
+
+IPLOC=CN1100; 
+SUID=44DD6D3B2320940A000000005945E840; 
+SUV=1497753659532815; 
+SNUID=CC293489AFAAF22C50400D49AFA06F7A; 
+usid=ZH6lM1wIuPtq5E_F; 
+ABTEST=4|1510196399|v17; 
+ld=jyllllllll2zlDvslllllVoReZYlllllJimpYkllllGllllljylll5@@@@@@@@@@; 
+browerV=2; 
+osV=1
+
+
+
+IPLOC=CN1100; 
+SUID=8E869B272208990A0000000059914DD3; 
+SUV=1502694868786611; 
+SMYUV=1503576678898155; 
+UM_distinctid=15e142762ba458-0ccda5919fa4db-333f5902-13c680-15e142762bbb05; 
+ABTEST=1|1510281512|v17; 
+SNUID=BF5A47FADCD8804A0CCE7EB7DDFA9761; 
+pgv_pvi=1635388416; 
+ld=Jkllllllll2zxS9olllllVoVVRylllllJimpYkllllwllllljklll5@@@@@@@@@@; 
+browerV=3; 
+osV=1; 
+taspeed=taspeedexist; 
+pgv_si=s1349663744; 
+LSTMV=610%2C217; 
+LCLKINT=13097; 
+sct=3
+            
+
+2017-11-10 15:33
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+SNUID=7097893611144F6A4A16E2C012E2A3F8; 
+usid=_AoyXlXRG_2xmcaB; 
+taspeed=taspeedexist; 
+pgv_si=s5974199296; 
+sct=40; 
+ld=WZllllllll2BdMBclllllVoVvh9lllllJimpYklllltllllljklll5@@@@@@@@@@; 
+LSTMV=0%2C364; 
+LCLKINT=180467; 
+browerV=3; 
+osV=1
+
+
+2017-11-10 15:53
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+SNUID=7097893611144F6A4A16E2C012E2A3F8; 
+usid=_AoyXlXRG_2xmcaB; 
+taspeed=taspeedexist; 
+pgv_si=s5974199296; 
+PHPSESSID=qtq131sp94m2eqs83fuis2erp3; 
+sst0=285; 
+ld=gyllllllll2BdMBclllllVoVQm6lllllJimpYklllxlllllljklll5@@@@@@@@@@; 
+browerV=3; 
+osV=1; 
+LSTMV=184%2C165; 
+LCLKINT=4290; 
+sct=47
+
+
+2017-11-13 09:46
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+usid=_AoyXlXRG_2xmcaB; 
+SNUID=53B7A91631346FE160479F6C32D22345; 
+sct=53; 
+ld=ekllllllll2BdMBclllllVowdcUlllllJimpYkllllwlllllRylll5@@@@@@@@@@; 
+browerV=3; 
+osV=1; 
+LSTMV=1095%2C336; 
+LCLKINT=44738
+
+
+2017-11-13 11:15 chrome
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+usid=_AoyXlXRG_2xmcaB; 
+SNUID=53B7A91631346FE160479F6C32D22345; 
+sst0=565; 
+sct=55; 
+ld=jlllllllll2BdMBclllllVoJluDlllllJimpYkllllklllllRylll5@@@@@@@@@@; 
+browerV=3; 
+osV=1
+
+
+2017-11-13 15:52 chrome
+SUV=00022B892641197A59DDD2D3624A0275; 
+IPLOC=CN1100; 
+ABTEST=0|1509418616|v17; 
+SUID=62869B276119940A0000000059F7E678; 
+pgv_pvi=3386598400; 
+SUIR=1DF91BA77F7ADDC6D4E6D7D680FD3318; 
+usid=_AoyXlXRG_2xmcaB; 
+taspeed=taspeedexist; 
+pgv_si=s4172974080; 
+sst0=515; 
+PHPSESSID=lr7q7l5ssq49j1h87mkto3va13; 
+SNUID=39DAC07B5C5901832F2282EB5CC25E49; 
+sct=64; 
+ld=Elllllllll2BdMBclllllVoJF87lllllJimpYkllljGlllllRylll5@@@@@@@@@@; 
+browerV=3; 
+osV=1
+
+
+2017-11-13 15:55 firefox
+IPLOC=CN1100; 
+SUID=44DD6D3B2320940A000000005945E840; 
+SUV=1497753659532815; 
+SNUID=76928E32151048CC6B32D18B15263EB0; 
+usid=ZH6lM1wIuPtq5E_F; 
+ABTEST=4|1510196399|v17; 
+ld=6yllllllll2zlDvslllllVoJF6DlllllJimpYkllll9lllllRylll5@@@@@@@@@@; 
+browerV=2; 
+osV=1; 
+sct=7; 
+SUIR=CC293489AFAAF22C50400D49AFA06F7A; 
+LSTMV=325%2C239; 
+LCLKINT=377844
+
+
+2017-11-13 15:57 firefox
+IPLOC=CN1100; 
+SUID=44DD6D3B2320940A000000005945E840; 
+SUV=1497753659532815; 
+SNUID=76928E32151048CC6B32D18B15263EB0; 
+usid=ZH6lM1wIuPtq5E_F; 
+ABTEST=4|1510196399|v17; 
+ld=zlllllllll2zlDvslllllVoJFD6lllllJimpYkllllwlllllRylll5@@@@@@@@@@; 
+browerV=2; 
+osV=1; 
+sct=8; 
+SUIR=CC293489AFAAF22C50400D49AFA06F7A; 
+LSTMV=376%2C251; 
+LCLKINT=165617
+
+
+2017-11-13 15:58 firefox
+IPLOC=CN1100; 
+SUID=44DD6D3B2320940A000000005945E840; 
+SUV=1497753659532815; 
+SNUID=76928E32151048CC6B32D18B15263EB0; 
+usid=ZH6lM1wIuPtq5E_F; 
+ABTEST=4|1510196399|v17; 
+ld=pyllllllll2zlDvslllllVoJU4llllllJimpYkllllGlllllRylll5@@@@@@@@@@; 
+browerV=2; 
+osV=1; 
+sct=9; 
+SUIR=CC293489AFAAF22C50400D49AFA06F7A; 
+taspeed=taspeedexist; 
+pgv_pvi=1396500480; 
+pgv_si=s3432387584; 
+LSTMV=281%2C253; 
+LCLKINT=60394
+
+注释结束
+-->
+
+<h1 id="被屏蔽现象"><a href="#被屏蔽现象" class="headerlink" title="被屏蔽现象"></a>被屏蔽现象</h1><p>  同样，要解决反爬虫问题，我们先来看看触发反爬虫的现象。当同一个SNUID访问次数sct多了以后，继续访问sogou会跳转到一个验证码页面。<br>URL地址以及解码后的url地址：<br><a target="_blank" rel="noopener" href="http://www.sogou.com/antispider/?from=/web?query=152512wqe&ie=utf8&_ast=1488957312&_asf=null&w=01029901&p=40040100&dp=1&cid=&cid=&sut=578&sst0=1488957299160&lkt=3,1488957298718,1488957298893">http://www.sogou.com/antispider/?from=%2fweb%3Fquery%3d152512wqe%26ie%3dutf8%26_ast%3d1488957312%26_asf%3dnull%26w%3d01029901%26p%3d40040100%26dp%3d1%26cid%3d%26cid%3d%26sut%3d578%26sst0%3d1488957299160%26lkt%3d3%2C1488957298718%2C1488957298893</a><br><a target="_blank" rel="noopener" href="http://www.sogou.com/antispider/?from=/web?query=152512wqe&amp;ie=utf8&amp;_ast=1488957312&amp;_asf=null&amp;w=01029901&amp;p=40040100&amp;dp=1&amp;cid=&amp;cid=&amp;sut=578&amp;sst0=1488957299160&amp;lkt=3,1488957298718,1488957298893">http://www.sogou.com/antispider/?from=/web?query=152512wqe&amp;ie=utf8&amp;_ast=1488957312&amp;_asf=null&amp;w=01029901&amp;p=40040100&amp;dp=1&amp;cid=&amp;cid=&amp;sut=578&amp;sst0=1488957299160&amp;lkt=3,1488957298718,1488957298893</a></p>
+<!--
+注释
+
+2017-11-13
+http://www.sogou.com/antispider/?from=%2fsogou%3Fsite%3dnews.qq.com%26query%3d%D7%F7%B0%B8%B9%A4%BE%DF%26pid%3dsogou-wsse-b58ac8403eb9cf17-0004%26sourceid%3d%26idx%3df%26idx%3d1%26ori%3d%D7%F7%B0%B8+
+http://www.sogou.com/antispider/?from=/sogou?site=news.qq.com&query=测试工具&pid=sogou-wsse-b58ac8403eb9cf17-0004&sourceid=&idx=f&idx=1&ori=测试 
+
+http://www.sogou.com/antispider/?from=%2fweb%3Fquery%3d%E6%B5%8B%E8%AF%95%E5%B7%A5%E5%85%B7%26_asf%3dwww.sogou.com%26_ast%3d%26w%3d01015002%26p%3d40040108%26ie%3dutf8%26from%3dindex-nologin%26s_from%3dindex%26oq%3d%26ri%3d0%26sourceid%3dsugg%26suguuid%3d%26sut%3d0%26sst0%3d1510558948525%26lkt%3d0%2C0%2C0%26sugsuv%3d00022B892641197A59DDD2D3624A0275%26sugtime%3d1510558948525
+http://www.sogou.com/antispider/?from=/web?query=测试工具&_asf=www.sogou.com&_ast=&w=01015002&p=40040108&ie=utf8&from=index-nologin&s_from=index&oq=&ri=0&sourceid=sugg&suguuid=&sut=0&sst0=1510558948525&lkt=0,0,0&sugsuv=00022B892641197A59DDD2D3624A0275&sugtime=1510558948525
+
+注释结束 -->
+
+
+<h1 id="获取SUID"><a href="#获取SUID" class="headerlink" title="获取SUID"></a>获取SUID</h1><p>在爬取<a target="_blank" rel="noopener" href="https://www.sogou.com/%E6%97%B6%EF%BC%8C%E5%8F%AF%E4%BB%A5%E5%9C%A8%E5%93%8D%E5%BA%94%E7%9A%84Headers%E9%87%8C%E6%89%BE%E8%A7%81SUID%EF%BC%8C%E5%A6%82%E4%B8%8B%EF%BC%9A">https://www.sogou.com/时，可以在响应的Headers里找见SUID，如下：</a></p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">
+-----请求开始-----https://www.sogou.com/
+响应状态：HTTP/1.1 200 OK
+Server    nginx
+Date    Fri, 10 Nov 2017 08:33:45 GMT
+Content-Type    text/html; charset=UTF-8
+Transfer-Encoding    chunked
+Connection    keep-alive
+Vary    Accept-Encoding
+Set-Cookie    ABTEST=0|1510302825|v17; expires=Sun, 10-Dec-17 08:33:45 GMT; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    IPLOC=CN1100; expires=Sat, 10-Nov-18 08:33:45 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    SUID=62869B271810990A000000005A056469; expires=Thu, 05-Nov-37 08:33:45 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Cache-Control    max-age=0
+Content-Language    zh-CN
+Set-Cookie    black_passportid=1; domain=.sogou.com; path=/; expires=Thu, 01-Dec-1994 16:00:00 GMT
+ Expires    Fri, 10 Nov 2017 08:33:45 GMT
+-----请求结束-----
+
+
+-----请求开始-----https://www.sogou.com/
+响应状态：HTTP/1.1 200 OK
+Server    nginx
+Date    Fri, 10 Nov 2017 08:36:43 GMT
+Content-Type    text/html; charset=UTF-8
+Transfer-Encoding    chunked
+Connection    keep-alive
+Vary    Accept-Encoding
+Set-Cookie    ABTEST=4|1510303003|v17; expires=Sun, 10-Dec-17 08:36:43 GMT; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    IPLOC=CN1100; expires=Sat, 10-Nov-18 08:36:43 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    SUID=62869B271810990A000000005A05651B; expires=Thu, 05-Nov-37 08:36:43 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Cache-Control    max-age=0
+Content-Language    zh-CN
+Set-Cookie    black_passportid=1; domain=.sogou.com; path=/; expires=Thu, 01-Dec-1994 16:00:00 GMT
+Expires    Fri, 10 Nov 2017 08:36:43 GMT
+-----请求结束-----
+
+
+-----请求开始-----https://www.sogou.com/
+响应状态：HTTP/1.1 200 OK
+Server    nginx
+Date    Mon, 13 Nov 2017 02:30:45 GMT
+Content-Type    text/html; charset=UTF-8
+Transfer-Encoding    chunked
+Connection    keep-alive
+Vary    Accept-Encoding
+Set-Cookie    ABTEST=0|1510540245|v17; expires=Wed, 13-Dec-17 02:30:45 GMT; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    IPLOC=CN1100; expires=Tue, 13-Nov-18 02:30:45 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    SUID=62869B271810990A000000005A0903D5; expires=Sun, 08-Nov-37 02:30:45 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Cache-Control    max-age=0
+Content-Language    zh-CN
+Set-Cookie    black_passportid=1; domain=.sogou.com; path=/; expires=Thu, 01-Dec-1994 16:00:00 GMT
+Expires    Mon, 13 Nov 2017 02:30:45 GMT
+-----请求结束-----
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="获取SNUID"><a href="#获取SNUID" class="headerlink" title="获取SNUID"></a>获取SNUID</h1><h2 id="搜狗重新生成SNUID的HTML源码"><a href="#搜狗重新生成SNUID的HTML源码" class="headerlink" title="搜狗重新生成SNUID的HTML源码"></a>搜狗重新生成SNUID的HTML源码</h2><p>  在源码里面可以看到重新生成SNUID的步骤</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">&lt;!DOCTYPE HTML>
+&lt;html>
+&lt;head>
+    &lt;meta charset="utf-8">
+    &lt;link rel="shortcut icon" href="//www.sogou.com/images/logo2014/new/favicon.ico" type="image/x-icon">
+    &lt;title>搜狗搜索&lt;/title>
+    &lt;link rel="stylesheet" href="static/css/anti.min.css?v=1"/>
+    &lt;script src="//dlweb.sogoucdn.com/common/lib/jquery/jquery-1.11.0.min.js">&lt;/script>
+    &lt;script src="static/js/antispider.min.js?v=2">&lt;/script>
+    &lt;script>
+        var domain = getDomain();
+        window.imgCode = -1;
+
+        (function() &#123;
+            function checkSNUID() &#123;
+                var cookieArr = document.cookie.split('; '),
+                    count = 0;
+
+                for(var i = 0, len = cookieArr.length; i &lt; len; i++) &#123;
+                    if (cookieArr[i].indexOf('SNUID=') > -1) &#123;
+                        count++;
+                    &#125;
+                &#125;
+
+                return count > 1;
+            &#125;
+
+            if(checkSNUID()) &#123;
+                var date = new Date(), expires;
+                date.setTime(date.getTime() -100000);
+
+                expires = date.toGMTString();
+
+                document.cookie = 'SNUID=1;path=/;expires=' + expires;
+                document.cookie = 'SNUID=1;path=/;expires=' + expires + ';domain=.www.sogou.com';
+                document.cookie = 'SNUID=1;path=/;expires=' + expires + ';domain=.weixin.sogou.com';
+                document.cookie = 'SNUID=1;path=/;expires=' + expires + ';domain=.sogou.com';
+                document.cookie = 'SNUID=1;path=/;expires=' + expires + ';domain=.snapshot.sogoucdn.com';
+
+                sendLog('delSNUID');
+            &#125;
+
+            if(getCookie('seccodeRight') === 'success') &#123;
+                sendLog('verifyLoop');
+
+                setCookie('seccodeRight', 1, getUTCString(-1), location.hostname, '/');
+            &#125;
+
+            if(getCookie('refresh')) &#123;
+                sendLog('refresh');
+            &#125;
+        &#125;)();
+
+        function setImgCode(code) &#123;
+            try &#123;
+                var t = new Date().getTime() - imgRequestTime.getTime();
+                sendLog('imgCost',"cost="+t);
+            &#125; catch (e) &#123;
+            &#125;
+            window.imgCode = code;
+        &#125;
+        sendLog('index');
+
+        function changeImg2() &#123;
+        	if(window.event) &#123;
+        		window.event.returnValue=false
+        	&#125;
+        &#125;
+    &lt;/script>
+&lt;/head>
+&lt;body>
+&lt;div class="header">
+    &lt;div class="logo">&lt;a href="/">&lt;img width="180" height="60" src="//www.sogou.com/images/logo2014/error180x60.png">&lt;/a>&lt;/div>
+    &lt;div class="other">&lt;span class="s1">您的访问出错了&lt;/span>&lt;span class="s2">&lt;a href="/">返回首页&amp;gt;&amp;gt;&lt;/a>&lt;/span>&lt;/div>
+&lt;/div>
+&lt;div class="content-box">
+    &lt;p class="ip-time-p">IP:xxx.xxx.xxx.xxx&lt;br>访问时间：2017.11.10 16:16:01&lt;/p>
+    &lt;p class="p2">用户您好，您的访问过于频繁，为确认本次访问为正常用户行为，需要您协助验证。&lt;/p>
+    &lt;p class="p3">&lt;label for="seccodeInput">验证码：&lt;/label>&lt;/p>
+    &lt;form name="authform" method="POST" id="seccodeForm" action="/">
+        &lt;p class="p4">
+            &lt;input type=text name="c" value="" placeholder="请输入验证码" id="seccodeInput">
+            &lt;input type="hidden" name="tc" id="tc" value="">
+            &lt;input type="hidden" name="r" id="from" value="%2Fweb%3Fquery%3D152512wqe" >
+            &lt;input type="hidden" name="m" value="0" >            &lt;span class="s1">
+                &lt;script>imgRequestTime=new Date();&lt;/script>
+                &lt;a onclick="changeImg2();" href="javascript:void(0)">
+                    &lt;img id="seccodeImage" onload="setImgCode(1)" onerror="setImgCode(0)" src="util/seccode.php?tc=1510301761" width="100" height="40" alt="请输入图中的验证码" title="请输入图中的验证码">
+                &lt;/a>
+            &lt;/span>
+            &lt;a href="javascript:void(0);" id="change-img" onclick="changeImg2();" style="padding-left:50px;">换一张&lt;/a>
+            &lt;span class="s2" id="error-tips" style="display: none;">&lt;/span>
+        &lt;/p>
+    &lt;/form>
+    &lt;p class="p5">
+        &lt;a href="javascript:void(0);" id="submit">提交&lt;/a>
+        &lt;span>提交后没解决问题？欢迎&lt;a href="http://fankui.help.sogou.com/index.php/web/web/index?type=10&amp;anti_time=1510301761&amp;domain=www.sogou.com" target="_blank">反馈&lt;/a>。&lt;/span>
+    &lt;/p>
+&lt;/div>
+&lt;div id="ft">&lt;a href="http://fuwu.sogou.com/" target="_blank">企业推广&lt;/a>&lt;a href="http://corp.sogou.com/" target="_blank">关于搜狗&lt;/a>&lt;a href="/docs/terms.htm?v=1" target="_blank">免责声明&lt;/a>&lt;a href="http://fankui.help.sogou.com/index.php/web/web/index?type=10&amp;anti_time=1510301761&amp;domain=www.sogou.com" target="_blank">意见反馈&lt;/a>&lt;br>&amp;nbsp;&amp;copy;&amp;nbsp;2017&lt;span id="footer-year">&lt;/span>&amp;nbsp;Sogou Inc.&amp;nbsp;-&amp;nbsp;&lt;a href="http://www.miibeian.gov.cn" target="_blank" class="g">京ICP证050897号&lt;/a>&amp;nbsp;-&amp;nbsp;京公网安备1100&lt;span class="ba">00000025号&lt;/span>&lt;/div>
+&lt;script src="static/js/index.min.js?v=0.1.4">&lt;/script>
+&lt;/body>
+&lt;/html>&lt;!--zly-->
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="通过访问一个搜狗url，获取响应header里面的SNUID"><a href="#通过访问一个搜狗url，获取响应header里面的SNUID" class="headerlink" title="通过访问一个搜狗url，获取响应header里面的SNUID"></a>通过访问一个搜狗url，获取响应header里面的SNUID</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">-----请求开始-----https://www.sogou.com/sogou?ori=%E6%B5%8B%E8%AF%95+&amp;site=news.qq.com&amp;query=%E6%B5%8B%E8%AF%95%E5%B7%A5%E5%85%B7&amp;pid=sogou-wsse-b58ac8403eb9cf17-0004&amp;idx=f&amp;page=2&amp;duppid=1&amp;ie=utf8
+Invalid cookie header: "set-cookie: ld=qyllllllll2zjStRlllllVoJVZGlllllJimpYkllll9lllllRylll5@@@@@@@@@@; path=/; expires=Wed, 13 Dec 2017 03:52:35 GMT; domain=.sogou.com". Invalid 'expires' attribute: Wed, 13 Dec 2017 03:52:35 GMT
+响应状态：HTTP/1.1 200 OK
+Server    nginx
+Date    Mon, 13 Nov 2017 03:52:35 GMT
+Content-Type    text/html; charset=utf-8
+Transfer-Encoding    chunked
+Connection    keep-alive
+Vary    Accept-Encoding
+Set-Cookie    ABTEST=5|1510545155|v17; expires=Wed, 13-Dec-17 03:52:35 GMT; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    SNUID=0DF6EB4870752DA55C005265702D6FF2; expires=Tue, 13-Nov-18 03:52:35 GMT; domain=.sogou.com; path=/
+Set-Cookie    IPLOC=CN1100; expires=Tue, 13-Nov-18 03:52:35 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+Set-Cookie    SUID=62869B27541C940A000000005A091703; expires=Sun, 08-Nov-37 03:52:35 GMT; domain=.sogou.com; path=/
+P3P    CP="CURa ADMa DEVa PSAo PSDo OUR BUS UNI PUR INT DEM STA PRE COM NAV OTC NOI DSP COR"
+set-cookie    ld=qyllllllll2zjStRlllllVoJVZGlllllJimpYkllll9lllllRylll5@@@@@@@@@@; path=/; expires=Wed, 13 Dec 2017 03:52:35 GMT; domain=.sogou.com
+Cache-Control    max-age=0
+x_ad_pagesize    adpagesize=1059
+Set-Cookie    black_passportid=1; domain=.sogou.com; path=/; expires=Thu, 01-Dec-1994 16:00:00 GMT
+Expires    Mon, 13 Nov 2017 03:52:35 GMT
+-----请求结束-----
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  注意: Set-Cookie 和 set-cookie 大小写不一样</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//通过访问一个搜狗url，获取响应header里面的SNUID</span>
+<span class="token comment">// </span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">#! -*- coding:utf-8 -*-
+'''
+获取SNUID的值
+'''
+import requests
+import json
+import time
+import random
+
+'''
+方法（一）通过phantomjs访问sogou搜索结果页面，获取SNUID的值
+'''
+def phantomjs_getsnuid():
+    from selenium import webdriver
+    d=webdriver.PhantomJS('D:\python27\Scripts\phantomjs.exe',service_args=['--load-images=no','--disk-cache=yes'])
+    try:
+        d.get("https://www.sogou.com/web?query=")
+        Snuid=d.get_cookies()[5]["value"]
+    except:
+        Snuid=""
+    d.quit()
+    return Snuid
+	
+'''
+方法（二）通过访问特定url，获取body里面的id
+'''
+def Method_one():
+    url="http://www.sogou.com/antispider/detect.php?sn=E9DA81B7290B940A0000000058BFAB0&amp;wdqz22=12&amp;4c3kbr=12&amp;ymqk4p=37&amp;qhw71j=42&amp;mfo5i5=7&amp;3rqpqk=14&amp;6p4tvk=27&amp;eiac26=29&amp;iozwml=44&amp;urfya2=38&amp;1bkeul=41&amp;jugazb=31&amp;qihm0q=8&amp;lplrbr=10&amp;wo65sp=11&amp;2pev4x=23&amp;4eyk88=16&amp;q27tij=27&amp;65l75p=40&amp;fb3gwq=27&amp;azt9t4=45&amp;yeyqjo=47&amp;kpyzva=31&amp;haeihs=7&amp;lw0u7o=33&amp;tu49bk=42&amp;f9c5r5=12&amp;gooklm=11&amp;_=1488956271683"
+    headers=&#123;"Cookie":
+    "ABTEST=0|1488956269|v17;\
+    IPLOC=CN3301;\
+    SUID=E9DA81B7290B940A0000000058BFAB6D;\
+    PHPSESSID=rfrcqafv5v74hbgpt98ah20vf3;\
+    SUIR=1488956269"
+    &#125;
+    try:
+        f=requests.get(url,headers=headers).content
+        f=json.loads(f)
+        Snuid=f["id"]
+    except:
+        Snuid=""
+    return Snuid
+	
+'''
+方法（三）访问特定url，获取header里面的内容
+'''
+def Method_two():
+    url="https://www.sogou.com/web?query=333&amp;_asf=www.sogou.com&amp;_ast=1488955851&amp;w=01019900&amp;p=40040100&amp;ie=utf8&amp;from=index-nologin"
+    headers=&#123;"Cookie":
+    "ABTEST=0|1488956269|v17;\
+    IPLOC=CN3301;\
+    SUID=E9DA81B7290B940A0000000058BFAB6D;\
+    PHPSESSID=rfrcqafv5v74hbgpt98ah20vf3;\
+    SUIR=1488956269"
+    &#125;
+    f=requests.head(url,headers=headers).headers
+    print f
+'''
+方法（四）通过访问需要输入验证码解封的页面，可以获取SNUID
+'''
+def Method_three():
+    '''
+    http://www.sogou.com/antispider/util/seccode.php?tc=1488958062 验证码地址
+    '''
+    '''
+    http://www.sogou.com/antispider/?from=%2fweb%3Fquery%3d152512wqe%26ie%3dutf8%26_ast%3d1488957312%26_asf%3dnull%26w%3d01029901%26p%3d40040100%26dp%3d1%26cid%3d%26cid%3d%26sut%3d578%26sst0%3d1488957299160%26lkt%3d3%2C1488957298718%2C1488957298893
+    访问这个url，然后填写验证码，发送以后就是以下的包内容，可以获取SNUID。
+    '''
+    import socket
+    import re
+    res=r"id\"\: \"([^\"]*)\""
+    s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    s.connect(('www.sogou.com',80))
+    s.send('''
+POST http://www.sogou.com/antispider/thank.php HTTP/1.1
+Host: www.sogou.com
+Content-Length: 223
+X-Requested-With: XMLHttpRequest
+Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+Cookie: CXID=65B8AE6BEE1CE37D4C63855D92AF339C; SUV=006B71D7B781DAE95800816584135075; IPLOC=CN3301; pgv_pvi=3190912000; GOTO=Af12315; ABTEST=8|1488945458|v17; PHPSESSID=f78qomvob1fq1robqkduu7v7p3; SUIR=D0E3BB8E393F794B2B1B02733A162729; SNUID=B182D8EF595C126A7D67E4E359B12C38; sct=2; sst0=958; ld=AXrrGZllll2Ysfa1lllllVA@rLolllllHc4zfyllllYllllljllll5@@@@@@@@@@; browerV=3; osV=1; LSTMV=673%2C447; LCLKINT=6022; ad=6FwTnyllll2g@popQlSGTVA@7VCYx98tLueNukllll9llllljpJ62s@@@@@@@@@@; SUID=EADA81B7516C860A57B28911000DA424; successCount=1|Wed, 08 Mar 2017 07:51:18 GMT; seccodeErrorCount=1|Wed, 08 Mar 2017 07:51:45 GMT
+c=6exp2e&amp;r=%252Fweb%253Fquery%253Djs%2B%25E6%25A0%25BC%25E5%25BC%258F%25E5%258C%2596%2526ie%253Dutf8%2526_ast%253D1488957312%2526_asf%253Dnull%2526w%253D01029901%2526p%253D40040100%2526dp%253D1%2526cid%253D%2526cid%253D&amp;v=5
+    ''')
+    buf=s.recv(1024)
+    p=re.compile(res)
+    L=p.findall(buf)
+    if len(L)>0:
+        Snuid=L[0]
+    else:
+        Snuid=""
+    return Snuid
+def getsnuid(q):
+    while 1:
+        if q.qsize()&lt;10:
+            Snuid=random.choice([Method_one(),Method_three(),phantomjs_getsnuid()])
+            if Snuid!="":
+                q.put(Snuid)
+                print Snuid
+                time.sleep(0.5)
+if __name__=="__main__":
+    import Queue
+    q=Queue.Queue()
+    getsnuid(q)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="SUV-1"><a href="#SUV-1" class="headerlink" title="SUV"></a>SUV</h1><p>  通过JS生成，可以直接用cookies里的，一般不会改变</p>
+<p>参考<br>[1] <a target="_blank" rel="noopener" href="https://thief.one/2017/03/19/%E7%88%AC%E5%8F%96%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E4%B9%8B%E6%90%9C%E7%8B%97/">https://thief.one/2017/03/19/爬取搜索引擎之搜狗/</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.gaoqixhb.com/p/56e92e1e7b71cea107c700ba">https://blog.gaoqixhb.com/p/56e92e1e7b71cea107c700ba</a>    记搜狗微信号搜索反爬虫</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/11/05/mariadb-notes/" rel="prev" title="MariaDB 笔记">
+                  <i class="fa fa-chevron-left"></i> MariaDB 笔记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/11/13/knowledge-graph/" rel="next" title="知识图谱">
+                  知识图谱 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

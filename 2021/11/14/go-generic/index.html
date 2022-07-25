@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="泛型编程的中心思想是对具体的、高效的算法进行抽象，以获得通用的算法，然后这些算法可以与不同的数据表示法结合起来，产生各种各样有用的软件。  简单了说是将算法与类型解耦，实现算法更广泛的复用。 　泛型程序设计(generic programming)是程序设计语言的一种风格或范式。泛型允许程序员在强类型程序设计语言中编写代码时使用一些以后才指定的类型，在实例化时作为参数指明这些类型。 func">
+<meta property="og:type" content="article">
+<meta property="og:title" content="go语言泛型">
+<meta property="og:url" content="http://weikeqin.com/2021/11/14/go-generic/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="泛型编程的中心思想是对具体的、高效的算法进行抽象，以获得通用的算法，然后这些算法可以与不同的数据表示法结合起来，产生各种各样有用的软件。  简单了说是将算法与类型解耦，实现算法更广泛的复用。 　泛型程序设计(generic programming)是程序设计语言的一种风格或范式。泛型允许程序员在强类型程序设计语言中编写代码时使用一些以后才指定的类型，在实例化时作为参数指明这些类型。 func">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/go/generic/go-generics-dilemma.png">
+<meta property="og:image" content="http://weikeqin.com/img/go/generic/go-generics-and-programming-languages.png">
+<meta property="article:published_time" content="2021-11-14T07:05:37.000Z">
+<meta property="article:modified_time" content="2022-07-03T15:20:57.755Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="go">
+<meta property="article:tag" content="generic">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/go/generic/go-generics-dilemma.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2021/11/14/go-generic/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2021/11/14/go-generic/","path":"2021/11/14/go-generic/","title":"go语言泛型"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>go语言泛型 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E6%B3%9B%E5%9E%8B"><span class="nav-number">1.</span> <span class="nav-text">(1) 泛型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Go%E6%B3%9B%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">(2) Go泛型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E7%B1%BB%E5%9E%8B%E5%BD%A2%E5%8F%82-Type-Parameters"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 类型形参(Type Parameters)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E7%B1%BB%E5%9E%8B%E5%85%B7%E5%8C%96-instantiation"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 类型具化(instantiation)</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%B3%9B%E5%9E%8B%E5%9B%B0%E5%A2%83"><span class="nav-number">3.</span> <span class="nav-text">(3) 泛型困境</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2021/11/14/go-generic/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          go语言泛型
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2021-11-14 15:05:37" itemprop="dateCreated datePublished" datetime="2021-11-14T15:05:37+08:00">2021-11-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-03 23:20:57" itemprop="dateModified" datetime="2022-07-03T23:20:57+08:00">2022-07-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/go/" itemprop="url" rel="index"><span itemprop="name">go</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2021/11/14/go-generic/" class="post-meta-item leancloud_visitors" data-flag-title="go语言泛型" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  泛型编程的中心思想是对具体的、高效的算法进行抽象，以获得通用的算法，然后这些算法可以与不同的数据表示法结合起来，产生各种各样有用的软件。<br>  简单了说是将算法与类型解耦，实现算法更广泛的复用。</p>
+<p>　泛型程序设计(generic programming)是程序设计语言的一种风格或范式。泛型允许程序员在强类型程序设计语言中编写代码时使用一些以后才指定的类型，在实例化时作为参数指明这些类型。</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> <span class="token function">AddInt8</span><span class="token punctuation">(</span>a <span class="token builtin">int8</span><span class="token punctuation">,</span> b <span class="token builtin">int8</span><span class="token punctuation">)</span> <span class="token builtin">int8</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> a <span class="token operator">+</span> b
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">func</span> <span class="token function">AddInt16</span><span class="token punctuation">(</span>a <span class="token builtin">int16</span><span class="token punctuation">,</span> b <span class="token builtin">int16</span><span class="token punctuation">)</span> <span class="token builtin">int16</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> a <span class="token operator">+</span> b
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">func</span> <span class="token function">AddInt32</span><span class="token punctuation">(</span>a <span class="token builtin">int32</span><span class="token punctuation">,</span> b <span class="token builtin">int32</span><span class="token punctuation">)</span> <span class="token builtin">int32</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> a <span class="token operator">+</span> b
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">func</span> <span class="token function">AddInt64</span><span class="token punctuation">(</span>a <span class="token builtin">int64</span><span class="token punctuation">,</span> b <span class="token builtin">int64</span><span class="token punctuation">)</span> <span class="token builtin">int64</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> a <span class="token operator">+</span> b
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  大家看到上面的代码有没有问题，感觉逻辑都是a+b，但是写了多次，如果有几十种类型，是不是要写对应几十个方法？</p>
+<h1 id="1-泛型"><a href="#1-泛型" class="headerlink" title="(1) 泛型"></a>(1) 泛型</h1><p>　<br>　泛型是一种编程范式，这种范式与特定的类型无关，泛型允许在函数和类型的实现中使用某个类型集合中的任何一种类型。</p>
+<span id="more"></span>
+
+<h1 id="2-Go泛型"><a href="#2-Go泛型" class="headerlink" title="(2) Go泛型"></a>(2) Go泛型</h1><p>  在Go 1.18版本中，引入了对使用参数化类型的泛型代码的新支持。泛型是自Go语言开源以来对Go做出的一次最大的变更。</p>
+<blockquote>
+<ol>
+<li>函数和类型新增对**类型形参(type parameters)的支持。</li>
+<li>将接口类型定义为类型集合，包括没有方法的接口类型。</li>
+<li>支持类型推导，大多数情况下，调用泛型函数时可省略类型实参(type arguments)。</li>
+</ol>
+</blockquote>
+<h2 id="2-1-类型形参-Type-Parameters"><a href="#2-1-类型形参-Type-Parameters" class="headerlink" title="(2.1) 类型形参(Type Parameters)"></a>(2.1) 类型形参(Type Parameters)</h2><p>让我们先看一个用于浮点值的基本的、非泛型的Min函数：</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> <span class="token function">Min</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y <span class="token builtin">float64</span><span class="token punctuation">)</span> <span class="token builtin">float64</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> x <span class="token operator">&lt;</span> y <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> x
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> y
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  通过添加一个类型形参列表来使这个函数泛型化，以使其适用于不同的类型。<br>  在这个例子中，我们添加了一个仅有一个类型形参T的类型形参列表，并用T替换float64的使用。</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 如果提示 Unresolved type 'constraints'   </span>
+<span class="token comment">// 1. 修改 go.mod文件 把go版本设置成 go 1.18</span>
+<span class="token comment">// 2. 使用最新的goland</span>
+<span class="token comment">// 3. 清理一下编译器的缓存  file->Invalidate Caches / Restart </span>
+<span class="token keyword">func</span> GMin<span class="token punctuation">[</span>T constraints<span class="token punctuation">.</span>Ordered<span class="token punctuation">]</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y T<span class="token punctuation">)</span> T <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> x <span class="token operator">&lt;</span> y <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> x
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> y
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<p>向GMin函数提供类型实参，在本例中是int，称为实例化(instantiation)。<br>实例化分两步进行。<br>首先，编译器在整个泛型函数或泛型类型中把所有的类型形参替换成它们各自的类型实参。<br>第二，编译器验证每个类型实参是否满足各自的约束条件。我们很快就会知道这意味着什么，但是如果第二步失败，实例化就会失败，程序也会无效。</p>
+<h2 id="2-2-类型具化-instantiation"><a href="#2-2-类型具化-instantiation" class="headerlink" title="(2.2) 类型具化(instantiation)"></a>(2.2) 类型具化(instantiation)</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> Sort<span class="token punctuation">[</span>Elem <span class="token keyword">interface</span><span class="token punctuation">&#123;</span> <span class="token function">Less</span><span class="token punctuation">(</span>y Elem<span class="token punctuation">)</span> <span class="token builtin">bool</span> <span class="token punctuation">&#125;</span><span class="token punctuation">]</span><span class="token punctuation">(</span>list <span class="token punctuation">[</span><span class="token punctuation">]</span>Elem<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">type</span> book <span class="token keyword">struct</span><span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>x book<span class="token punctuation">)</span> <span class="token function">Less</span><span class="token punctuation">(</span>y book<span class="token punctuation">)</span> <span class="token builtin">bool</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token boolean">true</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">var</span> bookshelf <span class="token punctuation">[</span><span class="token punctuation">]</span>book
+    Sort<span class="token punctuation">[</span>book<span class="token punctuation">]</span><span class="token punctuation">(</span>bookshelf<span class="token punctuation">)</span> <span class="token comment">// 泛型函数调用</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>根据 Go 泛型的实现原理，上面的泛型函数调用 Sort[book]（bookshelf）会分成两个阶段：<br>第一个阶段就是具化（instantiation）。<br>形象点说，具化（instantiation）就好比一家生产“排序机器”的工厂根据要排序的对象的类型，将这样的机器生产出来的过程。我们继续举前面的例子来分析一下，整个具化过程如下：<br>1、工厂接单：Sort[book]，发现要排序的对象类型为 book；<br>2、模具检查与匹配：检查 book 类型是否满足模具的约束要求（也就是是否实现了约束定义中的 Less 方法）。<br>  如果满足，就将其作为类型实参替换 Sort 函数中的类型形参，结果为 Sort[book]，如果不满足，编译器就会报错；<br>3、生产机器：将泛型函数 Sort 具化为一个新函数，这里我们把它起名为 booksort，其函数原型为 func([]book)。本质上 booksort := Sort[book]。</p>
+<p>第二阶段是调用（invocation）。<br>一旦“排序机器”被生产出来，那么它就可以对目标对象进行排序了，这和普通的函数调用没有区别。这里就相当于调用 booksort（bookshelf），整个过程只需要检查传入的函数实参（bookshelf）的类型与 booksort 函数原型中的形参类型（[]book）是否匹配就可以了。</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go">Sort<span class="token punctuation">[</span>book<span class="token punctuation">]</span><span class="token punctuation">(</span>bookshelf<span class="token punctuation">)</span>
+
+<span class="token operator">&lt;=</span><span class="token operator">></span>
+
+具化：booksort <span class="token operator">:=</span> Sort<span class="token punctuation">[</span>book<span class="token punctuation">]</span>
+调用：<span class="token function">booksort</span><span class="token punctuation">(</span>bookshelf<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="3-泛型困境"><a href="#3-泛型困境" class="headerlink" title="(3) 泛型困境"></a>(3) 泛型困境</h1><p> <a target="_blank" rel="noopener" href="https://research.swtch.com/generic">The Generic Dilemma</a></p>
+<p>　泛型和其他特性一样不是只有好处，为编程语言加入泛型会遇到需要权衡的两难问题。语言的设计者需要在<code>编程效率</code>、<code>编译速度</code>和<code>运行速度</code>三者进行权衡和选择，编程语言要选择牺牲一个而保留另外两个。<br> <img src="/img/go/generic/go-generics-dilemma.png" alt="go-generics-dilemma"></p>
+<p>以 C、C++ 和 Java 为例，介绍它们在设计上的不同考量：<br>　<br>　<code>拖慢编程效率</code>：不实现泛型，不会引入复杂性，需要程序员重复实现 AddInt、AddInt64 等；<br>  代表: C语言</p>
+<p>　<code>拖慢编译速度</code>：通过增加编译器负担为每个类型实例生成一份单独的泛型函数的实现；<br>　代表：C++使用编译期间类型特化实现泛型，编译器的实现变得非常复杂，泛型展开会生成的大量重复代码，也会导致最终的二进制文件膨胀和编译缓慢，往往需要链接器来解决代码重复的问题；<br>　<br>　<code>拖慢运行速度</code>：像 Java 的泛型实现方案那样，通过隐式的装箱和拆箱操作消除类型差异。<br>　代表: Java 在 1.5 版本引入了泛型，它的泛型是用类型擦除实现的。Java 的泛型只是在编译期间用于检查类型的正确，为了保证与旧版本JVM的兼容，类型擦除会删除泛型的相关信息，导致其在运行时不可用。编译器会插入额外的类型转换指令，Java类型的装箱和拆箱会降低程序的执行效率；</p>
+<p> <img src="/img/go/generic/go-generics-and-programming-languages.png" alt="go-generics-and-programming-languages"></p>
+<p>  Go 1.18 发布说明中给出了一个结论：Go 1.18 编译器的性能要比 Go 1.17 下降 15% 左右。<br>  Go使用的是编译时对泛型做的处理。但go使用的是一个hybrid方案。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://tonybai.com/2022/03/25/intro-generics/">Go泛型介绍[译]</a><br>[2] <a target="_blank" rel="noopener" href="https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md">Type Parameters Proposal</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/485140">聊聊最近大热的Go泛型</a><br>[4] <a target="_blank" rel="noopener" href="https://tonybai.com/2022/04/20/some-changes-in-go-1-18/">Go 1.18中值得关注的几个变化</a><br>[5]<a target="_blank" rel="noopener" href="https://colobu.com/2021/08/30/how-is-go-generic-implemented/">Go泛型是怎么实现的?</a><br>[6] <a target="_blank" rel="noopener" href="https://segmentfault.com/a/1190000041634906">Go 1.18 泛型全面讲解：一篇讲清泛型的全部</a><br>[7] <a target="_blank" rel="noopener" href="https://draveness.me/whys-the-design-go-generics/">为什么 Go 语言没有泛型</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/go/" rel="tag"># go</a>
+              <a href="/tags/generic/" rel="tag"># generic</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2021/11/06/go-struct/" rel="prev" title="go语言结构体">
+                  <i class="fa fa-chevron-left"></i> go语言结构体
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2021/11/14/go-polymorphism/" rel="next" title="go语言多态">
+                  go语言多态 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

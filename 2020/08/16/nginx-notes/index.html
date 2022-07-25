@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="nginx 可以用于 反向代理、负载均衡、缓存加速、解决跨域 等场景。  详细描述见 官网 http:&#x2F;&#x2F;nginx.org&#x2F;en&#x2F; (1) 下载安装  下载地址  http:&#x2F;&#x2F;nginx.org&#x2F;en&#x2F;download.html  (1.1) nginx依赖环境 nginx依赖以下模块: gzip模块需要 zlib 库 及其开发环境 rewrite模块需要 pcre 库及开发环境 ssl">
+<meta property="og:type" content="article">
+<meta property="og:title" content="nginx-notes">
+<meta property="og:url" content="http://weikeqin.com/2020/08/16/nginx-notes/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="nginx 可以用于 反向代理、负载均衡、缓存加速、解决跨域 等场景。  详细描述见 官网 http:&#x2F;&#x2F;nginx.org&#x2F;en&#x2F; (1) 下载安装  下载地址  http:&#x2F;&#x2F;nginx.org&#x2F;en&#x2F;download.html  (1.1) nginx依赖环境 nginx依赖以下模块: gzip模块需要 zlib 库 及其开发环境 rewrite模块需要 pcre 库及开发环境 ssl">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-08-16T12:14:46.000Z">
+<meta property="article:modified_time" content="2022-05-29T08:28:50.558Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="nginx">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/08/16/nginx-notes/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/08/16/nginx-notes/","path":"2020/08/16/nginx-notes/","title":"nginx-notes"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>nginx-notes | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85"><span class="nav-number">1.</span> <span class="nav-text">(1) 下载安装</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-nginx%E4%BE%9D%E8%B5%96%E7%8E%AF%E5%A2%83"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) nginx依赖环境</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-nginx%E5%AE%89%E8%A3%85%E7%8E%AF%E5%A2%83%E6%A3%80%E6%9F%A5"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) nginx安装环境检查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-nginx-conf%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E6%A3%80%E6%9F%A5"><span class="nav-number">1.3.</span> <span class="nav-text">(1.3) nginx.conf配置文件检查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-%E5%90%AF%E5%8A%A8"><span class="nav-number">1.4.</span> <span class="nav-text">(1.4) 启动</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-5-nginx%E9%87%8D%E5%90%AF"><span class="nav-number">1.5.</span> <span class="nav-text">(1.5) nginx重启</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%8D%E5%90%8C%E5%9C%BA%E6%99%AFnginx%E9%85%8D%E7%BD%AE"><span class="nav-number">2.</span> <span class="nav-text">(2) 不同场景nginx配置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 负载均衡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E8%B7%A8%E5%9F%9F%E8%AF%B7%E6%B1%82%E8%BD%AC%E5%8F%91"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 跨域请求转发</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">3.</span> <span class="nav-text">(3) 遇到的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E7%BC%BA%E5%B0%91PCRE%E5%BA%93"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 缺少PCRE库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E7%9B%AE%E5%BD%95%E6%B2%A1%E6%9C%89%E5%86%99%E6%9D%83%E9%99%90"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 目录没有写权限</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-nginx-warn-the-%E2%80%9Cuser%E2%80%9D-directive-makes-sense-only-if-the-master-process-runs-with-super-user-privileges-ignored-in-usr-local-nginx-conf-nginx-conf-2"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) nginx: [warn] the “user” directive makes sense only if the master process runs with super-user privileges, ignored in &#x2F;usr&#x2F;local&#x2F;nginx&#x2F;conf&#x2F;nginx.conf:2</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-nginx-emerg-mkdir-%E2%80%9C-dev-shm-nginx-temp-client-body%E2%80%9D-failed-2-No-such-file-or-directory"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) nginx: [emerg] mkdir() “&#x2F;dev&#x2F;shm&#x2F;nginx_temp&#x2F;client_body” failed (2: No such file or directory)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-nginx-emerg-bind-to-0-0-0-0-80-failed-13-Permission-denied"><span class="nav-number">3.5.</span> <span class="nav-text">(3.5) nginx: [emerg] bind() to 0.0.0.0:80 failed (13: Permission denied)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-6-nginx-emerg-%E2%80%9Cserver%E2%80%9D-directive-is-not-allowed-here-in-usr-log-nginx-conf-domains-weikeqin-nginx-conf-1"><span class="nav-number">3.6.</span> <span class="nav-text">(3.6) nginx: [emerg] “server” directive is not allowed here in &#x2F;usr&#x2F;log&#x2F;nginx&#x2F;conf&#x2F;domains&#x2F;weikeqin_nginx.conf:1</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-7-%E5%AE%B9%E5%99%A8%E9%87%8C%E9%85%8D%E7%BD%AEnginx%E8%87%AA%E5%8A%A8%E5%90%AF%E5%8A%A8"><span class="nav-number">3.7.</span> <span class="nav-text">(3.7) 容器里配置nginx自动启动</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-8-the-page-you-are-looking-for-is-currently-unavailable"><span class="nav-number">3.8.</span> <span class="nav-text">(3.8) the page you are looking for is currently unavailable.</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">4.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/08/16/nginx-notes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          nginx-notes
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-08-16 20:14:46" itemprop="dateCreated datePublished" datetime="2020-08-16T20:14:46+08:00">2020-08-16</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/08/16/nginx-notes/" class="post-meta-item leancloud_visitors" data-flag-title="nginx-notes" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  nginx 可以用于 反向代理、负载均衡、缓存加速、解决跨域 等场景。<br>  详细描述见 官网 <a target="_blank" rel="noopener" href="http://nginx.org/en/">http://nginx.org/en/</a></p>
+<h1 id="1-下载安装"><a href="#1-下载安装" class="headerlink" title="(1) 下载安装"></a>(1) 下载安装</h1><p>  下载地址  <a target="_blank" rel="noopener" href="http://nginx.org/en/download.html">http://nginx.org/en/download.html</a> </p>
+<h2 id="1-1-nginx依赖环境"><a href="#1-1-nginx依赖环境" class="headerlink" title="(1.1) nginx依赖环境"></a>(1.1) nginx依赖环境</h2><blockquote>
+<p>nginx依赖以下模块:<br> gzip模块需要 zlib 库 及其开发环境<br> rewrite模块需要 pcre 库及开发环境<br> ssl 功能需要openssl库及开发环境以及 yum install -y gcc-c++ 环境。</p>
+</blockquote>
+<h2 id="1-2-nginx安装环境检查"><a href="#1-2-nginx安装环境检查" class="headerlink" title="(1.2) nginx安装环境检查"></a>(1.2) nginx安装环境检查</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>nginx<span class="token operator">-</span><span class="token number">1.18.0</span> weikeqin1<span class="token operator">$</span> <span class="token file-path string">./configure</span>
+ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>nginx<span class="token operator">-</span><span class="token number">1.18.0</span> weikeqin1<span class="token operator">$</span> make
+ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>nginx<span class="token operator">-</span><span class="token number">1.18.0</span> weikeqin1<span class="token operator">$</span> make install<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p><code>./configure</code> 是用来检查安装环境。在configure阶段结束以后，将会出现如下信息：</p>
+<span id="more"></span>
+
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>nginx<span class="token operator">-</span><span class="token number">1.18.0</span> weikeqin1<span class="token operator">$</span> <span class="token file-path string">./configure</span> <span class="token operator">-</span><span class="token operator">-</span>prefix<span class="token operator">=</span><span class="token operator">/</span>usr<span class="token operator">/</span>local  <span class="token operator">-</span><span class="token operator">-</span>with<span class="token operator">-</span>openssl<span class="token operator">=</span><span class="token operator">/</span>usr<span class="token operator">/</span>bin<span class="token operator">/</span>openssl
+checking for OS
+ <span class="token operator">+</span> Darwin <span class="token number">17.7.0</span> x86_64
+checking for C compiler <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> found
+ <span class="token operator">+</span> using Clang C compiler
+ <span class="token operator">+</span> clang version<span class="token operator">:</span> <span class="token number">10.0.0</span> <span class="token operator">(</span>clang<span class="token operator">-</span><span class="token number">1000.10.44.4</span><span class="token operator">)</span>
+checking for <span class="token operator">-</span>Wl<span class="token punctuation">,</span><span class="token operator">-</span>E switch <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> not found
+checking for gcc builtin atomic operations <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> found
+
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+checking for PCRE library <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> found
+checking for PCRE JIT support <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> found
+checking for zlib library <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> found
+creating objs<span class="token operator">/</span>Makefile
+
+Configuration summary
+  <span class="token operator">+</span> using system PCRE library
+  <span class="token operator">+</span> using OpenSSL library<span class="token operator">:</span> <span class="token file-path string">/usr/bin/openssl</span>
+  <span class="token operator">+</span> using system zlib library
+
+  <span class="token property">nginx path prefix:</span> <span class="token string">"/usr/local"</span>
+  <span class="token property">nginx binary file:</span> <span class="token string">"/usr/local/sbin/nginx"</span>
+  <span class="token property">nginx modules path:</span> <span class="token string">"/usr/local/modules"</span>
+  <span class="token property">nginx configuration prefix:</span> <span class="token string">"/usr/local/conf"</span>
+  <span class="token property">nginx configuration file:</span> <span class="token string">"/usr/local/conf/nginx.conf"</span>
+  <span class="token property">nginx pid file:</span> <span class="token string">"/usr/local/logs/nginx.pid"</span>
+  <span class="token property">nginx error log file:</span> <span class="token string">"/usr/local/logs/error.log"</span>
+  <span class="token property">nginx http access log file:</span> <span class="token string">"/usr/local/logs/access.log"</span>
+  <span class="token property">nginx http client request body temporary files:</span> <span class="token string">"client_body_temp"</span>
+  <span class="token property">nginx http proxy temporary files:</span> <span class="token string">"proxy_temp"</span>
+  <span class="token property">nginx http fastcgi temporary files:</span> <span class="token string">"fastcgi_temp"</span>
+  <span class="token property">nginx http uwsgi temporary files:</span> <span class="token string">"uwsgi_temp"</span>
+  <span class="token property">nginx http scgi temporary files:</span> <span class="token string">"scgi_temp"</span>
+
+ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>nginx<span class="token operator">-</span><span class="token number">1.18.0</span> weikeqin1<span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="1-3-nginx-conf配置文件检查"><a href="#1-3-nginx-conf配置文件检查" class="headerlink" title="(1.3) nginx.conf配置文件检查"></a>(1.3) <code>nginx.conf</code>配置文件检查</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">sudo <span class="token file-path string">/usr/local/nginx/sbin/nginx</span> <span class="token operator">-</span>t <span class="token operator">-</span>c <span class="token file-path string">/usr/local/nginx/conf/nginx.conf</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p> 出现以下日志说明配置ok</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">nginx:</span> the configuration file <span class="token file-path string">/usr/local/nginx/conf/nginx.conf</span> syntax is ok
+<span class="token property">nginx:</span> configuration file <span class="token file-path string">/usr/local/nginx/conf/nginx.conf</span> test is successful<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h2 id="1-4-启动"><a href="#1-4-启动" class="headerlink" title="(1.4) 启动"></a>(1.4) 启动</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token file-path string">/usr/local/nginx/sbin/nginx</span> <span class="token operator">-</span>c <span class="token file-path string">/usr/local/nginx/conf/nginx.conf</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span><span class="token operator">~</span> weikeqin1<span class="token operator">$</span> <span class="token file-path string">/usr/local/nginx/sbin/nginx</span> <span class="token operator">-</span>v
+<span class="token property">nginx version:</span> nginx<span class="token operator">/</span><span class="token number">1.18.0</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<p>  访问 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/">http://127.0.0.1:8080/</a> 就可以看到nginx的页面</p>
+<p> 或者通过 <code>ps -ef | grep nginx</code> 查看nginx是否成功启动</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>admin<span class="token operator">@</span>localhost nginx<span class="token punctuation">]</span><span class="token operator">$</span> ps <span class="token operator">-</span>ef <span class="token operator">|</span> grep nginx
+root          <span class="token number">1</span>      <span class="token number">0</span>  <span class="token number">0</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">23</span> <span class="token operator">?</span>        <span class="token time number">00:00:00</span> <span class="token file-path string">/bin/sh</span> <span class="token operator">-</span>c <span class="token file-path string">/usr/sbin/sshd</span> <span class="token operator">&amp;</span><span class="token operator">&amp;</span> <span class="token file-path string">/usr/sbin/crond</span> <span class="token operator">&amp;</span><span class="token operator">&amp;</span> bash <span class="token file-path string">/home/admin/start_container.sh</span> <span class="token number">1</span> jdos_data<span class="token operator">-</span>nginx <span class="token number">1030527</span> <span class="token operator">&amp;</span><span class="token operator">&amp;</span> sleep <span class="token number">9999999d</span>
+root        <span class="token number">948</span>      <span class="token number">1</span>  <span class="token number">0</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">31</span> <span class="token operator">?</span>        <span class="token time number">00:00:00</span> nginx<span class="token operator">:</span> master process <span class="token file-path string">/usr/local/nginx/sbin/nginx</span> <span class="token operator">-</span>c <span class="token file-path string">/usr/local/nginx/conf/nginx.conf</span>
+admin       <span class="token number">949</span>    <span class="token number">948</span>  <span class="token number">0</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">31</span> <span class="token operator">?</span>        <span class="token time number">00:00:00</span> nginx<span class="token operator">:</span> worker process
+admin       <span class="token number">950</span>    <span class="token number">948</span>  <span class="token number">0</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">31</span> <span class="token operator">?</span>        <span class="token time number">00:00:00</span> nginx<span class="token operator">:</span> worker process
+admin      <span class="token number">1051</span>    <span class="token number">743</span>  <span class="token number">0</span> <span class="token number">18</span><span class="token operator">:</span><span class="token number">34</span> pts<span class="token operator">/</span><span class="token number">0</span>    <span class="token time number">00:00:00</span> grep nginx
+<span class="token punctuation">[</span>admin<span class="token operator">@</span>localhost nginx<span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="1-5-nginx重启"><a href="#1-5-nginx重启" class="headerlink" title="(1.5) nginx重启"></a>(1.5) nginx重启</h2><p> Command-line parameters   <a target="_blank" rel="noopener" href="http://nginx.org/en/docs/switches.html">http://nginx.org/en/docs/switches.html</a></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">#</span> 重新加载配置 新启动一个worker处理
+<span class="token operator">#</span> reload configuration<span class="token punctuation">,</span> start the new worker process with a new configuration<span class="token punctuation">,</span> gracefully shut down old worker processes<span class="token punctuation">.</span> 
+<span class="token file-path string">/usr/local/nginx/sbin/nginx</span> <span class="token operator">-</span>s reload   <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="2-不同场景nginx配置"><a href="#2-不同场景nginx配置" class="headerlink" title="(2) 不同场景nginx配置"></a>(2) 不同场景nginx配置</h1><pre class="line-numbers language-conf" data-language="conf"><code class="language-conf">
+#user  nobody;
+worker_processes  2;
+
+error_log  logs&#x2F;error.log;
+#error_log  logs&#x2F;error.log  notice;
+#error_log  logs&#x2F;error.log  info;
+
+pid        logs&#x2F;nginx.pid;
+
+worker_rlimit_nofile  65535;
+
+
+events &#123;
+    use epoll;
+    worker_connections  1024;
+&#125;
+
+
+http &#123;
+    include       mime.types;
+    default_type  application&#x2F;octet-stream;
+    server_tokens                   off;
+
+    #log_format  main  &#39;$remote_addr - $remote_user [$time_local] &quot;$request&quot; &#39;
+    #                  &#39;$status $body_bytes_sent &quot;$http_referer&quot; &#39;
+    #                  &#39;&quot;$http_user_agent&quot; &quot;$http_x_forwarded_for&quot;&#39;;
+
+    #access_log  logs&#x2F;access.log  main;
+
+                                                       &#39;&quot;$gzip_ratio&quot;&#39;;
+    #charset                        utf-8;
+    server_names_hash_bucket_size   128;
+    client_header_buffer_size       32k;
+    large_client_header_buffers     4 32k;
+    client_max_body_size            300m;
+    sendfile                        on;
+    tcp_nopush                      on;
+    keepalive_timeout               0;
+    tcp_nodelay                     on;
+    client_body_buffer_size         512k;
+    fastcgi_intercept_errors        on;
+    proxy_connect_timeout           90;
+    proxy_read_timeout              180;
+    proxy_send_timeout              180;
+    proxy_buffer_size               256k;
+    proxy_buffers                   4 256k;
+    proxy_busy_buffers_size         256k;
+    proxy_temp_file_write_size      256k;
+    proxy_intercept_errors          on;
+    server_name_in_redirect         off;
+    proxy_hide_header       X-Powered-By;
+
+    gzip                            on;
+    gzip_min_length                 100;
+    gzip_buffers                    4 16k;
+    gzip_http_version               1.0;
+    gzip_comp_level                 9;
+    gzip_types                      text&#x2F;plain application&#x2F;x-javascript text&#x2F;css application&#x2F;xml;
+    gzip_vary                       on;
+    gzip_proxied                       any;
+    error_page 400 401 402 403 404 405 408 410 412 413 414 415 500 501 502 503 506 &#x3D; http:&#x2F;&#x2F;weikeqin.com&#x2F;error.html;
+
+
+    server &#123;
+        listen       8080      proxy_protocol;
+        server_name  localhost ;
+
+        #charset koi8-r;
+
+        access_log  logs&#x2F;host.access.log  main;
+        error_log   logs&#x2F;host.error.log;
+
+        location &#x2F; &#123;
+            root   html;
+            index  index.html index.htm;
+        &#125;
+
+        error_page  404              &#x2F;404.html;
+
+        # redirect server error pages to the static page &#x2F;50x.html
+        #
+        error_page   500 502 503 504  &#x2F;50x.html;
+        location &#x3D; &#x2F;50x.html &#123;
+            root   html;
+        &#125;
+
+        # proxy the PHP scripts to Apache listening on 127.0.0.1:80
+        #
+        #location ~ \.php$ &#123;
+        #    proxy_pass   http:&#x2F;&#x2F;127.0.0.1;
+        #&#125;
+
+        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+        #
+        #location ~ \.php$ &#123;
+        #    root           html;
+        #    fastcgi_pass   127.0.0.1:9000;
+        #    fastcgi_index  index.php;
+        #    fastcgi_param  SCRIPT_FILENAME  &#x2F;scripts$fastcgi_script_name;
+        #    include        fastcgi_params;
+        #&#125;
+
+        # deny access to .htaccess files, if Apache&#39;s document root
+        # concurs with nginx&#39;s one
+        #
+        #location ~ &#x2F;\.ht &#123;
+        #    deny  all;
+        #&#125;
+    &#125;
+
+
+    # another virtual host using mix of IP-, name-, and port-based configuration
+    #
+    #server &#123;
+    #    listen       8000;
+    #    listen       somename:8080;
+    #    server_name  somename  alias  another.alias;
+
+    #    location &#x2F; &#123;
+    #        root   html;
+    #        index  index.html index.htm;
+    #    &#125;
+    #&#125;
+
+
+    # HTTPS server
+    #
+    server &#123;
+        listen       443 ssl;
+        server_name  localhost;
+
+        ssl_certificate      cert.pem;
+        ssl_certificate_key  cert.key;
+
+        ssl_session_cache    shared:SSL:1m;
+        ssl_session_timeout  5m;
+
+        ssl_ciphers  HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers  on;
+
+        location &#x2F; &#123;
+            root   html;
+            index  index.html index.htm;
+        &#125;
+    &#125;
+
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="2-1-负载均衡"><a href="#2-1-负载均衡" class="headerlink" title="(2.1) 负载均衡"></a>(2.1) 负载均衡</h2><blockquote>
+<p> 跨多个应用程序实例的负载平衡是一种常用的技术，用于优化资源利用率、最大化吞吐量、减少延迟并确保容错配置。</p>
+</blockquote>
+<blockquote>
+<p> 使用nginx作为一个非常有效的HTTP负载均衡器，可以将流量分配到多个应用服务器，并使用nginx提高web应用程序的性能、可伸缩性和可靠性。</p>
+</blockquote>
+<blockquote>
+<p> nginx支持以下负载平衡机制（或方法）：<br> 轮询 - 对应用程序服务器的请求以循环方式分发，<br> 最少连接 - 下一个请求被分配给活动连接数最少的服务器，<br> ip哈希 - 哈希函数用于确定下一个请求应选择的服务器（基于客户端的ip地址）。</p>
+</blockquote>
+<p>  参考 nginx官网  <a target="_blank" rel="noopener" href="http://nginx.org/en/docs/http/load_balancing.html">http://nginx.org/en/docs/http/load_balancing.html</a></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">#</span> 服务器列表
+http <span class="token operator">&#123;</span>
+    upstream <span class="token ip-address constant">127.0.0.1</span> <span class="token operator">&#123;</span>
+        server <span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">8081</span><span class="token operator">;</span>
+        server <span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">8082</span><span class="token operator">;</span>
+        server <span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">8083</span><span class="token operator">;</span>
+    <span class="token operator">&#125;</span>
+
+    server <span class="token operator">&#123;</span>
+        listen <span class="token number">8080</span><span class="token operator">;</span>
+
+        location <span class="token operator">/</span> <span class="token operator">&#123;</span>
+            proxy_pass <span class="token url">http://127.0.0.1</span><span class="token operator">;</span>
+        <span class="token operator">&#125;</span>
+    <span class="token operator">&#125;</span>
+<span class="token operator">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  把 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/">http://127.0.0.1:8080</a> 的流量转发到 三台服务器上( 127.0.0.1:8081  127.0.0.1:8082  127.0.0.1:8081 )<br>  实际使用时，可以把一个域名下的流量转发到多个域名/ip上</p>
+<br>
+
+
+<h2 id="2-2-跨域请求转发"><a href="#2-2-跨域请求转发" class="headerlink" title="(2.2) 跨域请求转发"></a>(2.2) 跨域请求转发</h2><p>  把 <a target="_blank" rel="noopener" href="http://127.0.0.1:8080/demo/">http://127.0.0.1:8080/demo/</a> 的请求转发到 <a target="_blank" rel="noopener" href="http://127.0.0.1:11011/demo/">http://127.0.0.1:11011/demo/</a> </p>
+<p>  实际应用时会把域名 <a href="http://weikeqin.com/demo/">http://weikeqin.com/demo/</a> 的请求转发到 后台服务 <a target="_blank" rel="noopener" href="http://10.x.x.x:11011/demo/">http://10.x.x.x:11011/demo/</a></p>
+<pre class="line-numbers language-conf" data-language="conf"><code class="language-conf">server &#123;
+    listen       8080;
+    server_name  localhost;
+
+    #charset koi8-r;
+
+    access_log  logs&#x2F;host.access.log  main;
+
+    location &#x2F; &#123;
+        root   html;
+        index  index.html index.htm;
+    &#125;
+
+    #error_page  404              &#x2F;404.html;
+
+    # redirect server error pages to the static page &#x2F;50x.html
+    #
+    error_page   500 502 503 504  &#x2F;50x.html;
+    location &#x3D; &#x2F;50x.html &#123;
+        root   html;
+    &#125;
+
+    location &#x3D; &#x2F;demo&#x2F; &#123;
+        proxy_pass         http:&#x2F;&#x2F;localhost:11011;
+        proxy_set_header   Host             $host;
+        proxy_set_header   X-Real-IP        $remote_addr;
+        proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+    &#125;
+
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  注意 listen 对应的是 转发前的端口，server_name 对应转发前的域名/ip<br>  location对应转发后的url，proxy_pass 对应转发后的域名/ip 注意不要多加<code>/</code><br><br></p>
+<h1 id="3-遇到的问题"><a href="#3-遇到的问题" class="headerlink" title="(3) 遇到的问题"></a>(3) 遇到的问题</h1><p>  安装 启动 及 配置 的过程中遇到的问题。</p>
+<h2 id="3-1-缺少PCRE库"><a href="#3-1-缺少PCRE库" class="headerlink" title="(3.1) 缺少PCRE库"></a>(3.1) 缺少PCRE库</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token file-path string">./configure</span><span class="token operator">:</span> error<span class="token operator">:</span> the HTTP rewrite module requires the PCRE library<span class="token punctuation">.</span>
+You can either disable the module by using <span class="token operator">-</span><span class="token operator">-</span>without<span class="token operator">-</span>http_rewrite_module
+option<span class="token punctuation">,</span> or install the PCRE library into the system<span class="token punctuation">,</span> or build the PCRE library
+statically from the source with nginx by using <span class="token operator">-</span><span class="token operator">-</span>with<span class="token operator">-</span>pcre<span class="token operator">=</span><span class="token operator">&lt;</span>path<span class="token operator">></span> option<span class="token punctuation">.</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  解决办法<br>  pcre官网 <a target="_blank" rel="noopener" href="https://www.pcre.org/">https://www.pcre.org/</a><br>  pcre下载地址  <a target="_blank" rel="noopener" href="https://ftp.pcre.org/pub/pcre/">https://ftp.pcre.org/pub/pcre/</a></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">cd pcre<span class="token operator">-</span><span class="token number">8.44</span><span class="token operator">/</span>
+sudo <span class="token file-path string">./configure</span> <span class="token operator">-</span><span class="token operator">-</span>prefix<span class="token operator">=</span><span class="token operator">/</span>usr<span class="token operator">/</span>local
+sudo make
+sudo make install<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-2-目录没有写权限"><a href="#3-2-目录没有写权限" class="headerlink" title="(3.2) 目录没有写权限"></a>(3.2) 目录没有写权限</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>pcre<span class="token operator">-</span><span class="token number">8.44</span> weikeqin1<span class="token operator">$</span> brew install pcre
+Updating Homebrew<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token property">Error:</span> <span class="token property">The following directories are not writable by your user:</span>
+<span class="token file-path string">/usr/local/lib/pkgconfig</span>
+<span class="token file-path string">/usr/local/share/info</span>
+<span class="token file-path string">/usr/local/share/man/man3</span>
+<span class="token file-path string">/usr/local/share/man/man5</span>
+
+You should change the ownership of these directories to your user<span class="token punctuation">.</span>
+  sudo chown <span class="token operator">-</span>R <span class="token operator">$</span><span class="token operator">(</span>whoami<span class="token operator">)</span> <span class="token file-path string">/usr/local/lib/pkgconfig</span> <span class="token file-path string">/usr/local/share/info</span> <span class="token file-path string">/usr/local/share/man/man3</span> <span class="token file-path string">/usr/local/share/man/man5</span>
+
+And make sure that your user has write permission<span class="token punctuation">.</span>
+  chmod u<span class="token operator">+</span>w <span class="token file-path string">/usr/local/lib/pkgconfig</span> <span class="token file-path string">/usr/local/share/info</span> <span class="token file-path string">/usr/local/share/man/man3</span> <span class="token file-path string">/usr/local/share/man/man5</span>
+ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">:</span>pcre<span class="token operator">-</span><span class="token number">8.44</span> weikeqin1<span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  对应目录授权<br> <code>sudo chown -R weikeqin1 /usr/local/lib/pkgconfig /usr/local/share/info /usr/local/share/man/man3 /usr/local/share/man/man5</code><br><br></p>
+<h2 id="3-3-nginx-warn-the-“user”-directive-makes-sense-only-if-the-master-process-runs-with-super-user-privileges-ignored-in-usr-local-nginx-conf-nginx-conf-2"><a href="#3-3-nginx-warn-the-“user”-directive-makes-sense-only-if-the-master-process-runs-with-super-user-privileges-ignored-in-usr-local-nginx-conf-nginx-conf-2" class="headerlink" title="(3.3) nginx: [warn] the “user” directive makes sense only if the master process runs with super-user privileges, ignored in /usr/local/nginx/conf/nginx.conf:2"></a>(3.3) nginx: [warn] the “user” directive makes sense only if the master process runs with super-user privileges, ignored in /usr/local/nginx/conf/nginx.conf:2</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">nginx:</span> <span class="token punctuation">[</span>warn<span class="token punctuation">]</span> the <span class="token string">"user"</span> directive makes sense only if the master process runs with super<span class="token operator">-</span>user privileges<span class="token punctuation">,</span> ignored in <span class="token file-path string">/usr/local/nginx/conf/nginx.conf</span><span class="token operator">:</span><span class="token number">2</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>  用户没有权限</p>
+<ol>
+<li>注释掉用户，使用默认用户</li>
+<li>给用户设置权限</li>
+<li>手动启动<br></li>
+</ol>
+<h2 id="3-4-nginx-emerg-mkdir-“-dev-shm-nginx-temp-client-body”-failed-2-No-such-file-or-directory"><a href="#3-4-nginx-emerg-mkdir-“-dev-shm-nginx-temp-client-body”-failed-2-No-such-file-or-directory" class="headerlink" title="(3.4) nginx: [emerg] mkdir() “/dev/shm/nginx_temp/client_body” failed (2: No such file or directory)"></a>(3.4) nginx: [emerg] mkdir() “/dev/shm/nginx_temp/client_body” failed (2: No such file or directory)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">nginx:</span> <span class="token punctuation">[</span>emerg<span class="token punctuation">]</span> mkdir<span class="token operator">(</span><span class="token operator">)</span> <span class="token string">"/dev/shm/nginx_temp/client_body"</span> <span class="token property">failed (2:</span> No such file or directory<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>  缺少文件或目录，穿件对应的文件或目录<br>  <code>sudo mkdir -p /dev/shm/nginx_temp/client_body</code></p>
+<h2 id="3-5-nginx-emerg-bind-to-0-0-0-0-80-failed-13-Permission-denied"><a href="#3-5-nginx-emerg-bind-to-0-0-0-0-80-failed-13-Permission-denied" class="headerlink" title="(3.5) nginx: [emerg] bind() to 0.0.0.0:80 failed (13: Permission denied)"></a>(3.5) nginx: [emerg] bind() to 0.0.0.0:80 failed (13: Permission denied)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">nginx:</span> <span class="token punctuation">[</span>emerg<span class="token punctuation">]</span> bind<span class="token operator">(</span><span class="token operator">)</span> to <span class="token ip-address constant">0.0.0.0</span><span class="token operator">:</span><span class="token number">80</span> failed <span class="token operator">(</span><span class="token number">13</span><span class="token operator">:</span> Permission denied<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>  Linux只有root用户可以使用1024以下的端口</p>
+<ol>
+<li>使用root用户启动</li>
+<li>换一个端口</li>
+</ol>
+<h2 id="3-6-nginx-emerg-“server”-directive-is-not-allowed-here-in-usr-log-nginx-conf-domains-weikeqin-nginx-conf-1"><a href="#3-6-nginx-emerg-“server”-directive-is-not-allowed-here-in-usr-log-nginx-conf-domains-weikeqin-nginx-conf-1" class="headerlink" title="(3.6) nginx: [emerg] “server” directive is not allowed here in /usr/log/nginx/conf/domains/weikeqin_nginx.conf:1"></a>(3.6) nginx: [emerg] “server” directive is not allowed here in /usr/log/nginx/conf/domains/weikeqin_nginx.conf:1</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">nginx:</span> <span class="token punctuation">[</span>emerg<span class="token punctuation">]</span> <span class="token string">"server"</span> directive is not allowed here in <span class="token file-path string">/usr/local/nginx/conf/domains/weikeqin_nginx.conf</span><span class="token operator">:</span><span class="token number">1</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<ol>
+<li>检查 <code>/usr/local/nginx/conf/nginx.conf</code>  <code>/usr/local/nginx/conf/domains/weikeqin_nginx.conf</code> 两个文件有无配置错误</li>
+<li>手动启动</li>
+<li>把两个文件合并到一个 <code>/usr/local/nginx/conf/nginx.conf</code> </li>
+</ol>
+<h2 id="3-7-容器里配置nginx自动启动"><a href="#3-7-容器里配置nginx自动启动" class="headerlink" title="(3.7) 容器里配置nginx自动启动"></a>(3.7) 容器里配置nginx自动启动</h2><pre class="line-numbers language-sh" data-language="sh"><code class="language-sh"># 如果使用到nginx需要启动nginx，不要reload，因为nginx默认是不启动的，需要使用sudo执行
+# 注：首先创建client_body文件
+mkdir -p &#x2F;dev&#x2F;shm&#x2F;nginx_temp&#x2F;client_body
+sudo &#x2F;export&#x2F;servers&#x2F;nginx&#x2F;sbin&#x2F;nginx -c &#x2F;export&#x2F;servers&#x2F;nginx&#x2F;conf&#x2F;nginx.conf<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h2 id="3-8-the-page-you-are-looking-for-is-currently-unavailable"><a href="#3-8-the-page-you-are-looking-for-is-currently-unavailable" class="headerlink" title="(3.8) the page you are looking for is currently unavailable."></a>(3.8) the page you are looking for is currently unavailable.</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">An error occurred<span class="token punctuation">.</span>
+
+Sorry<span class="token punctuation">,</span> the page you are looking for is currently unavailable<span class="token punctuation">.</span>
+Please try again later<span class="token punctuation">.</span>
+
+If you are the system administrator of this resource then you should check the error log for details<span class="token punctuation">.</span>
+
+Faithfully yours<span class="token punctuation">,</span> nginx<span class="token punctuation">.</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  请求页面不存在，后端服务关掉了，启动就好了</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="http://nginx.org/en/docs/">nginx documentation</a><br>[2] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/jingmoxukong/p/5945200.html">Nginx 简易教程</a><br>[3] <a target="_blank" rel="noopener" href="https://juejin.im/post/6844903461549522952">十分钟-Nginx入门到上线</a><br>[4] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/30831419">解决Mac下安装nginx出现的问题</a><br>[5] <a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/8963143/nginx-install-on-mac-os-x-lion-cannot-find-pcre/17034433">Nginx install on Mac OS X Lion. Cannot find PCRE</a><br>[6] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/xiaohaillong/p/6120913.html">brew 无法安装提示不能在根目录下使用</a><br>[7] <a target="_blank" rel="noopener" href="https://blog.csdn.net/eagle_naixue/article/details/26063871">在mac os x 10.9.2上安装nginx</a><br>[8] <a target="_blank" rel="noopener" href="https://blog.csdn.net/frankcreen/article/details/77460374">nginx: [emerg] bind() to 0.0.0.0:80 failed (13: Permission denied)</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/nginx/" rel="tag"># nginx</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/08/08/jvm-jit/" rel="prev" title="JVM Just-In-Time">
+                  <i class="fa fa-chevron-left"></i> JVM Just-In-Time
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/08/22/generic-reference/" rel="next" title="泛化调用">
+                  泛化调用 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

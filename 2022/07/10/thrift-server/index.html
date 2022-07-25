@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="thrift Server 作用Server将 thrift 所有功能整合到一起：  1、创建一个 Transport；2、创建 Transport 使用的 I&#x2F;O Protocol；3、为 I&#x2F;O Protocol 创建 Processor；4、启动服务，等待客户端的连接；  thrift不同语言实现提供的服务器端的模式不一样    thrift Java版本为服务器端提供了多种模式： TSim">
+<meta property="og:type" content="article">
+<meta property="og:title" content="thrift服务模型">
+<meta property="og:url" content="http://weikeqin.com/2022/07/10/thrift-server/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="thrift Server 作用Server将 thrift 所有功能整合到一起：  1、创建一个 Transport；2、创建 Transport 使用的 I&#x2F;O Protocol；3、为 I&#x2F;O Protocol 创建 Processor；4、启动服务，等待客户端的连接；  thrift不同语言实现提供的服务器端的模式不一样    thrift Java版本为服务器端提供了多种模式： TSim">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-07-10T12:20:46.000Z">
+<meta property="article:modified_time" content="2022-07-24T01:47:26.749Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="thrift">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2022/07/10/thrift-server/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2022/07/10/thrift-server/","path":"2022/07/10/thrift-server/","title":"thrift服务模型"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>thrift服务模型 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#thrift-Server-%E4%BD%9C%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">thrift Server 作用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Demo-Go"><span class="nav-number">2.</span> <span class="nav-text">Demo-Go</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90-go"><span class="nav-number">3.</span> <span class="nav-text">源码分析-go</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#TSimpleServer"><span class="nav-number">3.1.</span> <span class="nav-text">TSimpleServer</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Serve"><span class="nav-number">3.1.1.</span> <span class="nav-text">Serve</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Listen"><span class="nav-number">3.1.2.</span> <span class="nav-text">Listen()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AcceptLoop"><span class="nav-number">3.1.3.</span> <span class="nav-text">AcceptLoop()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#innerAccept"><span class="nav-number">3.1.4.</span> <span class="nav-text">innerAccept</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#processRequests"><span class="nav-number">3.1.5.</span> <span class="nav-text">processRequests</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Demo-Java"><span class="nav-number">4.</span> <span class="nav-text">Demo-Java</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90Java"><span class="nav-number">5.</span> <span class="nav-text">源码解析Java</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#TServer"><span class="nav-number">5.1.</span> <span class="nav-text">TServer</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TSimpleServer-1"><span class="nav-number">5.2.</span> <span class="nav-text">TSimpleServer</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#serve"><span class="nav-number">5.2.1.</span> <span class="nav-text">serve</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/07/10/thrift-server/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          thrift服务模型
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-07-10 20:20:46" itemprop="dateCreated datePublished" datetime="2022-07-10T20:20:46+08:00">2022-07-10</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-24 09:47:26" itemprop="dateModified" datetime="2022-07-24T09:47:26+08:00">2022-07-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2022/07/10/thrift-server/" class="post-meta-item leancloud_visitors" data-flag-title="thrift服务模型" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="thrift-Server-作用"><a href="#thrift-Server-作用" class="headerlink" title="thrift Server 作用"></a>thrift Server 作用</h1><p>Server将 thrift 所有功能整合到一起：</p>
+<blockquote>
+<p>1、创建一个 Transport；<br>2、创建 Transport 使用的 I/O Protocol；<br>3、为 I/O Protocol 创建 Processor；<br>4、启动服务，等待客户端的连接；</p>
+</blockquote>
+<p>thrift不同语言实现提供的服务器端的模式不一样 </p>
+<p>  thrift Java版本为服务器端提供了多种模式： TSimpleServer 、 TThreadPoolServer 、 TNonblockingServer 、 THsHaServer 、 TThreadedSelectorServer </p>
+<p>  Thrift Go版本为服务器端提供了 TSimpleServer </p>
+<table>
+<thead>
+<tr>
+<th>IO模型</th>
+<th>Java</th>
+<th>Go</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>阻塞IO</td>
+<td>TSimpleServer</td>
+<td>-</td>
+<td>只有一个工作线程，循环监听新请求的到来并完成对请求的处理，一次只能接收和处理一个socket连接，效率比较低。</td>
+</tr>
+<tr>
+<td>阻塞IO</td>
+<td>TThreadPoolServer</td>
+<td>TSimpleServer</td>
+<td></td>
+</tr>
+<tr>
+<td>IO多路复用</td>
+<td>TNonblockingServer</td>
+<td>-</td>
+<td>TNonblockingServer 单线程工作，采用NIO的方式，所有的socket都被注册到selector中</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<span id="more"></span>
+
+<p>从是否为阻塞IO角度划分为：阻塞服务模型、非阻塞服务模型。<br>阻塞服务模型：TSimpleServer、TThreadPoolServer。<br>非阻塞服务模型：TNonblockingServer、THsHaServer 和 TThreadedSelectorServer。</p>
+<p>从网络服务模型角度划分为：单线程/协程、多线程/协程、事件驱动</p>
+<h1 id="Demo-Go"><a href="#Demo-Go" class="headerlink" title="Demo-Go"></a>Demo-Go</h1><p>  源码  <a target="_blank" rel="noopener" href="https://github.com/weikeqin/thrift-tutorial-go-demo">https://github.com/weikeqin/thrift-tutorial-go-demo</a> </p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	
+	addr <span class="token operator">:=</span> flag<span class="token punctuation">.</span><span class="token function">String</span><span class="token punctuation">(</span><span class="token string">"addr"</span><span class="token punctuation">,</span> <span class="token string">"localhost:9090"</span><span class="token punctuation">,</span> <span class="token string">"Address to listen to"</span><span class="token punctuation">)</span>
+	<span class="token keyword">var</span> protocolFactory thrift<span class="token punctuation">.</span>TProtocolFactory
+	<span class="token keyword">var</span> transportFactory thrift<span class="token punctuation">.</span>TTransportFactory
+	<span class="token keyword">var</span> transport thrift<span class="token punctuation">.</span>TServerTransport
+	<span class="token comment">// 省略部分代码</span>
+
+	<span class="token comment">// CalculatorHandler 实现了 Calculator 接口</span>
+	calculatorHandler <span class="token operator">:=</span> <span class="token function">NewCalculatorHandler</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token comment">// CalculatorProcessor 实现了 TProcessor 接口</span>
+	calculatorProcessor <span class="token operator">:=</span> tutorial<span class="token punctuation">.</span><span class="token function">NewCalculatorProcessor</span><span class="token punctuation">(</span>calculatorHandler<span class="token punctuation">)</span>
+	<span class="token comment">// 创建 TSimpleServer</span>
+	server <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTSimpleServer4</span><span class="token punctuation">(</span>calculatorProcessor<span class="token punctuation">,</span> transport<span class="token punctuation">,</span> transportFactory<span class="token punctuation">,</span> protocolFactory<span class="token punctuation">)</span>
+	fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span><span class="token string">"Starting the simple server... on "</span><span class="token punctuation">,</span> addr<span class="token punctuation">)</span>
+	<span class="token comment">// 启动server</span>
+	err <span class="token operator">:=</span> server<span class="token punctuation">.</span><span class="token function">Serve</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+	fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span><span class="token string">"server start"</span><span class="token punctuation">)</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+<h1 id="源码分析-go"><a href="#源码分析-go" class="headerlink" title="源码分析-go"></a>源码分析-go</h1><h2 id="TSimpleServer"><a href="#TSimpleServer" class="headerlink" title="TSimpleServer"></a>TSimpleServer</h2><p>  首先看一下 TSimpleServer 的结构，里面标识了 服务状态、服务任务等待组、互斥锁、处理类的工厂、服务通信方式、输入通信方式工厂 </p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">/*
+ * 这不是典型的TSimpleServer，因为它在接受套接字后不会被阻塞。
+ * 它更像是一个TThreadedServer，可以在不同的goroutine中处理不同的连接。
+ * 如果golang用户在客户端实现了一个类似conn池的东西，这将起作用。
+ * 
+ * This is not a typical TSimpleServer as it is not blocked after accept a socket.
+ * It is more like a TThreadedServer that can handle different connections in different goroutines.
+ * This will work if golang user implements a conn-pool like thing in client side.
+ */</span>
+<span class="token keyword">type</span> TSimpleServer <span class="token keyword">struct</span> <span class="token punctuation">&#123;</span>
+	closed <span class="token builtin">int32</span>            <span class="token comment">// 关闭</span>
+	wg     sync<span class="token punctuation">.</span>WaitGroup   <span class="token comment">// 等待任务组</span>
+	mu     sync<span class="token punctuation">.</span>Mutex       <span class="token comment">// 互斥锁</span>
+
+	processorFactory       TProcessorFactory  <span class="token comment">// 处理工厂</span>
+	serverTransport        TServerTransport   <span class="token comment">// 服务通信   server具体实现</span>
+	inputTransportFactory  TTransportFactory  <span class="token comment">// 输入通信方式工厂</span>
+	outputTransportFactory TTransportFactory  <span class="token comment">// 输出通信方式工厂</span>
+	inputProtocolFactory   TProtocolFactory   <span class="token comment">// 输入协议工厂</span>
+	outputProtocolFactory  TProtocolFactory   <span class="token comment">// 输出协议工厂</span>
+
+	<span class="token comment">// Headers to auto forward in THeaderProtocol</span>
+	forwardHeaders <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token builtin">string</span>
+
+	logger Logger
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="Serve"><a href="#Serve" class="headerlink" title="Serve"></a>Serve</h3><p>  Serve是启动服务的方法，主要做了2件事<br>1、监听指定地址及端口。<br>2、开始accept阻塞，循环 接收并处理客户端的请求。</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">Serve</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+	p<span class="token punctuation">.</span>logger <span class="token operator">=</span> <span class="token function">fallbackLogger</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>logger<span class="token punctuation">)</span>
+
+    <span class="token comment">// 开启监听</span>
+	err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">Listen</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+    <span class="token punctuation">&#125;</span>
+    
+    <span class="token comment">// 阻塞，循环接收并处理客户端的请求</span>
+	p<span class="token punctuation">.</span><span class="token function">AcceptLoop</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="Listen"><a href="#Listen" class="headerlink" title="Listen()"></a>Listen()</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 监听</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">Listen</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> p<span class="token punctuation">.</span>serverTransport<span class="token punctuation">.</span><span class="token function">Listen</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 服务通信方式 </span>
+<span class="token comment">// Server transport. Object which provides client transports.</span>
+<span class="token keyword">type</span> TServerTransport <span class="token keyword">interface</span> <span class="token punctuation">&#123;</span>
+	<span class="token function">Listen</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span>
+	<span class="token function">Accept</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">(</span>TTransport<span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span>
+	<span class="token function">Close</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span>
+
+	<span class="token comment">// Optional method implementation. This signals to the server transport</span>
+	<span class="token comment">// that it should break out of any accept() or listen() that it is currently</span>
+	<span class="token comment">// blocked on. This method, if implemented, MUST be thread safe, as it may</span>
+	<span class="token comment">// be called from a different thread context than the other TServerTransport</span>
+	<span class="token comment">// methods.</span>
+	<span class="token function">Interrupt</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  TServerTransport接口的实现类有2个: <code>TServerSocket</code> 、<code>TSSLServerSocket</code>  </p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// </span>
+<span class="token keyword">type</span> TServerSocket <span class="token keyword">struct</span> <span class="token punctuation">&#123;</span>
+	listener      net<span class="token punctuation">.</span>Listener
+	addr          net<span class="token punctuation">.</span>Addr
+	clientTimeout time<span class="token punctuation">.</span>Duration
+
+	<span class="token comment">// Protects the interrupted value to make it thread safe.</span>
+	mu          sync<span class="token punctuation">.</span>RWMutex
+	interrupted <span class="token builtin">bool</span>
+<span class="token punctuation">&#125;</span>
+
+
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TServerSocket<span class="token punctuation">)</span> <span class="token function">Listen</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+	p<span class="token punctuation">.</span>mu<span class="token punctuation">.</span><span class="token function">Lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token keyword">defer</span> p<span class="token punctuation">.</span>mu<span class="token punctuation">.</span><span class="token function">Unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token keyword">if</span> p<span class="token punctuation">.</span><span class="token function">IsListening</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> <span class="token boolean">nil</span>
+	<span class="token punctuation">&#125;</span>
+	l<span class="token punctuation">,</span> err <span class="token operator">:=</span> net<span class="token punctuation">.</span><span class="token function">Listen</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>addr<span class="token punctuation">.</span><span class="token function">Network</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> p<span class="token punctuation">.</span>addr<span class="token punctuation">.</span><span class="token function">String</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+	<span class="token punctuation">&#125;</span>
+	p<span class="token punctuation">.</span>listener <span class="token operator">=</span> l
+	<span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="AcceptLoop"><a href="#AcceptLoop" class="headerlink" title="AcceptLoop()"></a>AcceptLoop()</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 循环接收请求</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">AcceptLoop</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">for</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 内部接受 </span>
+        closed<span class="token punctuation">,</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">innerAccept</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token comment">// 这块出错只能是serverTransport接收请求出错</span>
+		<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 出错，跳出循环，返回</span>
+			<span class="token keyword">return</span> err
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// closed=0是服务器开启状态  </span>
+		<span class="token keyword">if</span> closed <span class="token operator">!=</span> <span class="token number">0</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 服务关闭，跳出循环，返回</span>
+			<span class="token keyword">return</span> <span class="token boolean">nil</span>
+		<span class="token punctuation">&#125;</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="innerAccept"><a href="#innerAccept" class="headerlink" title="innerAccept"></a>innerAccept</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">innerAccept</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token builtin">int32</span><span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 接收请求</span>
+    client<span class="token punctuation">,</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span>serverTransport<span class="token punctuation">.</span><span class="token function">Accept</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment">// 加互斥锁 保证处理请求并发安全</span>
+	p<span class="token punctuation">.</span>mu<span class="token punctuation">.</span><span class="token function">Lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">defer</span> p<span class="token punctuation">.</span>mu<span class="token punctuation">.</span><span class="token function">Unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment">// 获取closed的值 </span>
+    closed <span class="token operator">:=</span> atomic<span class="token punctuation">.</span><span class="token function">LoadInt32</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>p<span class="token punctuation">.</span>closed<span class="token punctuation">)</span>
+    <span class="token comment">// 检查服务是否关闭 closed=1是服务关闭</span>
+	<span class="token keyword">if</span> closed <span class="token operator">!=</span> <span class="token number">0</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> closed<span class="token punctuation">,</span> <span class="token boolean">nil</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 从serverTransport接收请求是否异常</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">,</span> err
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// client是传输方式 </span>
+	<span class="token keyword">if</span> client <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+        p<span class="token punctuation">.</span>wg<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token comment">// 开一个goroutine单独处理</span>
+		<span class="token keyword">go</span> <span class="token keyword">func</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">defer</span> p<span class="token punctuation">.</span>wg<span class="token punctuation">.</span><span class="token function">Done</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token comment">// 处理请求</span>
+			<span class="token keyword">if</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">processRequests</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+				p<span class="token punctuation">.</span><span class="token function">logger</span><span class="token punctuation">(</span>fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"error processing request: %v"</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span><span class="token punctuation">)</span>
+			<span class="token punctuation">&#125;</span>
+		<span class="token punctuation">&#125;</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="processRequests"><a href="#processRequests" class="headerlink" title="processRequests"></a>processRequests</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 处理请求 </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">processRequests</span><span class="token punctuation">(</span>client TTransport<span class="token punctuation">)</span> <span class="token punctuation">(</span>err <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">defer</span> <span class="token keyword">func</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		err <span class="token operator">=</span> <span class="token function">treatEOFErrorsAsNil</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment">// 获取处理器 </span>
+    <span class="token comment">// 这里获取到的是*tutorial.CalculatorProcessor</span>
+    processor <span class="token operator">:=</span> p<span class="token punctuation">.</span>processorFactory<span class="token punctuation">.</span><span class="token function">GetProcessor</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+    <span class="token comment">// 获取输入请求传输方式</span>
+	inputTransport<span class="token punctuation">,</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span>inputTransportFactory<span class="token punctuation">.</span><span class="token function">GetTransport</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 输入通信协议</span>
+	inputProtocol <span class="token operator">:=</span> p<span class="token punctuation">.</span>inputProtocolFactory<span class="token punctuation">.</span><span class="token function">GetProtocol</span><span class="token punctuation">(</span>inputTransport<span class="token punctuation">)</span>
+	<span class="token keyword">var</span> outputTransport TTransport
+	<span class="token keyword">var</span> outputProtocol TProtocol
+
+	<span class="token comment">// for THeaderProtocol, we must use the same protocol instance for</span>
+	<span class="token comment">// input and output so that the response is in the same dialect that</span>
+	<span class="token comment">// the server detected the request was in.</span>
+	headerProtocol<span class="token punctuation">,</span> ok <span class="token operator">:=</span> inputProtocol<span class="token punctuation">.</span><span class="token punctuation">(</span><span class="token operator">*</span>THeaderProtocol<span class="token punctuation">)</span>
+	<span class="token keyword">if</span> ok <span class="token punctuation">&#123;</span>
+		outputProtocol <span class="token operator">=</span> inputProtocol
+	<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 输出传输方式</span>
+		oTrans<span class="token punctuation">,</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span>outputTransportFactory<span class="token punctuation">.</span><span class="token function">GetTransport</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+		<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">return</span> err
+		<span class="token punctuation">&#125;</span>
+		outputTransport <span class="token operator">=</span> oTrans
+		outputProtocol <span class="token operator">=</span> p<span class="token punctuation">.</span>outputProtocolFactory<span class="token punctuation">.</span><span class="token function">GetProtocol</span><span class="token punctuation">(</span>outputTransport<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token keyword">if</span> inputTransport <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">defer</span> inputTransport<span class="token punctuation">.</span><span class="token function">Close</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">if</span> outputTransport <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">defer</span> outputTransport<span class="token punctuation">.</span><span class="token function">Close</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">for</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">if</span> atomic<span class="token punctuation">.</span><span class="token function">LoadInt32</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>p<span class="token punctuation">.</span>closed<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">return</span> <span class="token boolean">nil</span>
+		<span class="token punctuation">&#125;</span>
+
+		ctx <span class="token operator">:=</span> <span class="token function">SetResponseHelper</span><span class="token punctuation">(</span>
+			defaultCtx<span class="token punctuation">,</span>
+			TResponseHelper<span class="token punctuation">&#123;</span>
+				THeaderResponseHelper<span class="token punctuation">:</span> <span class="token function">NewTHeaderResponseHelper</span><span class="token punctuation">(</span>outputProtocol<span class="token punctuation">)</span><span class="token punctuation">,</span>
+			<span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+		<span class="token punctuation">)</span>
+		<span class="token keyword">if</span> headerProtocol <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+			<span class="token comment">// We need to call ReadFrame here, otherwise we won't</span>
+			<span class="token comment">// get any headers on the AddReadTHeaderToContext call.</span>
+			<span class="token comment">//</span>
+			<span class="token comment">// ReadFrame is safe to be called multiple times so it</span>
+			<span class="token comment">// won't break when it's called again later when we</span>
+			<span class="token comment">// actually start to read the message.</span>
+			<span class="token keyword">if</span> err <span class="token operator">:=</span> headerProtocol<span class="token punctuation">.</span><span class="token function">ReadFrame</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+				<span class="token keyword">return</span> err
+			<span class="token punctuation">&#125;</span>
+			ctx <span class="token operator">=</span> <span class="token function">AddReadTHeaderToContext</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> headerProtocol<span class="token punctuation">.</span><span class="token function">GetReadHeaders</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+			ctx <span class="token operator">=</span> <span class="token function">SetWriteHeaderList</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> p<span class="token punctuation">.</span>forwardHeaders<span class="token punctuation">)</span>
+		<span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// 调用对应处理方法处理请求 </span>
+        <span class="token comment">// 返回数据会写入到 outputProtocol的TTransport里</span>
+        ok<span class="token punctuation">,</span> err <span class="token operator">:=</span> processor<span class="token punctuation">.</span><span class="token function">Process</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> inputProtocol<span class="token punctuation">,</span> outputProtocol<span class="token punctuation">)</span>
+        <span class="token comment">// 主动断开</span>
+		<span class="token keyword">if</span> errors<span class="token punctuation">.</span><span class="token function">Is</span><span class="token punctuation">(</span>err<span class="token punctuation">,</span> ErrAbandonRequest<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">return</span> client<span class="token punctuation">.</span><span class="token function">Close</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 通信异常</span>
+		<span class="token keyword">if</span> errors<span class="token punctuation">.</span><span class="token function">As</span><span class="token punctuation">(</span>err<span class="token punctuation">,</span> <span class="token function">new</span><span class="token punctuation">(</span>TTransportException<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 经常遇到的错误 read: connection reset by peer 就是这儿返回的 </span>
+            <span class="token comment">// read tcp 127.0.0.1:9090->127.0.0.1:58470: read: connection reset by peer</span>
+            <span class="token comment">// 还有 EOF </span>
+			<span class="token keyword">return</span> err
+		<span class="token punctuation">&#125;</span>
+		<span class="token keyword">var</span> tae TApplicationException
+		<span class="token keyword">if</span> errors<span class="token punctuation">.</span><span class="token function">As</span><span class="token punctuation">(</span>err<span class="token punctuation">,</span> <span class="token operator">&amp;</span>tae<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> tae<span class="token punctuation">.</span><span class="token function">TypeId</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> UNKNOWN_METHOD <span class="token punctuation">&#123;</span>
+			<span class="token keyword">continue</span>
+		<span class="token punctuation">&#125;</span>
+		<span class="token keyword">if</span> <span class="token operator">!</span>ok <span class="token punctuation">&#123;</span>
+			<span class="token keyword">break</span>
+		<span class="token punctuation">&#125;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">Stop</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+	p<span class="token punctuation">.</span>mu<span class="token punctuation">.</span><span class="token function">Lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token comment">// 加互斥锁</span>
+    <span class="token keyword">defer</span> p<span class="token punctuation">.</span>mu<span class="token punctuation">.</span><span class="token function">Unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token comment">// 互斥锁解锁</span>
+    <span class="token comment">// 如果已经关闭 直接返回    closed=1是关闭 closed=0是开启</span>
+	<span class="token keyword">if</span> atomic<span class="token punctuation">.</span><span class="token function">LoadInt32</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>p<span class="token punctuation">.</span>closed<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> <span class="token boolean">nil</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 设置closed=1 关闭</span>
+    atomic<span class="token punctuation">.</span><span class="token function">StoreInt32</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>p<span class="token punctuation">.</span>closed<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token comment">// 发送中断信号</span>
+    p<span class="token punctuation">.</span>serverTransport<span class="token punctuation">.</span><span class="token function">Interrupt</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment">// 等待所有请求处理完</span>
+	p<span class="token punctuation">.</span>wg<span class="token punctuation">.</span><span class="token function">Wait</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<h1 id="Demo-Java"><a href="#Demo-Java" class="headerlink" title="Demo-Java"></a>Demo-Java</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// </span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+<h1 id="源码解析Java"><a href="#源码解析Java" class="headerlink" title="源码解析Java"></a>源码解析Java</h1><h2 id="TServer"><a href="#TServer" class="headerlink" title="TServer"></a>TServer</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>thrift<span class="token punctuation">.</span>server</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * Generic interface for a Thrift server.
+ *
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">TServer</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token comment">/**
+   * Core processor
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TProcessorFactory</span> processorFactory_<span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * Server transport
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TServerTransport</span> serverTransport_<span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * Input Transport Factory
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TTransportFactory</span> inputTransportFactory_<span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * Output Transport Factory
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TTransportFactory</span> outputTransportFactory_<span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * Input Protocol Factory
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TProtocolFactory</span> inputProtocolFactory_<span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * Output Protocol Factory
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TProtocolFactory</span> outputProtocolFactory_<span class="token punctuation">;</span>
+
+  <span class="token keyword">private</span> <span class="token keyword">volatile</span> <span class="token keyword">boolean</span> isServing<span class="token punctuation">;</span>
+
+  <span class="token keyword">protected</span> <span class="token class-name">TServerEventHandler</span> eventHandler_<span class="token punctuation">;</span>
+
+  <span class="token comment">// Flag for stopping the server</span>
+  <span class="token comment">// Please see THRIFT-1795 for the usage of this flag</span>
+  <span class="token keyword">protected</span> <span class="token keyword">volatile</span> <span class="token keyword">boolean</span> stopped_ <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * 构造方法
+   * 设置处理工厂、服务通信方式、输入传输方式、输出通信方式、输入协议工厂、
+   */</span>
+  <span class="token keyword">protected</span> <span class="token class-name">TServer</span><span class="token punctuation">(</span><span class="token class-name">AbstractServerArgs</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    processorFactory_ <span class="token operator">=</span> args<span class="token punctuation">.</span>processorFactory<span class="token punctuation">;</span>
+    serverTransport_ <span class="token operator">=</span> args<span class="token punctuation">.</span>serverTransport<span class="token punctuation">;</span>
+    inputTransportFactory_ <span class="token operator">=</span> args<span class="token punctuation">.</span>inputTransportFactory<span class="token punctuation">;</span>
+    outputTransportFactory_ <span class="token operator">=</span> args<span class="token punctuation">.</span>outputTransportFactory<span class="token punctuation">;</span>
+    inputProtocolFactory_ <span class="token operator">=</span> args<span class="token punctuation">.</span>inputProtocolFactory<span class="token punctuation">;</span>
+    outputProtocolFactory_ <span class="token operator">=</span> args<span class="token punctuation">.</span>outputProtocolFactory<span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">Args</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractServerArgs</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Args</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">public</span> <span class="token class-name">Args</span><span class="token punctuation">(</span><span class="token class-name">TServerTransport</span> transport<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">super</span><span class="token punctuation">(</span>transport<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">/**
+   * The run method fires up the server and gets things going.
+   */</span>
+  <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">void</span> <span class="token function">serve</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">/**
+   * Stop the server. This is optional on a per-implementation basis. Not
+   * all servers are required to be cleanly stoppable.
+   */</span>
+  <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">stop</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到<code>TServer</code>是一个抽象类</p>
+<ol>
+<li>里面定义了server比较重要信息：核心处理工厂()、服务通信方式(server的实现)、输入传输方式工厂、输出传输方式工厂、输入协议工厂、输出协议工厂</li>
+<li>定义了TServer的构造方法</li>
+<li>服务启动方法<code>serve()</code>是一个抽象方法，需要子类自己去实现; 服务关闭方法<code>stop()</code>是一个普通方法，子类可以选择是否实现。</li>
+</ol>
+<h2 id="TSimpleServer-1"><a href="#TSimpleServer-1" class="headerlink" title="TSimpleServer"></a>TSimpleServer</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>thrift<span class="token punctuation">.</span>server</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * Simple singlethreaded server for testing.
+ *
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">TSimpleServer</span> <span class="token keyword">extends</span> <span class="token class-name">TServer</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token keyword">public</span> <span class="token class-name">TSimpleServer</span><span class="token punctuation">(</span><span class="token class-name">AbstractServerArgs</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">super</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="serve"><a href="#serve" class="headerlink" title="serve"></a>serve</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 启动serve</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">serve</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 监听</span>
+    serverTransport_<span class="token punctuation">.</span><span class="token function">listen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">TTransportException</span> ttx<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    LOGGER<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"Error occurred during listening."</span><span class="token punctuation">,</span> ttx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// </span>
+  <span class="token comment">// Run the preServe event</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>eventHandler_ <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    eventHandler_<span class="token punctuation">.</span><span class="token function">preServe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// </span>
+  <span class="token function">setServing</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// </span>
+  <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token operator">!</span>stopped_<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">TTransport</span> client <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">TProcessor</span> processor <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">TTransport</span> inputTransport <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">TTransport</span> outputTransport <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">TProtocol</span> inputProtocol <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">TProtocol</span> outputProtocol <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">ServerContext</span> connectionContext <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+      <span class="token comment">// 接收请求</span>
+      client <span class="token operator">=</span> serverTransport_<span class="token punctuation">.</span><span class="token function">accept</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>client <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        processor <span class="token operator">=</span> processorFactory_<span class="token punctuation">.</span><span class="token function">getProcessor</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        inputTransport <span class="token operator">=</span> inputTransportFactory_<span class="token punctuation">.</span><span class="token function">getTransport</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        outputTransport <span class="token operator">=</span> outputTransportFactory_<span class="token punctuation">.</span><span class="token function">getTransport</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        inputProtocol <span class="token operator">=</span> inputProtocolFactory_<span class="token punctuation">.</span><span class="token function">getProtocol</span><span class="token punctuation">(</span>inputTransport<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        outputProtocol <span class="token operator">=</span> outputProtocolFactory_<span class="token punctuation">.</span><span class="token function">getProtocol</span><span class="token punctuation">(</span>outputTransport<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>eventHandler_ <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+          connectionContext <span class="token operator">=</span> eventHandler_<span class="token punctuation">.</span><span class="token function">createContext</span><span class="token punctuation">(</span>inputProtocol<span class="token punctuation">,</span> outputProtocol<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 循环处理请求</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+          <span class="token keyword">if</span> <span class="token punctuation">(</span>eventHandler_ <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// </span>
+            eventHandler_<span class="token punctuation">.</span><span class="token function">processContext</span><span class="token punctuation">(</span>connectionContext<span class="token punctuation">,</span> inputTransport<span class="token punctuation">,</span> outputTransport<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token punctuation">&#125;</span>
+          <span class="token comment">// 调对应的方法 处理请求</span>
+          processor<span class="token punctuation">.</span><span class="token function">process</span><span class="token punctuation">(</span>inputProtocol<span class="token punctuation">,</span> outputProtocol<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">TTransportException</span> ttx<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token comment">// Client died, just move on</span>
+      LOGGER<span class="token punctuation">.</span><span class="token function">debug</span><span class="token punctuation">(</span><span class="token string">"Client Transportation Exception"</span><span class="token punctuation">,</span> ttx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">TException</span> tx<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>stopped_<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        LOGGER<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"Thrift error occurred during processing of message."</span><span class="token punctuation">,</span> tx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> x<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>stopped_<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        LOGGER<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"Error occurred during processing of message."</span><span class="token punctuation">,</span> x<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 删除</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>eventHandler_ <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      eventHandler_<span class="token punctuation">.</span><span class="token function">deleteContext</span><span class="token punctuation">(</span>connectionContext<span class="token punctuation">,</span> inputProtocol<span class="token punctuation">,</span> outputProtocol<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 关闭输入通信方式</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>inputTransport <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      inputTransport<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 关闭输出通信方式</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>outputTransport <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      outputTransport<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// 设置服务关闭</span>
+  <span class="token function">setServing</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/45194187">Apache Thrift系列详解(二) - 网络服务模型</a><br>[2] <a target="_blank" rel="noopener" href="https://xiaoyaozi.blog.csdn.net/article/details/42779915">由浅入深了解Thrift（三）——Thrift server端的几种工作模式分析</a><br>[3] <a target="_blank" rel="noopener" href="https://www.jianshu.com/p/adee5315aedd">6.Thrift指南 thrift go源码解析 1</a><br>[4] <a target="_blank" rel="noopener" href="https://www.codelast.com/%E5%8E%9F%E5%88%9B%EF%BC%88%E7%BF%BB%E8%AF%91%EF%BC%89java%E7%89%88%E7%9A%84%E5%90%84%E7%A7%8Dthrift-server%E5%AE%9E%E7%8E%B0%E7%9A%84%E6%AF%94%E8%BE%83/">[原创]（翻译）Java版的各种Thrift server实现的比较</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/thrift/" rel="tag"># thrift</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/07/10/thrift-client/" rel="prev" title="thrift客户端">
+                  <i class="fa fa-chevron-left"></i> thrift客户端
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

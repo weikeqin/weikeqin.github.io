@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="Bloom Filter是由Bloom在1970年提出的一种多哈希函数映射的快速查找算法。通常应用在一些需要快速判断某个元素是否属于集合，但是并不严格要求100%正确的场合。例如 网页URL的去重，垃圾邮件的判别，集合重复元素的判别，查询加速（比如基于key-value的存储系统）等。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="布隆过滤器">
+<meta property="og:url" content="http://weikeqin.com/2017/05/01/bloom-filter/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Bloom Filter是由Bloom在1970年提出的一种多哈希函数映射的快速查找算法。通常应用在一些需要快速判断某个元素是否属于集合，但是并不严格要求100%正确的场合。例如 网页URL的去重，垃圾邮件的判别，集合重复元素的判别，查询加速（比如基于key-value的存储系统）等。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/algorithm/BloomFilter/Bloom_filter.jpg">
+<meta property="og:image" content="http://weikeqin.com/img/algorithm/BloomFilter/URL.png">
+<meta property="article:published_time" content="2017-05-01T00:13:02.000Z">
+<meta property="article:modified_time" content="2022-07-09T14:22:11.209Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="algorithm">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/algorithm/BloomFilter/Bloom_filter.jpg">
+
+
+<link rel="canonical" href="http://weikeqin.com/2017/05/01/bloom-filter/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2017/05/01/bloom-filter/","path":"2017/05/01/bloom-filter/","title":"布隆过滤器"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>布隆过滤器 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E5%AE%9E%E4%BE%8B"><span class="nav-number">1.</span> <span class="nav-text">(1) 实例</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Bloom-Filter%E7%9A%84%E7%AE%97%E6%B3%95"><span class="nav-number">2.</span> <span class="nav-text">(2) Bloom Filter的算法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">2.1.</span> <span class="nav-text"></span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bloom-Filter-%E5%B8%83%E9%9A%86%E8%BF%87%E6%BB%A4%E5%99%A8-%E5%8E%9F%E7%90%86"><span class="nav-number">2.2.</span> <span class="nav-text">Bloom Filter(布隆过滤器)原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E4%BE%8B"><span class="nav-number">2.3.</span> <span class="nav-text">实例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Bloom-Filter%E5%8F%82%E6%95%B0%E9%80%89%E6%8B%A9"><span class="nav-number">3.</span> <span class="nav-text">(3) Bloom Filter参数选择</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E5%B8%83%E9%9A%86%E8%BF%87%E6%BB%A4%E5%99%A8%E5%BA%94%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">(4)　布隆过滤器应用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-Bloom-Filter%E5%AE%9E%E7%8E%B0%E4%BB%A3%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">(4) Bloom Filter实现代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%EF%BC%9A"><span class="nav-number">6.</span> <span class="nav-text">参考：</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2017/05/01/bloom-filter/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          布隆过滤器
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2017-05-01 08:13:02" itemprop="dateCreated datePublished" datetime="2017-05-01T08:13:02+08:00">2017-05-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-09 22:22:11" itemprop="dateModified" datetime="2022-07-09T22:22:11+08:00">2022-07-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/algorithm/" itemprop="url" rel="index"><span itemprop="name">algorithm</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2017/05/01/bloom-filter/" class="post-meta-item leancloud_visitors" data-flag-title="布隆过滤器" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Bloom Filter是由Bloom在1970年提出的一种多哈希函数映射的快速查找算法。通常应用在一些需要快速判断某个元素是否属于集合，但是并不严格要求100%正确的场合。例如 网页URL的去重，垃圾邮件的判别，集合重复元素的判别，查询加速（比如基于key-value的存储系统）等。</p>
+<span id="more"></span>
+
+<h2 id="1-实例"><a href="#1-实例" class="headerlink" title="(1) 实例"></a>(1) 实例</h2><p>　　为了说明Bloom Filter存在的重要意义，举一个实例：</p>
+<p>　　假设要你写一个网络蜘蛛（web crawler）。由于网络间的链接错综复杂，蜘蛛在网络间爬行很可能会形成“环”。为了避免形成“环”，就需要知道蜘蛛已经访问过那些URL。给一个URL，怎样知道蜘蛛是否已经访问过呢？稍微想想，就会有如下几种方案：</p>
+<p>　　1. 将访问过的URL保存到数据库。</p>
+<p>　　2. 用HashSet将访问过的URL保存起来。那只需接近O(1)的代价就可以查到一个URL是否被访问过了。</p>
+<p>　　3. URL经过MD5或SHA-1等单向哈希后再保存到HashSet或数据库。</p>
+<p>　　4. Bit-Map方法。建立一个BitSet，将每个URL经过一个哈希函数映射到某一位。</p>
+<p>　　方法1~3都是将访问过的URL完整保存，方法4则只标记URL的一个映射位。</p>
+<p>　　以上方法在数据量较小的情况下都能完美解决问题，但是当数据量变得非常庞大时问题就来了。</p>
+<p>　　方法1的缺点：数据量变得非常庞大后关系型数据库查询的效率会变得很低。而且每来一个URL就启动一次数据库查询是不是太小题大做了？</p>
+<p>　　方法2的缺点：太消耗内存。随着URL的增多，占用的内存会越来越多。就算只有1亿个URL，每个URL只算50个字符，就需要5GB内存。</p>
+<p>　　方法3：由于字符串经过MD5处理后的信息摘要长度只有128Bit，SHA-1处理后也只有160Bit，因此方法3比方法2节省了好几倍的内存。</p>
+<p>　　方法4消耗内存是相对较少的，但缺点是单一哈希函数发生冲突的概率太高。还记得数据结构课上学过的Hash表冲突的各种解决方法么？若要降低冲突发生的概率到1%，就要将BitSet的长度设置为URL个数的100倍。</p>
+<p>　　实质上上面的算法都忽略了一个重要的隐含条件：允许小概率的出错，不一定要100%准确！也就是说少量url实际上没有没网络蜘蛛访问，而将它们错判为已访问的代价是很小的——大不了少抓几个网页呗。 </p>
+<h2 id="2-Bloom-Filter的算法"><a href="#2-Bloom-Filter的算法" class="headerlink" title="(2) Bloom Filter的算法"></a>(2) Bloom Filter的算法</h2><p>  废话说到这里，下面引入本篇的主角——Bloom Filter。其实上面方法4的思想已经很接近Bloom Filter了。方法四的致命缺点是冲突概率高，为了降低冲突的概念，Bloom Filter使用了多个哈希函数，而不是一个。</p>
+<h3 id=""><a href="#" class="headerlink" title=""></a></h3><p>Bloom Filter是1970年由Bloom提出的。它实际上是一个很长的二进制向量和一系列随机映射函数（Hash函数）。布隆过滤器可以用于检索一个元素是否在一个集合中。它的优点是空间效率和查询时间都远远超过一般的算法，缺点是有一定的误识别率和删除困难。Bloom Filter广泛的应用于各种需要查询的场合中，如Orocle的数据库，Google的BitTable也用了此技术。</p>
+<p>如果想判断一个元素是不是在一个集合里，一般想到的是将所有元素保存起来，然后通过比较确定。链表，树等等数据结构都是这种思路. 但是随着集合中元素的增加，我们需要的存储空间越来越大，检索速度也越来越慢(O(n),O(logn))。</p>
+<p>这时候就可以利用哈希表这个数据结构（它可以通过一个Hash函数将一个元素映射成一个位阵列（Bit array）中的一个点）。这样一来，我们只要看看这个点是不是1就知道可以集合中有没有它了。这就是Bloom Filter的基本思想。</p>
+<p>但这时，哈希冲突会是一个问题：假设Hash函数是良好的，如果我们的位阵列长度为m个点，那么如果我们想将冲突率降低到例如 1%, 这个散列表就只能容纳m/100个元素。显然这就不叫空间效率了（Space-efficient）了。解决方法也简单，就是使用多个Hash，如果它们有一个说元素不在集合中，那肯定就不在。如果它们都说在，虽然也有一定可能性它们都在说谎，不过直觉上判断这种事情的概率是比较低的。这种多个Hash组成的数据结构就叫Bloom Filter。</p>
+<p>一个Bloom Filter是基于一个m位的位向量（b1,…bm），这些位向量的初始值为0。另外，还有一系列的hash函数（h1,…hk），这些hash函数的值域属于1~m。下图是一个bloom filter插入x,y,z并判断某个值w是否在该数据集的示意图：</p>
+<p>  <img src="/img/algorithm/BloomFilter/Bloom_filter.jpg" alt="URL"></p>
+<p>上图中，m=18，k=3；插入x是，三个hash函数分别得到蓝线对应的三个值，并将对应的位向量改为1，插入y，z时，类似的，分别将红线，紫线对应的位向量改为1。查找时，当查找x时，三个hash值对应的位向量都为1，因此判断x在此数据集中。y，z也是如此。但是查找w时，w有个hash值对应的位向量为0，因此可以判断不在此集合中。但是，假如w的最后那个hash值比上图中的大1，这是就会认为w在此集合中，而事实上，w可能不在此集合中，因此可能出现误报。显然的，插入数据越多，1的位数越多，误报的概率越大。</p>
+<p>Wiki的Bloom Filter词条有关于误报的概率的详细分析：Probability of false positives。从分析可以看出，当k比较大时，误报概率还是比较小的，因此这存储还是很空间有效滴。</p>
+<p>Bloom Filter有以下几个特点：</p>
+<pre><code>不存在漏报（False Negative），即某个元素在某个集合中，肯定能报出来。
+可能存在误报（False Positive），即某个元素不在某个集合中，可能也被爆出来。
+确定某个元素是否在某个集合中的代价和总的元素数目无关。
+</code></pre>
+<p>优点：<br>  相比于其它的数据结构，Bloom Filter在空间和时间方面都有巨大的优势。Bloom Filter存储空间和插入/查询时间都是常数。另外, Hash函数相互之间没有关系，方便由硬件并行实现。Bloom Filter不需要存储元素本身，在某些对保密要求非常严格的场合有优势。</p>
+<p>缺点：<br>  另外，一般情况下不能从Bloom Filter中删除元素. 我们很容易想到把位列阵变成整数数组，每插入一个元素相应的计数器加1, 这样删除元素时将计数器减掉就可以了。然而要保证安全的删除元素并非如此简单。首先我们必须保证删除的元素的确在Bloom Filter里面. 这一点单凭这个过滤器是无法保证的。另外计数器回绕也会造成问题。</p>
+<h3 id="Bloom-Filter-布隆过滤器-原理"><a href="#Bloom-Filter-布隆过滤器-原理" class="headerlink" title="Bloom Filter(布隆过滤器)原理"></a>Bloom Filter(布隆过滤器)原理</h3><p>  布隆过滤器需要的是一个位数组（这个和位图有点类似）和k个映射函数（和Hash表类似），在初始状态时，对于长度为m的位数组array，它的所有位都被置为0。对于有n个元素的集合S={s1,s2……sn}，通过k个映射函数{f1,f2,……fk}，将集合S中的每个元素sj(1&lt;=j&lt;=n)映射为k个值{g1,g2……gk}，然后再将位数组array中相对应的array[g1],array[g2]……array[gk]置为1；如果要查找某个元素item是否在S中，则通过映射函数{f1,f2…..fk}得到k个值{g1,g2…..gk}，然后再判断array[g1],array[g2]……array[gk]是否都为1，若全为1，则item在S中，否则item不在S中。这个就是布隆过滤器的实现原理。</p>
+<h3 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h3><p> 假定我们存储一亿个URL，我们先建立一个十六亿二进制（比特），即两亿字节的向量，然后将这十六亿个二进制全部设置为零。对于每一个URL，我们用八个不同的随机数产生器（F1,F2, …,F8） 产生八个信息指纹（f1, f2, …, f8）。再用一个随机数产生器 G 把这八个信息指纹映射到 1 到十六亿中的八个自然数 g1, g2, …,g8。现在我们把这八个位置的二进制全部设置为一。当我们对这一亿个URL都进行这样的处理后。一个针对这些URL的布隆过滤器就建成了。</p>
+<p> <img src="/img/algorithm/BloomFilter/URL.png" alt="URL"></p>
+<p> 现在，让我们看看如何用布隆过滤器来检测一个URL是否已访问。我们用相同的八个随机数产生器（F1, F2, …, F8）对这个地址产生八个信息指纹 s1,s2,…,s8，然后将这八个指纹对应到布隆过滤器的八个二进制位，分别是 t1,t2,…,t8。如果该URL已访问，显然，t1,t2,..,t8 对应的八个二进制一定是一。这样在遇到任何已访问的URL，我们都能准确地发现。 </p>
+<p> 布隆过滤器决不会漏掉任何一个已访问的URL。但是，它有一条不足之处。也就是它有极小的可能将未访问的URL判定为已访问的URL，因为有可能某个URL正巧对应个八个都被设置成一的二进制位。好在这种可能性很小。我们把它称为误识概率。在上面的例子中，误识概率在万分之一以下。</p>
+<p> 布隆过滤器的好处在于快速，省空间。但是有一定的误识别率。</p>
+<p> 常见的补救办法是在建立一个小的白名单，存储那些可能别误判的URL。</p>
+<h2 id="3-Bloom-Filter参数选择"><a href="#3-Bloom-Filter参数选择" class="headerlink" title="(3) Bloom Filter参数选择"></a>(3) Bloom Filter参数选择</h2><p>   (1)哈希函数选择</p>
+<p>   　　哈希函数的选择对性能的影响应该是很大的，一个好的哈希函数要能近似等概率的将字符串映射到各个Bit。选择k个不同的哈希函数比较麻烦，一种简单的方法是选择一个哈希函数，然后送入k个不同的参数。</p>
+<p>   (2)Bit数组大小选择 </p>
+<p>   　　哈希函数个数k、位数组大小m、加入的字符串数量n的关系可以参考参考文献1。该文献证明了对于给定的m、n，当 k = ln(2)* m/n 时出错的概率是最小的。</p>
+<p>   　　同时该文献还给出特定的k，m，n的出错概率。例如：根据参考文献1，哈希函数个数k取10，位数组大小m设为字符串个数n的20倍时，false positive发生的概率是0.0000889 ，这个概率基本能满足网络爬虫的需求了。  </p>
+<h2 id="4-布隆过滤器应用"><a href="#4-布隆过滤器应用" class="headerlink" title="(4)　布隆过滤器应用"></a>(4)　布隆过滤器应用</h2><p>  布隆过滤器在很多场合能发挥很好的效果，比如：网页URL的去重，垃圾邮件的判别，集合重复元素的判别，查询加速（比如基于key-value的存储系统）等。<br>  下面举几个例子：</p>
+<ol>
+<li>有两个URL集合A,B，每个集合中大约有1亿个URL，每个URL占64字节，有1G的内存，如何找出两个集合中重复的URL。<br>很显然，直接利用Hash表会超出内存限制的范围。这里给出两种思路：</li>
+</ol>
+<p>  第一种：如果不允许一定的错误率的话，只有用分治的思想去解决，将A,B两个集合中的URL分别存到若干个文件中{f1,f2…fk}和{g1,g2….gk}中，然后取f1和g1的内容读入内存，将f1的内容存储到hash_map当中，然后再取g1中的url，若有相同的url，则写入到文件中，然后直到g1的内容读取完毕，再取g2…gk。然后再取f2的内容读入内存。。。依次类推，知道找出所有的重复url。</p>
+<p>  第二种：如果允许一定错误率的话，则可以用布隆过滤器的思想。</p>
+<ol start="2">
+<li></li>
+</ol>
+<h2 id="4-Bloom-Filter实现代码"><a href="#4-Bloom-Filter实现代码" class="headerlink" title="(4) Bloom Filter实现代码"></a>(4) Bloom Filter实现代码</h2><p>  　 下面给出一个简单的Bloom Filter的Java实现代码：</p>
+<pre class="line-numbers language-none"><code class="language-none">import java.util.BitSet;
+
+&#x2F;**
+ * Bloom Filter
+ *&#x2F;
+public class BloomFilter &#123;
+
+	&#x2F;&#x2F; BitSet初始分配2^24个bit
+	private static final int DEFAULT_SIZE &#x3D; 1 &lt;&lt; 24;
+
+	&#x2F;&#x2F; 不同哈希函数的种子，一般应取质数
+	private static final int[] seeds &#x3D; new int[] &#123; 3, 5, 7, 11, 13, 31, 37, 61 &#125;;
+
+	&#x2F;&#x2F; 
+	private BitSet bits &#x3D; new BitSet(DEFAULT_SIZE);
+
+	&#x2F;&#x2F; 哈希函数对象
+	private SimpleHash[] func &#x3D; new SimpleHash[seeds.length];
+
+	public BloomFilter() &#123;
+		int length &#x3D; seeds.length;
+		for (int i &#x3D; 0; i &lt; length; i++) &#123;
+			func[i] &#x3D; new SimpleHash(DEFAULT_SIZE, seeds[i]);
+		&#125;
+	&#125;
+
+	&#x2F;**
+	 * 将字符串标记到bits中
+	 * 
+	 * @param value
+	 *&#x2F;
+	public void add(String value) &#123;
+		for (SimpleHash f : func) &#123;
+			bits.set(f.hash(value), true);
+		&#125;
+	&#125;
+
+	&#x2F;**
+	 * 判断字符串是否已经被bits标记
+	 * 
+	 * @param value
+	 * @return
+	 *&#x2F;
+	public boolean contains(String value) &#123;
+		if (value &#x3D;&#x3D; null) &#123;
+			return false;
+		&#125;
+		boolean ret &#x3D; true;
+		for (SimpleHash f : func) &#123;
+			ret &#x3D; ret &amp;&amp; bits.get(f.hash(value));
+		&#125;
+		return ret;
+	&#125;
+
+	&#x2F;**
+	 * 哈希函数类
+	 * 
+	 *&#x2F;
+	public class SimpleHash &#123;
+		private int cap;
+		private int seed;
+
+		public SimpleHash(int cap, int seed) &#123;
+			this.cap &#x3D; cap;
+			this.seed &#x3D; seed;
+		&#125;
+
+		&#x2F;**
+		 * 字符串哈希，选取好的哈希函数很重要&lt;br&gt;
+		 * hash函数，采用简单的加权和hash
+		 * 
+		 * @param value
+		 * @return
+		 *&#x2F;
+		public int hash(String value) &#123;
+			int result &#x3D; 0;
+			int len &#x3D; value.length();
+			for (int i &#x3D; 0; i &lt; len; i++) &#123;
+				result &#x3D; seed * result + value.charAt(i);
+			&#125;
+			return (cap - 1) &amp; result;
+		&#125;
+
+	&#125;&#x2F;&#x2F; end class SimpleHash
+
+&#125;
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="参考："><a href="#参考：" class="headerlink" title="参考："></a>参考：</h2><p>[1] Pei Cao. Bloom Filters - the math.  <a target="_blank" rel="noopener" href="http://pages.cs.wisc.edu/~cao/papers/summary-cache/node8.html">http://pages.cs.wisc.edu/~cao/papers/summary-cache/node8.html</a><br>[2] Wikipedia. Bloom filter.  <a target="_blank" rel="noopener" href="http://en.wikipedia.org/wiki/Bloom_filter">http://en.wikipedia.org/wiki/Bloom_filter</a><br>[3] <a target="_blank" rel="noopener" href="http://blog.csdn.net/v_july_v/article/details/6685894">http://blog.csdn.net/v_july_v/article/details/6685894</a><br>[4] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/heaad/archive/2011/01/02/1924195.html">http://www.cnblogs.com/heaad/archive/2011/01/02/1924195.html</a><br>[5] <a target="_blank" rel="noopener" href="http://blog.csdn.net/dadoneo/article/details/6847481">http://blog.csdn.net/dadoneo/article/details/6847481</a><br>[6] <a target="_blank" rel="noopener" href="http://blog.csdn.net/jiaomeng/article/details/1495500">http://blog.csdn.net/jiaomeng/article/details/1495500</a><br>[7] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/hxsyl/p/4176280.html">http://www.cnblogs.com/hxsyl/p/4176280.html</a><br>[8] <a target="_blank" rel="noopener" href="http://www.cnblogs.com/KevinYang/archive/2009/02/01/1381803.html">http://www.cnblogs.com/KevinYang/archive/2009/02/01/1381803.html</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/algorithm/" rel="tag"># algorithm</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2017/04/28/cmder-notes/" rel="prev" title="Cmder 使用 笔记">
+                  <i class="fa fa-chevron-left"></i> Cmder 使用 笔记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2017/05/01/bitmap/" rel="next" title="位图">
+                  位图 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

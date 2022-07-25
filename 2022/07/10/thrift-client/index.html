@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="设计  TClient ，  TStandardClient、WrappedTClient 实现了TClient接口的Call方法  demo  https:&#x2F;&#x2F;github.com&#x2F;weikeqin&#x2F;thrift-tutorial-go-demo    以client调用add方法为例   调用下游Add()方法代码  func main() &amp;#123; 	&#x2F;&#x2F; 创建thrift client">
+<meta property="og:type" content="article">
+<meta property="og:title" content="thrift客户端">
+<meta property="og:url" content="http://weikeqin.com/2022/07/10/thrift-client/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="设计  TClient ，  TStandardClient、WrappedTClient 实现了TClient接口的Call方法  demo  https:&#x2F;&#x2F;github.com&#x2F;weikeqin&#x2F;thrift-tutorial-go-demo    以client调用add方法为例   调用下游Add()方法代码  func main() &amp;#123; 	&#x2F;&#x2F; 创建thrift client">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-07-10T07:56:59.000Z">
+<meta property="article:modified_time" content="2022-07-24T01:47:26.748Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="rpc">
+<meta property="article:tag" content="thrift">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2022/07/10/thrift-client/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2022/07/10/thrift-client/","path":"2022/07/10/thrift-client/","title":"thrift客户端"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>thrift客户端 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AE%BE%E8%AE%A1"><span class="nav-number">1.</span> <span class="nav-text">设计</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#demo"><span class="nav-number">2.</span> <span class="nav-text">demo</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#CalculatorClient-Add"><span class="nav-number">2.1.</span> <span class="nav-text">CalculatorClient::Add</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB-go"><span class="nav-number">3.</span> <span class="nav-text">源码解读-go</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#TClient"><span class="nav-number">3.1.</span> <span class="nav-text">TClient</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TStandardClient"><span class="nav-number">3.2.</span> <span class="nav-text">TStandardClient</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BANewTStandardClient%E6%96%B9%E6%B3%95-NewTStandardClient"><span class="nav-number">3.2.1.</span> <span class="nav-text">创建NewTStandardClient方法 NewTStandardClient</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Call"><span class="nav-number">3.2.2.</span> <span class="nav-text">Call</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send"><span class="nav-number">3.2.3.</span> <span class="nav-text">Send</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Recv"><span class="nav-number">3.2.4.</span> <span class="nav-text">Recv</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WrappedTClient"><span class="nav-number">3.3.</span> <span class="nav-text">WrappedTClient</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%B0%E5%BB%BAWrappedTClient"><span class="nav-number">3.3.1.</span> <span class="nav-text">新建WrappedTClient</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Call-1"><span class="nav-number">3.3.2.</span> <span class="nav-text">Call</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WrappedTClient-Demo"><span class="nav-number">3.4.</span> <span class="nav-text">WrappedTClient Demo</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/07/10/thrift-client/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          thrift客户端
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-07-10 15:56:59" itemprop="dateCreated datePublished" datetime="2022-07-10T15:56:59+08:00">2022-07-10</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-24 09:47:26" itemprop="dateModified" datetime="2022-07-24T09:47:26+08:00">2022-07-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2022/07/10/thrift-client/" class="post-meta-item leancloud_visitors" data-flag-title="thrift客户端" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="设计"><a href="#设计" class="headerlink" title="设计"></a>设计</h1><p>  TClient ，<br>  TStandardClient、WrappedTClient 实现了<code>TClient</code>接口的<code>Call</code>方法 </p>
+<h1 id="demo"><a href="#demo" class="headerlink" title="demo"></a>demo</h1><p>  <a target="_blank" rel="noopener" href="https://github.com/weikeqin/thrift-tutorial-go-demo">https://github.com/weikeqin/thrift-tutorial-go-demo</a> </p>
+<p>  以client调用add方法为例</p>
+<p>  调用下游Add()方法代码 </p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token comment">// 创建thrift client</span>
+	thriftClient <span class="token operator">:=</span> <span class="token function">getThriftClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token comment">// 创建 calculatorClient   tutorial是由idl生成的</span>
+	calculatorClient <span class="token operator">:=</span> tutorial<span class="token punctuation">.</span><span class="token function">NewCalculatorClient</span><span class="token punctuation">(</span>thriftClient<span class="token punctuation">)</span>
+	<span class="token comment">// 调用Add方法</span>
+	sum<span class="token punctuation">,</span> <span class="token boolean">_</span> <span class="token operator">:=</span> calculatorClient<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>defaultCtx<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>
+	fmt<span class="token punctuation">.</span><span class="token function">Print</span><span class="token punctuation">(</span><span class="token string">"1+2="</span><span class="token punctuation">,</span> sum<span class="token punctuation">,</span> <span class="token string">"\n"</span><span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 获取一个thriftClient</span>
+<span class="token keyword">func</span> <span class="token function">getThriftClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">*</span>thrift<span class="token punctuation">.</span>TStandardClient <span class="token punctuation">&#123;</span>
+
+	addr <span class="token operator">:=</span> flag<span class="token punctuation">.</span><span class="token function">String</span><span class="token punctuation">(</span><span class="token string">"addr"</span><span class="token punctuation">,</span> <span class="token string">"localhost:9090"</span><span class="token punctuation">,</span> <span class="token string">"Address to listen to"</span><span class="token punctuation">)</span>
+
+	<span class="token keyword">var</span> transportFactory thrift<span class="token punctuation">.</span>TTransportFactory
+	transportFactory <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTTransportFactory</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+	cfg <span class="token operator">:=</span> <span class="token operator">&amp;</span>thrift<span class="token punctuation">.</span>TConfiguration<span class="token punctuation">&#123;</span>
+		TLSConfig<span class="token punctuation">:</span> <span class="token operator">&amp;</span>tls<span class="token punctuation">.</span>Config<span class="token punctuation">&#123;</span>
+			InsecureSkipVerify<span class="token punctuation">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+		<span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">// 传输方式</span>
+	<span class="token keyword">var</span> transport thrift<span class="token punctuation">.</span>TTransport
+	transport <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTSocketConf</span><span class="token punctuation">(</span><span class="token operator">*</span>addr<span class="token punctuation">,</span> cfg<span class="token punctuation">)</span>
+	<span class="token comment">// 传输方式增强</span>
+	transport<span class="token punctuation">,</span> err <span class="token operator">:=</span> transportFactory<span class="token punctuation">.</span><span class="token function">GetTransport</span><span class="token punctuation">(</span>transport<span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">//defer transport.Close()</span>
+	<span class="token keyword">if</span> err <span class="token operator">:=</span> transport<span class="token punctuation">.</span><span class="token function">Open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">// 协议工厂</span>
+	<span class="token keyword">var</span> protocolFactory thrift<span class="token punctuation">.</span>TProtocolFactory
+	protocolFactory <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTBinaryProtocolFactoryConf</span><span class="token punctuation">(</span><span class="token boolean">nil</span><span class="token punctuation">)</span>
+
+	iprot <span class="token operator">:=</span> protocolFactory<span class="token punctuation">.</span><span class="token function">GetProtocol</span><span class="token punctuation">(</span>transport<span class="token punctuation">)</span>
+	oprot <span class="token operator">:=</span> protocolFactory<span class="token punctuation">.</span><span class="token function">GetProtocol</span><span class="token punctuation">(</span>transport<span class="token punctuation">)</span>
+
+	<span class="token comment">// 创建thrift client，</span>
+	<span class="token comment">// 这个client使用TStandardClient类型，  TStandardClient 实现了 TClient 接口</span>
+	thriftClient <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTStandardClient</span><span class="token punctuation">(</span>iprot<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span>
+	<span class="token keyword">return</span> thriftClient
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<span id="more"></span>
+
+
+<h2 id="CalculatorClient-Add"><a href="#CalculatorClient-Add" class="headerlink" title="CalculatorClient::Add"></a>CalculatorClient::Add</h2><p>  CalculatorClient 可以看做Calculator接口的代理</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// gen-go/tutorial/tutorial.go </span>
+<span class="token keyword">package</span> tutorial
+
+
+<span class="token comment">// Parameters:</span>
+<span class="token comment">//  - Num1</span>
+<span class="token comment">//  - Num2</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>CalculatorClient<span class="token punctuation">)</span> <span class="token function">Add</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> num1 <span class="token builtin">int32</span><span class="token punctuation">,</span> num2 <span class="token builtin">int32</span><span class="token punctuation">)</span> <span class="token punctuation">(</span>_r <span class="token builtin">int32</span><span class="token punctuation">,</span> _err <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// 业务方法入参包装  `CalculatorAddArgs`实现了`TStruct`接口</span>
+  <span class="token keyword">var</span> _args3 CalculatorAddArgs
+  _args3<span class="token punctuation">.</span>Num1 <span class="token operator">=</span> num1
+  _args3<span class="token punctuation">.</span>Num2 <span class="token operator">=</span> num2
+  <span class="token comment">// 业务返回结果   </span>
+  <span class="token comment">// call的第4个入参类型是`TStruct`，`CalculatorAddResult`实现了`TStruct`接口，可以直接传递</span>
+  <span class="token keyword">var</span> _result5 CalculatorAddResult
+  <span class="token comment">// 通用返回结果里的headers</span>
+  <span class="token keyword">var</span> _meta4 thrift<span class="token punctuation">.</span>ResponseMeta
+
+  <span class="token comment">// 调用 TStandardClient::Call 方法</span>
+  _meta4<span class="token punctuation">,</span> _err <span class="token operator">=</span> p<span class="token punctuation">.</span><span class="token function">Client_</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">Call</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token string">"add"</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>_args3<span class="token punctuation">,</span> <span class="token operator">&amp;</span>_result5<span class="token punctuation">)</span>
+  p<span class="token punctuation">.</span><span class="token function">SetLastResponseMeta_</span><span class="token punctuation">(</span>_meta4<span class="token punctuation">)</span>
+  <span class="token keyword">if</span> _err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 返回业务处理结果</span>
+  <span class="token keyword">return</span> _result5<span class="token punctuation">.</span><span class="token function">GetSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="源码解读-go"><a href="#源码解读-go" class="headerlink" title="源码解读-go"></a>源码解读-go</h1><p>  TClient</p>
+<h2 id="TClient"><a href="#TClient" class="headerlink" title="TClient"></a>TClient</h2><p>  TClient定义了客户端</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">package</span> thrift
+<span class="token comment">// thrift.client.go </span>
+
+<span class="token keyword">type</span> TClient <span class="token keyword">interface</span> <span class="token punctuation">&#123;</span>
+	<span class="token function">Call</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> args<span class="token punctuation">,</span> result TStruct<span class="token punctuation">)</span> <span class="token punctuation">(</span>ResponseMeta<span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="TStandardClient"><a href="#TStandardClient" class="headerlink" title="TStandardClient"></a>TStandardClient</h2><p>  TStandardClient有3个方法 <code>Send</code> <code>Recv</code>  <code>Call</code></p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">package</span> thrift
+<span class="token comment">// thrift.client.go </span>
+
+<span class="token comment">// </span>
+<span class="token keyword">type</span> TStandardClient <span class="token keyword">struct</span> <span class="token punctuation">&#123;</span>
+	seqId        <span class="token builtin">int32</span>      <span class="token comment">// 序列Id</span>
+	iprot<span class="token punctuation">,</span> oprot TProtocol  <span class="token comment">// 输入传输协议 输出传输协议</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="创建NewTStandardClient方法-NewTStandardClient"><a href="#创建NewTStandardClient方法-NewTStandardClient" class="headerlink" title="创建NewTStandardClient方法 NewTStandardClient"></a>创建NewTStandardClient方法 NewTStandardClient</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// TStandardClient 实现了 TClient 接口，使用 Thrift 的标准消息格式。</span>
+<span class="token comment">// 并发使用是不安全的</span>
+<span class="token comment">// </span>
+<span class="token comment">// TStandardClient implements TClient, and uses the standard message format for Thrift.</span>
+<span class="token comment">// It is not safe for concurrent use.</span>
+<span class="token keyword">func</span> <span class="token function">NewTStandardClient</span><span class="token punctuation">(</span>inputProtocol<span class="token punctuation">,</span> outputProtocol TProtocol<span class="token punctuation">)</span> <span class="token operator">*</span>TStandardClient <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> <span class="token operator">&amp;</span>TStandardClient<span class="token punctuation">&#123;</span>
+		iprot<span class="token punctuation">:</span> inputProtocol<span class="token punctuation">,</span>
+		oprot<span class="token punctuation">:</span> outputProtocol<span class="token punctuation">,</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="Call"><a href="#Call" class="headerlink" title="Call"></a>Call</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// param  method  方法名</span>
+<span class="token comment">// param  args    业务入参</span>
+<span class="token comment">// param  result  返回(业务)结果</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TStandardClient<span class="token punctuation">)</span> <span class="token function">Call</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> args<span class="token punctuation">,</span> result TStruct<span class="token punctuation">)</span> <span class="token punctuation">(</span>ResponseMeta<span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 序列Id+1  注意：这儿不是并发安全的 </span>
+    p<span class="token punctuation">.</span>seqId<span class="token operator">++</span>
+	seqId <span class="token operator">:=</span> p<span class="token punctuation">.</span>seqId
+
+    <span class="token comment">// 调用Send方法</span>
+	<span class="token keyword">if</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">Send</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> p<span class="token punctuation">.</span>oprot<span class="token punctuation">,</span> seqId<span class="token punctuation">,</span> method<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> ResponseMeta<span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span><span class="token punctuation">,</span> err
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">// method is oneway</span>
+	<span class="token keyword">if</span> result <span class="token operator">==</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> ResponseMeta<span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span><span class="token punctuation">,</span> <span class="token boolean">nil</span>
+	<span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 调用Recv方法，把返回结果写入result</span>
+    err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">Recv</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> p<span class="token punctuation">.</span>iprot<span class="token punctuation">,</span> seqId<span class="token punctuation">,</span> method<span class="token punctuation">,</span> result<span class="token punctuation">)</span>
+    <span class="token comment">// 处理返回headers </span>
+	<span class="token keyword">var</span> headers THeaderMap
+	<span class="token keyword">if</span> hp<span class="token punctuation">,</span> ok <span class="token operator">:=</span> p<span class="token punctuation">.</span>iprot<span class="token punctuation">.</span><span class="token punctuation">(</span><span class="token operator">*</span>THeaderProtocol<span class="token punctuation">)</span><span class="token punctuation">;</span> ok <span class="token punctuation">&#123;</span>
+		headers <span class="token operator">=</span> hp<span class="token punctuation">.</span>transport<span class="token punctuation">.</span>readHeaders
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">return</span> ResponseMeta<span class="token punctuation">&#123;</span>
+		Headers<span class="token punctuation">:</span> headers<span class="token punctuation">,</span>
+	<span class="token punctuation">&#125;</span><span class="token punctuation">,</span> err
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>从以上的代码可以看到<br>  1、<code>TStandardClient</code>并发使用是不安全的，所以使用的时候得每次新建一个<br>  2、<code>TStandardClient</code>是同步调用</p>
+<h3 id="Send"><a href="#Send" class="headerlink" title="Send"></a>Send</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// client给Server发请求的方法 </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TStandardClient<span class="token punctuation">)</span> <span class="token function">Send</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> oprot TProtocol<span class="token punctuation">,</span> seqId <span class="token builtin">int32</span><span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> args TStruct<span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+
+	<span class="token comment">// 设置headers</span>
+	<span class="token comment">// Set headers from context object on THeaderProtocol</span>
+	<span class="token keyword">if</span> headerProt<span class="token punctuation">,</span> ok <span class="token operator">:=</span> oprot<span class="token punctuation">.</span><span class="token punctuation">(</span><span class="token operator">*</span>THeaderProtocol<span class="token punctuation">)</span><span class="token punctuation">;</span> ok <span class="token punctuation">&#123;</span>
+		headerProt<span class="token punctuation">.</span><span class="token function">ClearWriteHeaders</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+		<span class="token keyword">for</span> <span class="token boolean">_</span><span class="token punctuation">,</span> key <span class="token operator">:=</span> <span class="token keyword">range</span> <span class="token function">GetWriteHeaderList</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">if</span> value<span class="token punctuation">,</span> ok <span class="token operator">:=</span> <span class="token function">GetHeader</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> key<span class="token punctuation">)</span><span class="token punctuation">;</span> ok <span class="token punctuation">&#123;</span>
+				headerProt<span class="token punctuation">.</span><span class="token function">SetWriteHeader</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> value<span class="token punctuation">)</span>
+			<span class="token punctuation">&#125;</span>
+		<span class="token punctuation">&#125;</span>
+	<span class="token punctuation">&#125;</span>
+
+
+	<span class="token comment">// 使用配置的传输协议写入数据 </span>
+	<span class="token comment">// method是方法名  CALL是TMessageType对应的枚举  seqId是序列Id </span>
+    <span class="token comment">// 调用server接口 其实就是给server发一个请求，按照约定的传输协议(TProtocol)和传输方式(TTransport)传输对应的二进制数据 </span>
+    <span class="token comment">// 这个例子里传输协议是 TBinaryProtocol  传输方式是 TSocket</span>
+	<span class="token keyword">if</span> err <span class="token operator">:=</span> oprot<span class="token punctuation">.</span><span class="token function">WriteMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> method<span class="token punctuation">,</span> CALL<span class="token punctuation">,</span> seqId<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">if</span> err <span class="token operator">:=</span> args<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">if</span> err <span class="token operator">:=</span> oprot<span class="token punctuation">.</span><span class="token function">WriteMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+    <span class="token punctuation">&#125;</span>
+    
+    <span class="token comment">// 传输协议 调 传输方式 flush </span>
+	<span class="token keyword">return</span> oprot<span class="token punctuation">.</span><span class="token function">Flush</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到，client 的send方法主要作用有2个<br>  1、(在传输协议是THeaderProtocol的情况下)设置headers<br>  2、按照约定的传输一些写数据，并flush </p>
+<h3 id="Recv"><a href="#Recv" class="headerlink" title="Recv"></a>Recv</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 接收请求方法</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TStandardClient<span class="token punctuation">)</span> <span class="token function">Recv</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> iprot TProtocol<span class="token punctuation">,</span> seqId <span class="token builtin">int32</span><span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> result TStruct<span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+	rMethod<span class="token punctuation">,</span> rTypeId<span class="token punctuation">,</span> rSeqId<span class="token punctuation">,</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+	<span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 消息校验 校验方法名、序列Id、消息类型</span>
+	<span class="token keyword">if</span> method <span class="token operator">!=</span> rMethod <span class="token punctuation">&#123;</span>  <span class="token comment">// 方法和消息里的方法不一致，抛异常</span>
+		<span class="token keyword">return</span> <span class="token function">NewTApplicationException</span><span class="token punctuation">(</span>WRONG_METHOD_NAME<span class="token punctuation">,</span> fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"%s: wrong method name"</span><span class="token punctuation">,</span> method<span class="token punctuation">)</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> seqId <span class="token operator">!=</span> rSeqId <span class="token punctuation">&#123;</span> <span class="token comment">// 序列Id不一致，抛异常 </span>
+		<span class="token keyword">return</span> <span class="token function">NewTApplicationException</span><span class="token punctuation">(</span>BAD_SEQUENCE_ID<span class="token punctuation">,</span> fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"%s: out of order sequence response"</span><span class="token punctuation">,</span> method<span class="token punctuation">)</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> rTypeId <span class="token operator">==</span> EXCEPTION <span class="token punctuation">&#123;</span> <span class="token comment">// 异常类消息，抛异常</span>
+		<span class="token keyword">var</span> exception tApplicationException
+		<span class="token keyword">if</span> err <span class="token operator">:=</span> exception<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> iprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">return</span> err
+		<span class="token punctuation">&#125;</span>
+
+		<span class="token keyword">if</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">return</span> err
+		<span class="token punctuation">&#125;</span>
+
+		<span class="token keyword">return</span> <span class="token operator">&amp;</span>exception
+	<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> rTypeId <span class="token operator">!=</span> REPLY <span class="token punctuation">&#123;</span> <span class="token comment">// 返回结果里消息类型不是回复消息，抛异常</span>
+		<span class="token keyword">return</span> <span class="token function">NewTApplicationException</span><span class="token punctuation">(</span>INVALID_MESSAGE_TYPE_EXCEPTION<span class="token punctuation">,</span> fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"%s: invalid message type"</span><span class="token punctuation">,</span> method<span class="token punctuation">)</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 读取消息</span>
+	<span class="token keyword">if</span> err <span class="token operator">:=</span> result<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> iprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+	<span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// </span>
+	<span class="token keyword">return</span> iprot<span class="token punctuation">.</span><span class="token function">ReadMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+<h2 id="WrappedTClient"><a href="#WrappedTClient" class="headerlink" title="WrappedTClient"></a>WrappedTClient</h2><p>  Wrapper提供了一种包装机制，使得在执行某方法前先执行Wrapper<br>  因此可以在客户端和服务器做很多功能：接口监控、熔断限流、鉴权、Filter等。</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// file thrift/middleware.go</span>
+<span class="token keyword">package</span> thrift
+
+<span class="token comment">// WrappedTClient is a convenience struct that implements the TClient interface</span>
+<span class="token comment">// using inner Wrapped function.</span>
+<span class="token comment">//</span>
+<span class="token comment">// This is provided to aid in developing ClientMiddleware.</span>
+<span class="token keyword">type</span> WrappedTClient <span class="token keyword">struct</span> <span class="token punctuation">&#123;</span>
+	Wrapped <span class="token keyword">func</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> args<span class="token punctuation">,</span> result TStruct<span class="token punctuation">)</span> <span class="token punctuation">(</span>ResponseMeta<span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="新建WrappedTClient"><a href="#新建WrappedTClient" class="headerlink" title="新建WrappedTClient"></a>新建WrappedTClient</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// file thrift/middleware.go</span>
+<span class="token keyword">package</span> thrift
+
+<span class="token comment">// 验证 WrappedTClient 实现了 TClient</span>
+<span class="token comment">// verify that WrappedTClient implements TClient</span>
+<span class="token keyword">var</span> <span class="token punctuation">(</span>
+	<span class="token boolean">_</span> TClient <span class="token operator">=</span> WrappedTClient<span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+	<span class="token boolean">_</span> TClient <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token operator">*</span>WrappedTClient<span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token boolean">nil</span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span>
+
+
+<span class="token comment">// WrappedTClient 是一个使用内部 Wrapped 函数实现 TClient 接口的便利结构。</span>
+<span class="token comment">// 这是为了帮助开发 ClientMiddleware。</span>
+<span class="token comment">// </span>
+<span class="token comment">// WrapClient wraps the given TClient in the given middlewares.</span>
+<span class="token comment">//</span>
+<span class="token comment">// Middlewares will be called in the order that they are defined:</span>
+<span class="token comment">//</span>
+<span class="token comment">//		1. Middlewares[0]</span>
+<span class="token comment">//		2. Middlewares[1]</span>
+<span class="token comment">//		...</span>
+<span class="token comment">//		N. Middlewares[n]</span>
+<span class="token keyword">func</span> <span class="token function">WrapClient</span><span class="token punctuation">(</span>client TClient<span class="token punctuation">,</span> middlewares <span class="token operator">...</span>ClientMiddleware<span class="token punctuation">)</span> TClient <span class="token punctuation">&#123;</span>
+	<span class="token comment">// 反向添加中间件，因此列表中的第一个是最外面的。</span>
+	<span class="token comment">// Add middlewares in reverse so the first in the list is the outermost.</span>
+	<span class="token keyword">for</span> i <span class="token operator">:=</span> <span class="token function">len</span><span class="token punctuation">(</span>middlewares<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">;</span> i <span class="token operator">>=</span> <span class="token number">0</span><span class="token punctuation">;</span> i<span class="token operator">--</span> <span class="token punctuation">&#123;</span>
+		<span class="token comment">// middlewares[i]是ClientMiddleware，是一个函数，client是对应的入参 </span>
+		client <span class="token operator">=</span> middlewares<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">return</span> client
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="Call-1"><a href="#Call-1" class="headerlink" title="Call"></a>Call</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// file thrift/middleware.go</span>
+<span class="token keyword">package</span> thrift
+
+<span class="token comment">// Call 通过调用 c.Wrapped的TClient接口实现 来方法调用 并返回结果 。</span>
+<span class="token comment">// Call implements the TClient interface by calling and returning c.Wrapped.</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>c WrappedTClient<span class="token punctuation">)</span> <span class="token function">Call</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> args<span class="token punctuation">,</span> result TStruct<span class="token punctuation">)</span> <span class="token punctuation">(</span>ResponseMeta<span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token comment">// </span>
+	<span class="token keyword">return</span> c<span class="token punctuation">.</span><span class="token function">Wrapped</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> method<span class="token punctuation">,</span> args<span class="token punctuation">,</span> result<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="WrappedTClient-Demo"><a href="#WrappedTClient-Demo" class="headerlink" title="WrappedTClient Demo"></a>WrappedTClient Demo</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">var</span> thriftClient thrift<span class="token punctuation">.</span>TClient
+	thriftClient <span class="token operator">=</span> <span class="token function">getThriftClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+	<span class="token comment">// 扩展点：日志中间件  </span>
+	clientMiddleware <span class="token operator">:=</span> <span class="token function">clientLoggingMiddleware</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token comment">// 包装后的client</span>
+	wrapClient <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">WrapClient</span><span class="token punctuation">(</span>thriftClient<span class="token punctuation">,</span> clientMiddleware<span class="token punctuation">)</span>
+
+	<span class="token comment">// 创建 calculatorClient   tutorial是由idl生成的</span>
+	calculatorClient <span class="token operator">:=</span> tutorial<span class="token punctuation">.</span><span class="token function">NewCalculatorClient</span><span class="token punctuation">(</span>wrapClient<span class="token punctuation">)</span>
+	<span class="token comment">// 调用Add方法</span>
+	sum<span class="token punctuation">,</span> <span class="token boolean">_</span> <span class="token operator">:=</span> calculatorClient<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>defaultCtx<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>
+	fmt<span class="token punctuation">.</span><span class="token function">Print</span><span class="token punctuation">(</span><span class="token string">"1+2="</span><span class="token punctuation">,</span> sum<span class="token punctuation">,</span> <span class="token string">"\n"</span><span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 生成一个日志中间件 Demo用  </span>
+<span class="token keyword">func</span> <span class="token function">clientLoggingMiddleware</span><span class="token punctuation">(</span><span class="token punctuation">)</span> thrift<span class="token punctuation">.</span>ClientMiddleware <span class="token punctuation">&#123;</span>
+
+	clientMiddleware <span class="token operator">:=</span> <span class="token keyword">func</span><span class="token punctuation">(</span>next thrift<span class="token punctuation">.</span>TClient<span class="token punctuation">)</span> thrift<span class="token punctuation">.</span>TClient <span class="token punctuation">&#123;</span>
+		wrappedTClient <span class="token operator">:=</span> thrift<span class="token punctuation">.</span>WrappedTClient<span class="token punctuation">&#123;</span>
+			Wrapped<span class="token punctuation">:</span> <span class="token keyword">func</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> method <span class="token builtin">string</span><span class="token punctuation">,</span> args<span class="token punctuation">,</span> result thrift<span class="token punctuation">.</span>TStruct<span class="token punctuation">)</span> <span class="token punctuation">(</span>thrift<span class="token punctuation">.</span>ResponseMeta<span class="token punctuation">,</span> <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+				<span class="token comment">// 调用前打印 方法名及参数</span>
+				log<span class="token punctuation">.</span><span class="token function">Printf</span><span class="token punctuation">(</span><span class="token string">"Before: %q    Args: %#v "</span><span class="token punctuation">,</span> method<span class="token punctuation">,</span> args<span class="token punctuation">)</span>
+				<span class="token comment">// 方法调用</span>
+				headers<span class="token punctuation">,</span> err <span class="token operator">:=</span> next<span class="token punctuation">.</span><span class="token function">Call</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> method<span class="token punctuation">,</span> args<span class="token punctuation">,</span> result<span class="token punctuation">)</span>
+				<span class="token comment">// 调用后打印</span>
+				log<span class="token punctuation">.</span><span class="token function">Printf</span><span class="token punctuation">(</span><span class="token string">"After: %q    Result: %#v"</span><span class="token punctuation">,</span> method<span class="token punctuation">,</span> result<span class="token punctuation">)</span>
+				<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+					log<span class="token punctuation">.</span><span class="token function">Printf</span><span class="token punctuation">(</span><span class="token string">"Error: %v"</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span>
+				<span class="token punctuation">&#125;</span>
+				<span class="token keyword">return</span> headers<span class="token punctuation">,</span> err
+			<span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+		<span class="token punctuation">&#125;</span>
+		<span class="token keyword">return</span> wrappedTClient
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token keyword">return</span> clientMiddleware
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://github.com/apache/thrift/tree/0.16.0/lib/go">github-thrift-0.16.0-go</a><br>[2] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/cqvoip/p/9967995.html">Golang微服务：Micro限流、熔断</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/rpc/" rel="tag"># rpc</a>
+              <a href="/tags/thrift/" rel="tag"># thrift</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/07/02/thrift-transport/" rel="prev" title="thrift 传输方式(Transport)">
+                  <i class="fa fa-chevron-left"></i> thrift 传输方式(Transport)
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/07/10/thrift-server/" rel="next" title="thrift服务模型">
+                  thrift服务模型 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

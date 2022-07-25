@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="(1) Actor  Actor模型：面向对象原生的并发模型    Actor模型是高性能网络中处理并行任务的一种方法，解决并发问题的利器    Actor模型本质上是一种计算模型，基本的计算单元称为 Actor，在 Actor 模型里，一切都是 Actor，所有的计算都是在 Actor 中执行的，并且 Actor 之间是完全隔离的，不会共享任何变量。      Actor模型解决了 传统编程假设">
+<meta property="og:type" content="article">
+<meta property="og:title" content="并发模型">
+<meta property="og:url" content="http://weikeqin.com/2020/06/13/concurrent-model/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="(1) Actor  Actor模型：面向对象原生的并发模型    Actor模型是高性能网络中处理并行任务的一种方法，解决并发问题的利器    Actor模型本质上是一种计算模型，基本的计算单元称为 Actor，在 Actor 模型里，一切都是 Actor，所有的计算都是在 Actor 中执行的，并且 Actor 之间是完全隔离的，不会共享任何变量。      Actor模型解决了 传统编程假设">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-06-13T15:17:59.000Z">
+<meta property="article:modified_time" content="2022-05-29T08:28:50.538Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="concurrent">
+<meta property="article:tag" content="model">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/06/13/concurrent-model/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/06/13/concurrent-model/","path":"2020/06/13/concurrent-model/","title":"并发模型"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>并发模型 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Actor"><span class="nav-number">1.</span> <span class="nav-text">(1) Actor</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-STM"><span class="nav-number">2.</span> <span class="nav-text">(2) STM</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%8D%8F%E7%A8%8B"><span class="nav-number">3.</span> <span class="nav-text">(3) 协程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-golang%E4%B8%AD%E7%9A%84%E5%8D%8F%E7%A8%8B"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) golang中的协程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-CSP%E6%A8%A1%E5%9E%8B"><span class="nav-number">4.</span> <span class="nav-text">(4) CSP模型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">5.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/13/concurrent-model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          并发模型
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-13 23:17:59" itemprop="dateCreated datePublished" datetime="2020-06-13T23:17:59+08:00">2020-06-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/06/13/concurrent-model/" class="post-meta-item leancloud_visitors" data-flag-title="并发模型" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="1-Actor"><a href="#1-Actor" class="headerlink" title="(1) Actor"></a>(1) Actor</h1><blockquote>
+<p> Actor模型：面向对象原生的并发模型</p>
+</blockquote>
+<blockquote>
+<p> Actor模型是高性能网络中处理并行任务的一种方法，解决并发问题的利器</p>
+</blockquote>
+<blockquote>
+<p> Actor模型本质上是一种计算模型，基本的计算单元称为 Actor，在 Actor 模型里，一切都是 Actor，所有的计算都是在 Actor 中执行的，并且 Actor 之间是完全隔离的，不会共享任何变量。  </p>
+</blockquote>
+<blockquote>
+<p> Actor模型解决了 传统编程假设与现代多线程、多CPU架构的现实之间的不匹配问题。</p>
+<ol>
+<li>消息传递的使用避免了锁和阻塞。  </li>
+<li>Actor能够优化地处理错误情况。 </li>
+</ol>
+</blockquote>
+<blockquote>
+<p> Java 语言本身并不支持 Actor 模型，所以如果你想在 Java 语言里使用 Actor 模型，就需要借助第三方类库，目前能完备地支持 Actor 模型而且比较成熟的类库就是 Akka。</p>
+</blockquote>
+<span id="more"></span>
+
+
+<h1 id="2-STM"><a href="#2-STM" class="headerlink" title="(2) STM"></a>(2) STM</h1><p>  软件事务内存（Software Transactional Memory，简称 STM）</p>
+<blockquote>
+<p> 传统的数据库事务，支持 4 个特性：原子性（Atomicity）、一致性（Consistency）、隔离性（Isolation）和持久性（Durability），也就是大家常说的 ACID<br> STM 由于不涉及到持久化，所以只支持 ACI。 </p>
+</blockquote>
+<p>  <a target="_blank" rel="noopener" href="https://github.com/pveentjer/Multiverse">Multiverse</a><br>  <a target="_blank" rel="noopener" href="http://www.codecommit.com/blog/scala/software-transactional-memory-in-scala">software-transactional-memory-in-scala</a><br>  <a target="_blank" rel="noopener" href="https://github.com/epam-mooc/stm-java">stm-java</a></p>
+<br>
+
+
+
+<h1 id="3-协程"><a href="#3-协程" class="headerlink" title="(3) 协程"></a>(3) 协程</h1><blockquote>
+<p> 我们可以把协程简单地理解为一种轻量级的线程。从操作系统的角度来看，线程是在内核态中调度的，而协程是在用户态调度的，所以相对于线程来说，协程切换的成本更低。协程虽然也有自己的栈，但是相比线程栈要小得多，典型的线程栈大小差不多有 1M，而协程栈的大小往往只有几 K 或者几十 K。所以，无论是从时间维度还是空间维度来看，协程都比线程轻量得多。</p>
+</blockquote>
+<blockquote>
+<p> 支持协程的语言还是挺多的，例如 Golang、Python、Lua、Kotlin 等都支持协程。</p>
+</blockquote>
+<h2 id="3-1-golang中的协程"><a href="#3-1-golang中的协程" class="headerlink" title="(3.1) golang中的协程"></a>(3.1) golang中的协程</h2><blockquote>
+<p> 在 Golang 中创建协程非常简单，在下面的示例代码中，要让 hello() 方法在一个新的协程中执行，只需要go hello(“World”) 这一行代码就搞定了。</p>
+</blockquote>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">import</span> <span class="token punctuation">(</span>
+  <span class="token string">"fmt"</span>
+  <span class="token string">"time"</span>
+<span class="token punctuation">)</span>
+<span class="token keyword">func</span> <span class="token function">hello</span><span class="token punctuation">(</span>msg <span class="token builtin">string</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span><span class="token string">"Hello "</span> <span class="token operator">+</span> msg<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//在新的协程中执行hello方法</span>
+  <span class="token keyword">go</span> <span class="token function">hello</span><span class="token punctuation">(</span><span class="token string">"World"</span><span class="token punctuation">)</span>
+    fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span><span class="token string">"Run in main"</span><span class="token punctuation">)</span>
+    <span class="token comment">//等待100毫秒让协程执行结束</span>
+  time<span class="token punctuation">.</span><span class="token function">Sleep</span><span class="token punctuation">(</span><span class="token number">100</span> <span class="token operator">*</span> time<span class="token punctuation">.</span>Millisecond<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h1 id="4-CSP模型"><a href="#4-CSP模型" class="headerlink" title="(4) CSP模型"></a>(4) CSP模型</h1><p>  CSP（Communicating Sequential Processes）</p>
+<blockquote>
+<p> 打印从 1 累加到 100 亿的结果，如果使用单个协程来计算，大概需要 4 秒多的时间。单个协程，只能用到 CPU 中的一个核，为了提高计算性能，我们可以用多个协程来并行计算，这样就能发挥多核的优势了。<br> 用了 4 个子协程来并行执行，这 4 个子协程分别计算[1, 25 亿]、(25 亿, 50 亿]、(50 亿, 75 亿]、(75 亿, 100 亿]，最后再在主协程中汇总 4 个子协程的计算结果。主协程要汇总 4 个子协程的计算结果，势必要和 4 个子协程之间通信，Golang 中协程之间通信推荐的是使用 channel，channel 你可以形象地理解为现实世界里的管道。</p>
+</blockquote>
+<pre><code class="go">import (
+  &quot;fmt&quot;
+  &quot;time&quot;
+)
+
+func main() &#123;
+    // 变量声明
+  var result, i uint64
+    // 单个协程执行累加操作
+  start := time.Now()
+  for i = 1; i &lt;= 10000000000; i++ &#123;
+    result += i
+  &#125;
+  // 统计计算耗时
+  elapsed := time.Since(start)
+  fmt.Printf(&quot;执行消耗的时间为:&quot;, elapsed)
+  fmt.Println(&quot;, result:&quot;, result)
+
+    // 4个协程共同执行累加操作
+  start = time.Now()
+  ch1 := calc(1, 2500000000)
+  ch2 := calc(2500000001, 5000000000)
+  ch3 := calc(5000000001, 7500000000)
+  ch4 := calc(7500000001, 10000000000)
+    // 汇总4个协程的累加结果
+  result = &lt;-ch1 + &lt;-ch2 + &lt;-ch3 + &lt;-ch4
+  // 统计计算耗时
+  elapsed = time.Since(start)
+  fmt.Printf(&quot;执行消耗的时间为:&quot;, elapsed)
+  fmt.Println(&quot;, result:&quot;, result)
+&#125;
+// 在协程中异步执行累加操作，累加结果通过channel传递
+func calc(from uint64, to uint64) &lt;-chan uint64 &#123;
+    // channel用于协程间的通信
+  ch := make(chan uint64)
+    // 在协程中执行累加操作
+  go func() &#123;
+    result := from
+    for i := from + 1; i &lt;= to; i++ &#123;
+      result += i
+    &#125;
+        // 将结果写入channel
+    ch &lt;- result
+  &#125;()
+    // 返回结果是用于通信的channel
+  return ch
+&#125;
+</code></pre>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/98903">42 | Actor模型：面向对象原生的并发模型</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/99251">43 | 软件事务内存：借鉴数据库的并发经验</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/99787">44 | 协程：更轻量级的线程</a><br>[4] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/100098">45 | CSP模型：Golang的主力队员</a><br>[5] <a target="_blank" rel="noopener" href="https://doc.akka.io/docs/akka/2.2/AkkaJava.pdf">doc.akka.io/docs/akka/2.2/AkkaJava.pdf</a><br>[6] <a target="_blank" rel="noopener" href="https://developer.lightbend.com/guides/akka-quickstart-java/">guides/akka-quickstart-java</a><br>[7] <a target="_blank" rel="noopener" href="https://developer.lightbend.com/start/?group=akka&project=akka-quickstart-java">akka-quickstart-java</a><br>[8] <a target="_blank" rel="noopener" href="https://doc.akka.io/docs/akka/current/index.html">doc.akka.io/docs/akka/current</a><br>[9] <a target="_blank" rel="noopener" href="https://github.com/guobinhit/akka-guide">akka-guide</a><br>[10] <a target="_blank" rel="noopener" href="https://github.com/epam-mooc/stm-java">stm-java</a><br>[11] <a target="_blank" rel="noopener" href="http://www.codecommit.com/blog/scala/software-transactional-memory-in-scala">software-transactional-memory-in-scala</a><br>[12] <a target="_blank" rel="noopener" href="https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/">notes-on-structured-concurrency-or-go-statement-considered-harmful</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/concurrent/" rel="tag"># concurrent</a>
+              <a href="/tags/model/" rel="tag"># model</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/06/13/akka-notes/" rel="prev" title="akka笔记">
+                  <i class="fa fa-chevron-left"></i> akka笔记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/06/14/java-performance-tuning/" rel="next" title="java-performance-tuning">
+                  java-performance-tuning <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>

@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="集群内的原理    介绍 cluster 、 node 、 shard 等常用术语，Elastisearch 的扩容机制， 以及如何处理硬件故障的内容。   ElasticSearch 的主旨是随时可用和按需扩容。 而扩容可以通过购买性能更强大（ 垂直扩容 ，或 纵向扩容 ） 或者数量更多的服务器（ 水平扩容 ，或 横向扩容 ）来实现。   虽然 Elasticsearch 可以获益于更强大的硬">
+<meta property="og:type" content="article">
+<meta property="og:title" content="elasticsearch 集群">
+<meta property="og:url" content="http://weikeqin.com/2018/08/03/elasticsearch-cluster/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="集群内的原理    介绍 cluster 、 node 、 shard 等常用术语，Elastisearch 的扩容机制， 以及如何处理硬件故障的内容。   ElasticSearch 的主旨是随时可用和按需扩容。 而扩容可以通过购买性能更强大（ 垂直扩容 ，或 纵向扩容 ） 或者数量更多的服务器（ 水平扩容 ，或 横向扩容 ）来实现。   虽然 Elasticsearch 可以获益于更强大的硬">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-08-03T09:32:09.000Z">
+<meta property="article:modified_time" content="2022-05-28T03:51:47.226Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="elasticsearch">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2018/08/03/elasticsearch-cluster/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2018/08/03/elasticsearch-cluster/","path":"2018/08/03/elasticsearch-cluster/","title":"elasticsearch 集群"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>elasticsearch 集群 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E7%A9%BA%E9%9B%86%E7%BE%A4"><span class="nav-number">1.</span> <span class="nav-text">(1) 空集群</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E9%9B%86%E7%BE%A4%E5%81%A5%E5%BA%B7"><span class="nav-number">2.</span> <span class="nav-text">(2) 集群健康</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%B7%BB%E5%8A%A0%E7%B4%A2%E5%BC%95"><span class="nav-number">3.</span> <span class="nav-text">(3) 添加索引</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%B7%BB%E5%8A%A0%E6%95%85%E9%9A%9C%E8%BD%AC%E7%A7%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) 添加故障转移</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E8%87%AA%E5%B7%B1%E6%90%AD%E5%BB%BA%E4%B8%80%E4%B8%AA3%E4%B8%AA%E8%8A%82%E7%82%B9%E7%9A%84%E9%9B%86%E7%BE%A4"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 自己搭建一个3个节点的集群</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%B0%B4%E5%B9%B3%E6%89%A9%E5%AE%B9"><span class="nav-number">5.</span> <span class="nav-text">(5) 水平扩容</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E8%AE%BE%E7%BD%AE%E5%89%AF%E6%9C%AC%E6%95%B0"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1)  设置副本数</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%BA%94%E5%AF%B9%E6%95%85%E9%9A%9C"><span class="nav-number">6.</span> <span class="nav-text">(6) 应对故障</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">7.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">250</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/08/03/elasticsearch-cluster/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          elasticsearch 集群
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-08-03 17:32:09" itemprop="dateCreated datePublished" datetime="2018-08-03T17:32:09+08:00">2018-08-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2018/08/03/elasticsearch-cluster/" class="post-meta-item leancloud_visitors" data-flag-title="elasticsearch 集群" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p> 集群内的原理 </p>
+<p>  介绍 cluster 、 node 、 shard 等常用术语，Elastisearch 的扩容机制， 以及如何处理硬件故障的内容。</p>
+<p>  ElasticSearch 的主旨是随时可用和按需扩容。 而扩容可以通过购买性能更强大（ 垂直扩容 ，或 纵向扩容 ） 或者数量更多的服务器（ 水平扩容 ，或 横向扩容 ）来实现。</p>
+<p>  虽然 Elasticsearch 可以获益于更强大的硬件设备，但是垂直扩容是有极限的。 真正的扩容能力是来自于水平扩容–为集群添加更多的节点，并且将负载压力和稳定性分散到这些节点中。</p>
+<h1 id="1-空集群"><a href="#1-空集群" class="headerlink" title="(1) 空集群"></a>(1) 空集群</h1><p>  一个运行中的 Elasticsearch 实例称为一个 节点，而集群是由一个或者多个拥有相同 cluster.name 配置的节点组成， 它们共同承担数据和负载的压力。当有节点加入集群中或者从集群中移除节点时，集群将会重新平均分布所有的数据。</p>
+<h1 id="2-集群健康"><a href="#2-集群健康" class="headerlink" title="(2) 集群健康"></a>(2) 集群健康</h1><p>  查看集群健康状态</p>
+<p>  <code>http://localhost:9200/_cluster/health?pretty</code></p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">$ curl -X GET "localhost:9200/_cluster/health?pretty"
+&#123;
+  "cluster_name" : "my-application",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 5,
+  "active_shards" : 5,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 5,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 50.0
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>status 字段指示着当前集群在总体上是否工作正常。它的三种颜色含义如下：<br>  green  所有的主分片和副本分片都正常运行。<br>  yellow 所有的主分片都正常运行，但不是所有的副本分片都正常运行。<br>  red    有主分片没能正常运行。</p>
+<span id="more"></span> 
+
+<h1 id="3-添加索引"><a href="#3-添加索引" class="headerlink" title="(3) 添加索引"></a>(3) 添加索引</h1><p>   我们往 Elasticsearch 添加数据时需要用到 <code>索引</code> —— 保存相关数据的地方。 索引实际上是指向一个或者多个物理 <code>分片</code> 的 逻辑命名空间 。</p>
+<p>  一个 分片 是一个底层的 工作单元 ，它仅保存了全部数据中的一部分。 在分片内部机制中，我们将详细介绍分片是如何工作的，而现在我们只需知道一个分片是一个 Lucene 的实例，以及它本身就是一个完整的搜索引擎。 我们的文档被存储和索引到分片内，但是应用程序是直接与索引而不是与分片进行交互。</p>
+<p>  Elasticsearch 是利用分片将数据分发到集群内各处的。分片是数据的容器，文档保存在分片内，分片又被分配到集群内的各个节点里。 当你的集群规模扩大或者缩小时， Elasticsearch 会自动的在各节点中迁移分片，使得数据仍然均匀分布在集群里。</p>
+<p>  一个分片可以是 主 分片或者 副本 分片。 索引内任意一个文档都归属于一个主分片，所以主分片的数目决定着索引能够保存的最大数据量。</p>
+<p>  技术上来说，一个主分片最大能够存储 Integer.MAX_VALUE - 128 个文档，但是实际最大值还需要参考你的使用场景：包括你使用的硬件， 文档的大小和复杂程度，索引和查询文档的方式以及你期望的响应时长。</p>
+<p>  一个副本分片只是一个主分片的拷贝。 副本分片作为硬件故障时保护数据不丢失的冗余备份，并为搜索和返回文档等读操作提供服务。<br>  在索引建立的时候就已经确定了主分片数，但是副本分片数可以随时修改。  </p>
+<p>  索引在默认情况下会被分配5个主分片</p>
+<p>  创建一个blogs索引，设置3个主分片和一份副本(每个主分片拥有一个副本分片)</p>
+<p>  设置分片数和副本数</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">$ curl -X PUT "localhost:9200/blogs?pretty" -H 'Content-Type: application/json' -d'
+> &#123;
+>    "settings" : &#123;
+>       "number_of_shards" : 3,
+>       "number_of_replicas" : 1
+>    &#125;
+> &#125;
+> '
+&#123;
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "blogs"
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">WKQ@WKQ-PC MINGW64 /c/ProfessionalSoftWare/ElasticSearch/elasticsearch-5.6.10
+$ curl -X PUT "localhost:9200/blogs" -H 'Content-Type: application/json' -d'
+> &#123;
+>    "settings" : &#123;
+>       "number_of_shards" : 3,
+>       "number_of_replicas" : 1
+>    &#125;
+> &#125;
+> '
+&#123;"acknowledged":true,"shards_acknowledged":true,"index":"blogs"&#125;
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="4-添加故障转移"><a href="#4-添加故障转移" class="headerlink" title="(4) 添加故障转移"></a>(4) 添加故障转移</h1><p>  当集群中只有一个节点在运行时，意味着会有一个单点故障问题——没有冗余。 幸运的是，我们只需再启动一个节点即可防止数据丢失。</p>
+<p>  为了测试第二个节点启动后的情况，你可以在同一个目录内，完全依照启动第一个节点的方式来启动一个新节点。多个节点可以共享同一个目录。</p>
+<p>  当你在同一台机器上启动了第二个节点时，只要它和第一个节点有同样的 cluster.name 配置，它就会自动发现集群并加入到其中。 但是在不同机器上启动节点的时候，为了加入到同一集群，你需要配置一个可连接到的单播主机列表。</p>
+<h2 id="4-1-自己搭建一个3个节点的集群"><a href="#4-1-自己搭建一个3个节点的集群" class="headerlink" title="(4.1) 自己搭建一个3个节点的集群"></a>(4.1) 自己搭建一个3个节点的集群</h2><p>  elasticsearch-5.6.10解压三份，然后把3个的配置文件里 <code>cluster.name</code> 全改成统一的一个名字，这儿我写的是 <code>elasticsearch_production</code> ，然后分别启动3个ES</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">λ elasticsearch
+[2018-07-22T17:38:20,925][INFO ][o.e.n.Node               ] [elasticsearch_node_001] initializing ...
+[2018-07-22T17:38:21,034][INFO ][o.e.e.NodeEnvironment    ] [elasticsearch_node_001] using [1] data paths, mounts [[disk-C (C:)]], net usable_space [81.2gb], net total_space [118.7gb], spins? [unknown], types [NTFS]
+[2018-07-22T17:38:21,034][INFO ][o.e.e.NodeEnvironment    ] [elasticsearch_node_001] heap size [1.9gb], compressed ordinary object pointers [true]
+[2018-07-22T17:38:21,164][INFO ][o.e.n.Node               ] [elasticsearch_node_001] node name [elasticsearch_node_001], node ID [gjy4N2RCQ4mLxp1lxdyZ8w]
+[2018-07-22T17:38:21,164][INFO ][o.e.n.Node               ] [elasticsearch_node_001] version[5.6.10], pid[9412], build[b727a60/2018-06-06T15:48:34.860Z], OS[Windows 10/10.0/amd64], JVM[Oracle Corporation/Java HotSpot(TM) 64-Bit Server VM/1.8.0_131/25.131-b11]
+[2018-07-22T17:38:21,164][INFO ][o.e.n.Node               ] [elasticsearch_node_001] JVM arguments [-Xms2g, -Xmx2g, -XX:+UseConcMarkSweepGC, -XX:CMSInitiatingOccupancyFraction=75, -XX:+UseCMSInitiatingOccupancyOnly, -XX:+AlwaysPreTouch, -Xss1m, -Djava.awt.headless=true, -Dfile.encoding=UTF-8, -Djna.nosys=true, -Djdk.io.permissionsUseCanonicalPath=true, -Dio.netty.noUnsafe=true, -Dio.netty.noKeySetOptimization=true, -Dio.netty.recycler.maxCapacityPerThread=0, -Dlog4j.shutdownHookEnabled=false, -Dlog4j2.disable.jmx=true, -Dlog4j.skipJansi=true, -XX:+HeapDumpOnOutOfMemoryError, -Delasticsearch, -Des.path.home=C:\ProfessionalSoftWare\ElasticSearch\elasticsearch-5.6.10]
+[2018-07-22T17:38:22,254][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [aggs-matrix-stats]
+[2018-07-22T17:38:22,256][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [ingest-common]
+[2018-07-22T17:38:22,257][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [lang-expression]
+[2018-07-22T17:38:22,258][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [lang-groovy]
+[2018-07-22T17:38:22,258][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [lang-mustache]
+[2018-07-22T17:38:22,258][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [lang-painless]
+[2018-07-22T17:38:22,259][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [parent-join]
+[2018-07-22T17:38:22,259][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [percolator]
+[2018-07-22T17:38:22,259][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [reindex]
+[2018-07-22T17:38:22,260][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [transport-netty3]
+[2018-07-22T17:38:22,260][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] loaded module [transport-netty4]
+[2018-07-22T17:38:22,261][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_001] no plugins loaded
+[2018-07-22T17:38:24,294][INFO ][o.e.d.DiscoveryModule    ] [elasticsearch_node_001] using discovery type [zen]
+[2018-07-22T17:38:24,844][INFO ][o.e.n.Node               ] [elasticsearch_node_001] initialized
+[2018-07-22T17:38:24,844][INFO ][o.e.n.Node               ] [elasticsearch_node_001] starting ...
+[2018-07-22T17:38:25,488][INFO ][o.e.t.TransportService   ] [elasticsearch_node_001] publish_address &#123;127.0.0.1:9300&#125;, bound_addresses &#123;127.0.0.1:9300&#125;, &#123;[::1]:9300&#125;
+[2018-07-22T17:38:28,621][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_001] new_master &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;, reason: zen-disco-elected-as-master ([0] nodes joined)[, ]
+[2018-07-22T17:38:28,887][INFO ][o.e.g.GatewayService     ] [elasticsearch_node_001] recovered [2] indices into cluster_state
+[2018-07-22T17:38:29,246][INFO ][o.e.c.r.a.AllocationService] [elasticsearch_node_001] Cluster health status changed from [RED] to [YELLOW] (reason: [shards started [[megacorp][4], [megacorp][3], [megacorp][0]] ...]).
+[2018-07-22T17:38:29,360][INFO ][o.e.h.n.Netty4HttpServerTransport] [elasticsearch_node_001] publish_address &#123;127.0.0.1:9200&#125;, bound_addresses &#123;127.0.0.1:9200&#125;, &#123;[::1]:9200&#125;
+[2018-07-22T17:38:29,360][INFO ][o.e.n.Node               ] [elasticsearch_node_001] started
+[2018-07-22T17:38:56,302][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_001] added &#123;&#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;,&#125;, reason: zen-disco-node-join
+[2018-07-22T17:38:56,505][WARN ][o.e.d.z.ElectMasterService] [elasticsearch_node_001] value for setting "discovery.zen.minimum_master_nodes" is too low. This can result in data loss! Please set it to at least a quorum of master-eligible nodes (current value: [-1], total number of master-eligible nodes used for publishing in this round: [2])
+[2018-07-22T17:38:58,989][INFO ][o.e.c.r.a.AllocationService] [elasticsearch_node_001] Cluster health status changed from [YELLOW] to [GREEN] (reason: [shards started [[megacorp][4]] ...]).
+[2018-07-22T17:39:43,600][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_001] added &#123;&#123;elasticsearch_node_003&#125;&#123;upVg0NksTRi8LH8mj9xqpg&#125;&#123;ydGaCWORSlWf09TTjpUBQg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9302&#125;,&#125;, reason: zen-disco-node-join<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">C:\ProfessionalSoftWare\ElasticSearch\elasticsearch-5.6.10-node2\bin
+λ elasticsearch
+[2018-07-22T17:38:47,851][INFO ][o.e.n.Node               ] [elasticsearch_node_002] initializing ...
+[2018-07-22T17:38:47,960][INFO ][o.e.e.NodeEnvironment    ] [elasticsearch_node_002] using [1] data paths, mounts [[disk-C (C:)]], net usable_space [78.9gb], net total_space [118.7gb], spins? [unknown], types [NTFS]
+[2018-07-22T17:38:47,960][INFO ][o.e.e.NodeEnvironment    ] [elasticsearch_node_002] heap size [1.9gb], compressed ordinary object pointers [true]
+[2018-07-22T17:38:47,960][INFO ][o.e.n.Node               ] [elasticsearch_node_002] node name [elasticsearch_node_002], node ID [3ezLh-3jTB-c0pQXFXnr5Q]
+[2018-07-22T17:38:47,960][INFO ][o.e.n.Node               ] [elasticsearch_node_002] version[5.6.10], pid[13072], build[b727a60/2018-06-06T15:48:34.860Z], OS[Windows 10/10.0/amd64], JVM[Oracle Corporation/Java HotSpot(TM) 64-Bit Server VM/1.8.0_131/25.131-b11]
+[2018-07-22T17:38:47,960][INFO ][o.e.n.Node               ] [elasticsearch_node_002] JVM arguments [-Xms2g, -Xmx2g, -XX:+UseConcMarkSweepGC, -XX:CMSInitiatingOccupancyFraction=75, -XX:+UseCMSInitiatingOccupancyOnly, -XX:+AlwaysPreTouch, -Xss1m, -Djava.awt.headless=true, -Dfile.encoding=UTF-8, -Djna.nosys=true, -Djdk.io.permissionsUseCanonicalPath=true, -Dio.netty.noUnsafe=true, -Dio.netty.noKeySetOptimization=true, -Dio.netty.recycler.maxCapacityPerThread=0, -Dlog4j.shutdownHookEnabled=false, -Dlog4j2.disable.jmx=true, -Dlog4j.skipJansi=true, -XX:+HeapDumpOnOutOfMemoryError, -Delasticsearch, -Des.path.home=C:\ProfessionalSoftWare\ElasticSearch\elasticsearch-5.6.10-node2]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [aggs-matrix-stats]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [ingest-common]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [lang-expression]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [lang-groovy]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [lang-mustache]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [lang-painless]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [parent-join]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [percolator]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [reindex]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [transport-netty3]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] loaded module [transport-netty4]
+[2018-07-22T17:38:49,179][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_002] no plugins loaded
+[2018-07-22T17:38:51,724][INFO ][o.e.d.DiscoveryModule    ] [elasticsearch_node_002] using discovery type [zen]
+[2018-07-22T17:38:52,224][INFO ][o.e.n.Node               ] [elasticsearch_node_002] initialized
+[2018-07-22T17:38:52,240][INFO ][o.e.n.Node               ] [elasticsearch_node_002] starting ...
+[2018-07-22T17:38:52,929][INFO ][o.e.t.TransportService   ] [elasticsearch_node_002] publish_address &#123;127.0.0.1:9301&#125;, bound_addresses &#123;127.0.0.1:9301&#125;, &#123;[::1]:9301&#125;
+[2018-07-22T17:38:56,365][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_002] detected_master &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;, added &#123;&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;,&#125;, reason: zen-disco-receive(from master [master &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125; committed version [7]])
+[2018-07-22T17:38:57,005][INFO ][o.e.h.n.Netty4HttpServerTransport] [elasticsearch_node_002] publish_address &#123;127.0.0.1:9201&#125;, bound_addresses &#123;127.0.0.1:9201&#125;, &#123;[::1]:9201&#125;
+[2018-07-22T17:38:57,005][INFO ][o.e.n.Node               ] [elasticsearch_node_002] started
+[2018-07-22T17:39:43,600][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_002] added &#123;&#123;elasticsearch_node_003&#125;&#123;upVg0NksTRi8LH8mj9xqpg&#125;&#123;ydGaCWORSlWf09TTjpUBQg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9302&#125;,&#125;, reason: zen-disco-receive(from master [master &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125; committed version [16]])<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">λ elasticsearch
+[2018-07-22T17:39:34,786][INFO ][o.e.n.Node               ] [elasticsearch_node_003] initializing ...
+[2018-07-22T17:39:35,020][INFO ][o.e.e.NodeEnvironment    ] [elasticsearch_node_003] using [1] data paths, mounts [[disk-C (C:)]], net usable_space [76.8gb], net total_space [118.7gb], spins? [unknown], types [NTFS]
+[2018-07-22T17:39:35,020][INFO ][o.e.e.NodeEnvironment    ] [elasticsearch_node_003] heap size [1.9gb], compressed ordinary object pointers [true]
+[2018-07-22T17:39:35,020][INFO ][o.e.n.Node               ] [elasticsearch_node_003] node name [elasticsearch_node_003], node ID [upVg0NksTRi8LH8mj9xqpg]
+[2018-07-22T17:39:35,020][INFO ][o.e.n.Node               ] [elasticsearch_node_003] version[5.6.10], pid[2316], build[b727a60/2018-06-06T15:48:34.860Z], OS[Windows 10/10.0/amd64], JVM[Oracle Corporation/Java HotSpot(TM) 64-Bit Server VM/1.8.0_131/25.131-b11]
+[2018-07-22T17:39:35,020][INFO ][o.e.n.Node               ] [elasticsearch_node_003] JVM arguments [-Xms2g, -Xmx2g, -XX:+UseConcMarkSweepGC, -XX:CMSInitiatingOccupancyFraction=75, -XX:+UseCMSInitiatingOccupancyOnly, -XX:+AlwaysPreTouch, -Xss1m, -Djava.awt.headless=true, -Dfile.encoding=UTF-8, -Djna.nosys=true, -Djdk.io.permissionsUseCanonicalPath=true, -Dio.netty.noUnsafe=true, -Dio.netty.noKeySetOptimization=true, -Dio.netty.recycler.maxCapacityPerThread=0, -Dlog4j.shutdownHookEnabled=false, -Dlog4j2.disable.jmx=true, -Dlog4j.skipJansi=true, -XX:+HeapDumpOnOutOfMemoryError, -Delasticsearch, -Des.path.home=C:\ProfessionalSoftWare\ElasticSearch\elasticsearch-5.6.10-node3]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [aggs-matrix-stats]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [ingest-common]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [lang-expression]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [lang-groovy]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [lang-mustache]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [lang-painless]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [parent-join]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [percolator]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [reindex]
+[2018-07-22T17:39:36,389][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [transport-netty3]
+[2018-07-22T17:39:36,404][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] loaded module [transport-netty4]
+[2018-07-22T17:39:36,404][INFO ][o.e.p.PluginsService     ] [elasticsearch_node_003] no plugins loaded
+[2018-07-22T17:39:38,995][INFO ][o.e.d.DiscoveryModule    ] [elasticsearch_node_003] using discovery type [zen]
+[2018-07-22T17:39:39,605][INFO ][o.e.n.Node               ] [elasticsearch_node_003] initialized
+[2018-07-22T17:39:39,605][INFO ][o.e.n.Node               ] [elasticsearch_node_003] starting ...
+[2018-07-22T17:39:40,386][INFO ][o.e.t.TransportService   ] [elasticsearch_node_003] publish_address &#123;127.0.0.1:9302&#125;, bound_addresses &#123;127.0.0.1:9302&#125;, &#123;[::1]:9302&#125;
+[2018-07-22T17:39:43,631][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_003] detected_master &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;, added &#123;&#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;,&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;,&#125;, reason: zen-disco-receive(from master [master &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125; committed version [16]])
+[2018-07-22T17:39:44,308][INFO ][o.e.h.n.Netty4HttpServerTransport] [elasticsearch_node_003] publish_address &#123;127.0.0.1:9202&#125;, bound_addresses &#123;127.0.0.1:9202&#125;, &#123;[::1]:9202&#125;
+[2018-07-22T17:39:44,308][INFO ][o.e.n.Node               ] [elasticsearch_node_003] started<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">WKQ@WKQ-PC MINGW64 /c/ProfessionalSoftWare/ElasticSearch/elasticsearch-5.6.10
+$ curl -X GET "localhost:9200/_cluster/health"
+&#123;
+    "cluster_name":"elasticsearch_production",
+    "status":"green",
+    "timed_out":false,
+    "number_of_nodes":3,
+    "number_of_data_nodes":3,
+    "active_primary_shards":8,
+    "active_shards":16,
+    "relocating_shards":0,
+    "initializing_shards":0,
+    "unassigned_shards":0,
+    "delayed_unassigned_shards":0,
+    "number_of_pending_tasks":0,
+    "number_of_in_flight_fetch":0,
+    "task_max_waiting_in_queue_millis":0,
+    "active_shards_percent_as_number":100
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="5-水平扩容"><a href="#5-水平扩容" class="headerlink" title="(5) 水平扩容"></a>(5) 水平扩容</h1><p>  每个节点的硬件资源（CPU, RAM, I/O）将被更少的分片所共享，每个分片的性能将会得到提升。<br>  分片是一个功能完整的搜索引擎，它拥有使用一个节点上的所有资源的能力。<br>  主分片的数目在索引创建时 就已经确定了下来。实际上，这个数目定义了这个索引能够 存储 的最大数据量。（实际大小取决于你的数据、硬件和使用场景。）<br>  但是，读操作——搜索和返回数据——可以同时被主分片 或 副本分片所处理，所以当你拥有越多的副本分片时，也将拥有越高的吞吐量。</p>
+<h2 id="5-1-设置副本数"><a href="#5-1-设置副本数" class="headerlink" title="(5.1)  设置副本数"></a>(5.1)  设置副本数</h2><pre class="line-numbers language-text" data-language="text"><code class="language-text">$ curl -X PUT "localhost:9200/blogs/_settings?pretty" -H 'Content-Type: application/json' -d'
+> &#123;
+>    "number_of_replicas" : 2
+> &#125;
+> '
+&#123;
+  "acknowledged" : true
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  blogs 索引现在拥有9个分片：3个主分片和6个副本分片。 这意味着我们可以将集群扩容到9个节点，每个节点上一个分片。相比原来3个节点时，集群搜索性能可以提升 3 倍。</p>
+<p>  当然，如果只是在相同节点数目的集群上增加更多的副本分片并不能提高性能，因为每个分片从节点上获得的资源会变少。 你需要增加更多的硬件资源来提升吞吐量。<br>  但是更多的副本分片数提高了数据冗余量：按照上面的节点配置，我们可以在失去2个节点的情况下不丢失任何数据。</p>
+<h1 id="6-应对故障"><a href="#6-应对故障" class="headerlink" title="(6) 应对故障"></a>(6) 应对故障</h1><pre class="line-numbers language-text" data-language="text"><code class="language-text">[2018-07-22T17:59:38,513][INFO ][o.e.c.m.MetaDataUpdateSettingsService] [elasticsearch_node_001] updating number_of_replicas to [2] for indices [blogs]
+[2018-07-22T17:59:39,286][INFO ][o.e.c.r.a.AllocationService] [elasticsearch_node_001] Cluster health status changed from [YELLOW] to [GREEN] (reason: [shards started [[blogs][2]] ...]).
+[2018-07-22T18:05:07,871][INFO ][o.e.n.Node               ] [elasticsearch_node_001] stopping ...
+[2018-07-22T18:05:07,943][INFO ][o.e.n.Node               ] [elasticsearch_node_001] stopped
+[2018-07-22T18:05:08,051][INFO ][o.e.n.Node               ] [elasticsearch_node_001] closing ...
+[2018-07-22T18:05:08,065][INFO ][o.e.n.Node               ] [elasticsearch_node_001] closed
+终止批处理操作吗(Y/N)? y
+
+
+[2018-07-22T18:05:07,887][INFO ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_002] master_left [&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;], reason [shut_down]
+[2018-07-22T18:05:07,910][WARN ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_002] master left (reason = shut_down), current nodes: nodes:
+   &#123;elasticsearch_node_003&#125;&#123;upVg0NksTRi8LH8mj9xqpg&#125;&#123;ydGaCWORSlWf09TTjpUBQg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9302&#125;
+   &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;, master
+   &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;, local
+
+[2018-07-22T18:05:07,911][INFO ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_002] master_left [&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;], reason [transport disconnected]
+[2018-07-22T18:05:07,925][WARN ][o.e.t.n.Netty4Transport  ] [elasticsearch_node_002] write and flush on the network layer failed (channel: [id: 0xee4a8fab, L:0.0.0.0/0.0.0.0:9301 ! R:/127.0.0.1:53349])
+java.nio.channels.ClosedChannelException: null
+        at io.netty.channel.AbstractChannel$AbstractUnsafe.write(...)(Unknown Source) ~[?:?]
+[2018-07-22T18:05:08,929][WARN ][o.e.c.NodeConnectionsService] [elasticsearch_node_002] failed to connect to node &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125; (tried [1] times)
+org.elasticsearch.transport.ConnectTransportException: [elasticsearch_node_001][127.0.0.1:9300] connect_timeout[30s]
+        at org.elasticsearch.transport.netty4.Netty4Transport.connectToChannels(Netty4Transport.java:363) ~[?:?]
+        at org.elasticsearch.transport.TcpTransport.openConnection(TcpTransport.java:570) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.connectToNode(TcpTransport.java:473) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.connectToNode(TransportService.java:342) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.connectToNode(TransportService.java:329) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.NodeConnectionsService.validateAndConnectIfNeeded(NodeConnectionsService.java:154) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.NodeConnectionsService$1.doRun(NodeConnectionsService.java:107) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:674) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:37) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: no further information: 127.0.0.1/127.0.0.1:9300
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method) ~[?:?]
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717) ~[?:?]
+        at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:352) ~[?:?]
+        at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:340) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:632) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeysPlain(NioEventLoop.java:544) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:498) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:458) ~[?:?]
+        at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:858) ~[?:?]
+        ... 1 more
+Caused by: java.net.ConnectException: Connection refused: no further information
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method) ~[?:?]
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717) ~[?:?]
+        at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:352) ~[?:?]
+        at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:340) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:632) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeysPlain(NioEventLoop.java:544) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:498) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:458) ~[?:?]
+        at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:858) ~[?:?]
+        ... 1 more
+[2018-07-22T18:05:10,961][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_002] new_master &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;, reason: zen-disco-elected-as-master ([0] nodes joined)[, ]
+[2018-07-22T18:05:13,003][DEBUG][o.e.a.a.c.n.s.TransportNodesStatsAction] [elasticsearch_node_002] failed to execute on node [gjy4N2RCQ4mLxp1lxdyZ8w]
+org.elasticsearch.transport.NodeNotConnectedException: [elasticsearch_node_001][127.0.0.1:9300] Node not connected
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:640) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:117) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.getConnection(TransportService.java:540) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.sendRequest(TransportService.java:516) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.nodes.TransportNodesAction$AsyncAction.start(TransportNodesAction.java:197) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.nodes.TransportNodesAction.doExecute(TransportNodesAction.java:89) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.nodes.TransportNodesAction.doExecute(TransportNodesAction.java:52) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction$RequestFilterChain.proceed(TransportAction.java:170) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:142) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:84) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.executeLocally(NodeClient.java:83) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.doExecute(NodeClient.java:72) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient.execute(AbstractClient.java:408) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$ClusterAdmin.execute(AbstractClient.java:730) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$ClusterAdmin.nodesStats(AbstractClient.java:826) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.updateNodeStats(InternalClusterInfoService.java:256) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.refresh(InternalClusterInfoService.java:292) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.maybeRefresh(InternalClusterInfoService.java:277) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.lambda$onMaster$0(InternalClusterInfoService.java:137) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingRunnable.run(ThreadContext.java:575) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+[2018-07-22T18:05:13,015][DEBUG][o.e.a.a.i.s.TransportIndicesStatsAction] [elasticsearch_node_002] failed to execute [indices:monitor/stats] on node [gjy4N2RCQ4mLxp1lxdyZ8w]
+org.elasticsearch.transport.NodeNotConnectedException: [elasticsearch_node_001][127.0.0.1:9300] Node not connected
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:640) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:117) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.getConnection(TransportService.java:540) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.sendRequest(TransportService.java:503) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction$AsyncAction.sendNodeRequest(TransportBroadcastByNodeAction.java:322) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction$AsyncAction.start(TransportBroadcastByNodeAction.java:311) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction.doExecute(TransportBroadcastByNodeAction.java:234) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction.doExecute(TransportBroadcastByNodeAction.java:79) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction$RequestFilterChain.proceed(TransportAction.java:170) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:142) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:84) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.executeLocally(NodeClient.java:83) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.doExecute(NodeClient.java:72) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient.execute(AbstractClient.java:408) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$IndicesAdmin.execute(AbstractClient.java:1256) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$IndicesAdmin.stats(AbstractClient.java:1577) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.updateIndicesStats(InternalClusterInfoService.java:270) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.refresh(InternalClusterInfoService.java:321) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.maybeRefresh(InternalClusterInfoService.java:277) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.lambda$onMaster$0(InternalClusterInfoService.java:137) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingRunnable.run(ThreadContext.java:575) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+[2018-07-22T18:05:13,057][INFO ][o.e.c.r.a.AllocationService] [elasticsearch_node_002] Cluster health status changed from [GREEN] to [YELLOW] (reason: []).
+[2018-07-22T18:05:13,058][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_002] removed &#123;&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;,&#125;, reason: zen-disco-node-failed(&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;), reason(transport disconnected)
+[2018-07-22T18:05:14,096][INFO ][o.e.c.r.DelayedAllocationService] [elasticsearch_node_002] scheduling reroute for delayed shards in [58.8s] (6 delayed shards)
+
+
+
+[2018-07-22T18:05:07,882][INFO ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_003] master_left [&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;], reason [shut_down]
+[2018-07-22T18:05:07,891][WARN ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_003] master left (reason = shut_down), current nodes: nodes:
+   &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;
+   &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;, master
+   &#123;elasticsearch_node_003&#125;&#123;upVg0NksTRi8LH8mj9xqpg&#125;&#123;ydGaCWORSlWf09TTjpUBQg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9302&#125;, local
+
+[2018-07-22T18:05:07,904][INFO ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_003] master_left [&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;], reason [transport disconnected]
+[2018-07-22T18:05:08,917][WARN ][o.e.c.NodeConnectionsService] [elasticsearch_node_003] failed to connect to node &#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125; (tried [1] times)
+org.elasticsearch.transport.ConnectTransportException: [elasticsearch_node_001][127.0.0.1:9300] connect_timeout[30s]
+        at org.elasticsearch.transport.netty4.Netty4Transport.connectToChannels(Netty4Transport.java:363) ~[?:?]
+        at org.elasticsearch.transport.TcpTransport.openConnection(TcpTransport.java:570) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.connectToNode(TcpTransport.java:473) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.connectToNode(TransportService.java:342) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.connectToNode(TransportService.java:329) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.NodeConnectionsService.validateAndConnectIfNeeded(NodeConnectionsService.java:154) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.NodeConnectionsService$1.doRun(NodeConnectionsService.java:107) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:674) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:37) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: no further information: 127.0.0.1/127.0.0.1:9300
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method) ~[?:?]
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717) ~[?:?]
+        at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:352) ~[?:?]
+        at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:340) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:632) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeysPlain(NioEventLoop.java:544) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:498) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:458) ~[?:?]
+        at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:858) ~[?:?]
+        ... 1 more
+Caused by: java.net.ConnectException: Connection refused: no further information
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method) ~[?:?]
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717) ~[?:?]
+        at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:352) ~[?:?]
+        at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:340) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:632) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeysPlain(NioEventLoop.java:544) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:498) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:458) ~[?:?]
+        at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:858) ~[?:?]
+        ... 1 more
+[2018-07-22T18:05:11,977][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_003] detected_master &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;, reason: zen-disco-receive(from master [master &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125; committed version [27]])
+[2018-07-22T18:05:13,066][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_003] removed &#123;&#123;elasticsearch_node_001&#125;&#123;gjy4N2RCQ4mLxp1lxdyZ8w&#125;&#123;81yv2TghSQSrqvbPWszDTg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9300&#125;,&#125;, reason: zen-disco-receive(from master [master &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125; committed version [28]])
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">[2018-07-22T18:11:53,988][INFO ][o.e.n.Node               ] [elasticsearch_node_002] stopping ...
+[2018-07-22T18:11:54,051][INFO ][o.e.n.Node               ] [elasticsearch_node_002] stopped
+[2018-07-22T18:11:54,051][INFO ][o.e.n.Node               ] [elasticsearch_node_002] closing ...
+[2018-07-22T18:11:54,059][INFO ][o.e.n.Node               ] [elasticsearch_node_002] closed
+终止批处理操作吗(Y/N)? y
+
+
+[2018-07-22T18:11:53,998][INFO ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_003] master_left [&#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;], reason [shut_down]
+[2018-07-22T18:11:54,002][WARN ][o.e.d.z.ZenDiscovery     ] [elasticsearch_node_003] master left (reason = shut_down), current nodes: nodes:
+   &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;, master
+   &#123;elasticsearch_node_003&#125;&#123;upVg0NksTRi8LH8mj9xqpg&#125;&#123;ydGaCWORSlWf09TTjpUBQg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9302&#125;, local
+
+[2018-07-22T18:11:57,059][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_003] new_master &#123;elasticsearch_node_003&#125;&#123;upVg0NksTRi8LH8mj9xqpg&#125;&#123;ydGaCWORSlWf09TTjpUBQg&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9302&#125;, reason: zen-disco-elected-as-master ([0] nodes joined)[, ]
+[2018-07-22T18:11:58,069][WARN ][o.e.c.NodeConnectionsService] [elasticsearch_node_003] failed to connect to node &#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125; (tried [1] times)
+org.elasticsearch.transport.ConnectTransportException: [elasticsearch_node_002][127.0.0.1:9301] connect_timeout[30s]
+        at org.elasticsearch.transport.netty4.Netty4Transport.connectToChannels(Netty4Transport.java:363) ~[?:?]
+        at org.elasticsearch.transport.TcpTransport.openConnection(TcpTransport.java:570) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.connectToNode(TcpTransport.java:473) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.connectToNode(TransportService.java:342) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.connectToNode(TransportService.java:329) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.NodeConnectionsService.validateAndConnectIfNeeded(NodeConnectionsService.java:154) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.NodeConnectionsService$1.doRun(NodeConnectionsService.java:107) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:674) [elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:37) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: no further information: 127.0.0.1/127.0.0.1:9301
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method) ~[?:?]
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717) ~[?:?]
+        at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:352) ~[?:?]
+        at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:340) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:632) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeysPlain(NioEventLoop.java:544) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:498) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:458) ~[?:?]
+        at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:858) ~[?:?]
+        ... 1 more
+Caused by: java.net.ConnectException: Connection refused: no further information
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method) ~[?:?]
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717) ~[?:?]
+        at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:352) ~[?:?]
+        at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:340) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:632) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeysPlain(NioEventLoop.java:544) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:498) ~[?:?]
+        at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:458) ~[?:?]
+        at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:858) ~[?:?]
+        ... 1 more
+[2018-07-22T18:11:58,100][DEBUG][o.e.a.a.c.n.s.TransportNodesStatsAction] [elasticsearch_node_003] failed to execute on node [3ezLh-3jTB-c0pQXFXnr5Q]
+org.elasticsearch.transport.NodeNotConnectedException: [elasticsearch_node_002][127.0.0.1:9301] Node not connected
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:640) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:117) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.getConnection(TransportService.java:540) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.sendRequest(TransportService.java:516) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.nodes.TransportNodesAction$AsyncAction.start(TransportNodesAction.java:197) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.nodes.TransportNodesAction.doExecute(TransportNodesAction.java:89) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.nodes.TransportNodesAction.doExecute(TransportNodesAction.java:52) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction$RequestFilterChain.proceed(TransportAction.java:170) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:142) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:84) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.executeLocally(NodeClient.java:83) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.doExecute(NodeClient.java:72) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient.execute(AbstractClient.java:408) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$ClusterAdmin.execute(AbstractClient.java:730) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$ClusterAdmin.nodesStats(AbstractClient.java:826) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.updateNodeStats(InternalClusterInfoService.java:256) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.refresh(InternalClusterInfoService.java:292) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.maybeRefresh(InternalClusterInfoService.java:277) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.lambda$onMaster$0(InternalClusterInfoService.java:137) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingRunnable.run(ThreadContext.java:575) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+[2018-07-22T18:11:58,155][DEBUG][o.e.a.a.i.s.TransportIndicesStatsAction] [elasticsearch_node_003] failed to execute [indices:monitor/stats] on node [3ezLh-3jTB-c0pQXFXnr5Q]
+org.elasticsearch.transport.NodeNotConnectedException: [elasticsearch_node_002][127.0.0.1:9301] Node not connected
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:640) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TcpTransport.getConnection(TcpTransport.java:117) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.getConnection(TransportService.java:540) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.transport.TransportService.sendRequest(TransportService.java:503) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction$AsyncAction.sendNodeRequest(TransportBroadcastByNodeAction.java:322) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction$AsyncAction.start(TransportBroadcastByNodeAction.java:311) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction.doExecute(TransportBroadcastByNodeAction.java:234) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.broadcast.node.TransportBroadcastByNodeAction.doExecute(TransportBroadcastByNodeAction.java:79) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction$RequestFilterChain.proceed(TransportAction.java:170) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:142) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.action.support.TransportAction.execute(TransportAction.java:84) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.executeLocally(NodeClient.java:83) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.node.NodeClient.doExecute(NodeClient.java:72) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient.execute(AbstractClient.java:408) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$IndicesAdmin.execute(AbstractClient.java:1256) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.client.support.AbstractClient$IndicesAdmin.stats(AbstractClient.java:1577) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.updateIndicesStats(InternalClusterInfoService.java:270) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.refresh(InternalClusterInfoService.java:321) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.maybeRefresh(InternalClusterInfoService.java:277) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.cluster.InternalClusterInfoService.lambda$onMaster$0(InternalClusterInfoService.java:137) ~[elasticsearch-5.6.10.jar:5.6.10]
+        at org.elasticsearch.common.util.concurrent.ThreadContext$ContextPreservingRunnable.run(ThreadContext.java:575) [elasticsearch-5.6.10.jar:5.6.10]
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142) [?:1.8.0_131]
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617) [?:1.8.0_131]
+        at java.lang.Thread.run(Thread.java:748) [?:1.8.0_131]
+[2018-07-22T18:11:58,170][INFO ][o.e.c.s.ClusterService   ] [elasticsearch_node_003] removed &#123;&#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;,&#125;, reason: zen-disco-node-failed(&#123;elasticsearch_node_002&#125;&#123;3ezLh-3jTB-c0pQXFXnr5Q&#125;&#123;Y4i8X_t7QhWDBoP6MoDuvw&#125;&#123;127.0.0.1&#125;&#123;127.0.0.1:9301&#125;), reason(transport disconnected)
+[2018-07-22T18:11:58,220][INFO ][o.e.c.r.DelayedAllocationService] [elasticsearch_node_003] scheduling reroute for delayed shards in [59.8s] (8 delayed shards)
+[2018-07-22T18:12:02,864][INFO ][o.e.n.Node               ] [elasticsearch_node_003] stopping ...
+[2018-07-22T18:12:02,893][INFO ][o.e.n.Node               ] [elasticsearch_node_003] stopped
+[2018-07-22T18:12:02,894][INFO ][o.e.n.Node               ] [elasticsearch_node_003] closing ...
+[2018-07-22T18:12:02,902][INFO ][o.e.n.Node               ] [elasticsearch_node_003] closed
+终止批处理操作吗(Y/N)? y<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/_an-empty-cluster.html">空集群</a><br>[2] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/cluster-health.html">集群健康</a><br>[3] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/_add-an-index.html">添加索引</a><br>[4] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/_add_failover.html">添加故障转移</a><br>[5] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/_scale_horizontally.html">水平扩容</a><br>[6] <a target="_blank" rel="noopener" href="https://www.elastic.co/guide/cn/elasticsearch/guide/cn/_coping_with_failure.html">应对故障</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/elasticsearch/" rel="tag"># elasticsearch</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2018/08/03/neo4j-practice/" rel="prev" title="neo4j">
+                  <i class="fa fa-chevron-left"></i> neo4j
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2018/08/11/orientdb-download-install/" rel="next" title="OrientDB 下载 安装">
+                  OrientDB 下载 安装 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>
