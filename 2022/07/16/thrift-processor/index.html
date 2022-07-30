@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="大家有没有想过，调用方调用一个方法，服务端是怎么找到对应方法并处理的？   很多RPC里是通过反射实现的，但是thrift里用的是另一种方式。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="thrift TProcessor">
+<meta property="og:url" content="http://weikeqin.com/2022/07/16/thrift-processor/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="大家有没有想过，调用方调用一个方法，服务端是怎么找到对应方法并处理的？   很多RPC里是通过反射实现的，但是thrift里用的是另一种方式。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-07-16T12:20:35.000Z">
+<meta property="article:modified_time" content="2022-07-30T15:44:25.517Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="rpc">
+<meta property="article:tag" content="thrift">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2022/07/16/thrift-processor/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2022/07/16/thrift-processor/","path":"2022/07/16/thrift-processor/","title":"thrift TProcessor"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>thrift TProcessor | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-TProcessor%E4%BD%9C%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">(1) TProcessor作用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Demo-go"><span class="nav-number">2.</span> <span class="nav-text">(2) Demo-go</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-thrift-idl-%E7%94%9F%E6%88%90%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90-go"><span class="nav-number">3.</span> <span class="nav-text">(3) thrift idl 生成代码分析-go</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-server%E5%A4%84%E7%90%86%E8%AF%B7%E6%B1%82%E9%80%BB%E8%BE%91"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) server处理请求逻辑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-service-processor%E9%80%BB%E8%BE%91-%E8%B0%83%E7%94%A8idl%E7%9A%84Process%E6%96%B9%E6%B3%95"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) service-processor逻辑  (调用idl的Process方法)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-method-processor%E9%80%BB%E8%BE%91-%E5%8C%85%E5%90%AB%E8%B0%83%E7%94%A8%E4%B8%9A%E5%8A%A1%E6%96%B9%E6%B3%95"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) method-processor逻辑 (包含调用业务方法)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E4%BB%8E%E6%B6%88%E6%81%AF%E8%AF%BB%E5%8F%96%E5%85%A5%E5%8F%82%E9%80%BB%E8%BE%91"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 从消息读取入参逻辑</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-1-%E8%AF%BB%E5%8F%96%E6%9F%90%E4%B8%AA%E5%AD%97%E6%AE%B5"><span class="nav-number">3.4.1.</span> <span class="nav-text">(3.4.1) 读取某个字段</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-thrift-TProcessor-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90-go"><span class="nav-number">4.</span> <span class="nav-text">(4) thrift TProcessor 源码分析-go</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">251</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/07/16/thrift-processor/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          thrift TProcessor
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-07-16 20:20:35" itemprop="dateCreated datePublished" datetime="2022-07-16T20:20:35+08:00">2022-07-16</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-30 23:44:25" itemprop="dateModified" datetime="2022-07-30T23:44:25+08:00">2022-07-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2022/07/16/thrift-processor/" class="post-meta-item leancloud_visitors" data-flag-title="thrift TProcessor" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  大家有没有想过，调用方调用一个方法，服务端是怎么找到对应方法并处理的？</p>
+<p>  很多RPC里是通过反射实现的，但是thrift里用的是另一种方式。  </p>
+<span id="more"></span>
+
+<h1 id="1-TProcessor作用"><a href="#1-TProcessor作用" class="headerlink" title="(1) TProcessor作用"></a>(1) TProcessor作用</h1><p>  thrift idl 生成的代码 隐藏了复杂的序列化、业务接口调用等逻辑</p>
+<p>  在调用方的程序里面，thrift idl根据调用的服务接口提前生成代理实现类，并通过依赖注入等技术注入到声明了该接口的相关业务逻辑里面。该代理实现类会拦截所有的方法调用，在提供的方法处理逻辑里面完成一整套的远程调用，并把远程调用结果返回给调用方，这样调用方在调用远程方法的时候就获得了像调用本地接口一样的体验。</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// </span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+<h1 id="2-Demo-go"><a href="#2-Demo-go" class="headerlink" title="(2) Demo-go"></a>(2) Demo-go</h1><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	
+	addr <span class="token operator">:=</span> <span class="token string">"localhost:9090"</span>
+
+	<span class="token comment">// 协议工厂</span>
+	<span class="token keyword">var</span> protocolFactory thrift<span class="token punctuation">.</span>TProtocolFactory
+	protocolFactory <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTBinaryProtocolFactoryConf</span><span class="token punctuation">(</span><span class="token boolean">nil</span><span class="token punctuation">)</span>
+
+	<span class="token comment">// 传输工厂</span>
+	<span class="token keyword">var</span> transportFactory thrift<span class="token punctuation">.</span>TTransportFactory
+	transportFactory <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTTransportFactory</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token comment">// 传输方式</span>
+	<span class="token keyword">var</span> transport thrift<span class="token punctuation">.</span>TServerTransport
+	transport<span class="token punctuation">,</span> err <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTServerSocket</span><span class="token punctuation">(</span>addr<span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span>
+
+	<span class="token comment">// (src/handler.go) CalculatorHandler 是 Calculator接口的实现</span>
+	calculatorHandler <span class="token operator">:=</span> <span class="token function">NewCalculatorHandler</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+	<span class="token comment">// 入参要求是  (gen-go/tutorial/tutorial.go)里的Calculator接口</span>
+	<span class="token comment">// 返回结果 CalculatorProcessor的父类SharedServiceProcessor (gen-go/tutorial/tutorial.go) 是 TProcessor接口 (thrift/processor_factory.go) 的实现</span>
+	processor <span class="token operator">:=</span> tutorial<span class="token punctuation">.</span><span class="token function">NewCalculatorProcessor</span><span class="token punctuation">(</span>calculatorHandler<span class="token punctuation">)</span>
+	<span class="token comment">// 根据 processor, transport, transportFactory, protocolFactory 创建server</span>
+	<span class="token comment">// 这些信息会保存在server结构里，在处理请求的时候会用到</span>
+	server <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTSimpleServer4</span><span class="token punctuation">(</span>processor<span class="token punctuation">,</span> transport<span class="token punctuation">,</span> transportFactory<span class="token punctuation">,</span> protocolFactory<span class="token punctuation">)</span>
+
+	fmt<span class="token punctuation">.</span><span class="token function">Println</span><span class="token punctuation">(</span><span class="token string">"Starting the simple server... on "</span><span class="token punctuation">,</span> addr<span class="token punctuation">)</span>
+  <span class="token keyword">return</span> server<span class="token punctuation">.</span><span class="token function">Serve</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h1 id="3-thrift-idl-生成代码分析-go"><a href="#3-thrift-idl-生成代码分析-go" class="headerlink" title="(3) thrift idl 生成代码分析-go"></a>(3) thrift idl 生成代码分析-go</h1><p>  // TODO  调用流程图</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// idl生成的文件  /gen-go/tutorial/tutorial.go</span>
+<span class="token keyword">package</span> tutorial
+
+<span class="token keyword">type</span> CalculatorProcessor <span class="token keyword">struct</span> <span class="token punctuation">&#123;</span>
+  <span class="token operator">*</span>shared<span class="token punctuation">.</span>SharedServiceProcessor
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 创建计算处理类</span>
+<span class="token comment">// CalculatorProcessor 实现了 TProcessor接口</span>
+<span class="token keyword">func</span> <span class="token function">NewCalculatorProcessor</span><span class="token punctuation">(</span>handler Calculator<span class="token punctuation">)</span> <span class="token operator">*</span>CalculatorProcessor <span class="token punctuation">&#123;</span>
+  <span class="token comment">// </span>
+  self10 <span class="token operator">:=</span> <span class="token operator">&amp;</span>CalculatorProcessor<span class="token punctuation">&#123;</span>shared<span class="token punctuation">.</span><span class="token function">NewSharedServiceProcessor</span><span class="token punctuation">(</span>handler<span class="token punctuation">)</span><span class="token punctuation">&#125;</span>
+  <span class="token comment">// 按照 接口的方法名、方法对应的处理类 放入processorMap</span>
+  self10<span class="token punctuation">.</span><span class="token function">AddToProcessorMap</span><span class="token punctuation">(</span><span class="token string">"ping"</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>calculatorProcessorPing<span class="token punctuation">&#123;</span>handler<span class="token punctuation">:</span>handler<span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+  self10<span class="token punctuation">.</span><span class="token function">AddToProcessorMap</span><span class="token punctuation">(</span><span class="token string">"add"</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>calculatorProcessorAdd<span class="token punctuation">&#123;</span>handler<span class="token punctuation">:</span>handler<span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+  self10<span class="token punctuation">.</span><span class="token function">AddToProcessorMap</span><span class="token punctuation">(</span><span class="token string">"calculate"</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>calculatorProcessorCalculate<span class="token punctuation">&#123;</span>handler<span class="token punctuation">:</span>handler<span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+  self10<span class="token punctuation">.</span><span class="token function">AddToProcessorMap</span><span class="token punctuation">(</span><span class="token string">"zip"</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>calculatorProcessorZip<span class="token punctuation">&#123;</span>handler<span class="token punctuation">:</span>handler<span class="token punctuation">&#125;</span><span class="token punctuation">)</span>
+  <span class="token keyword">return</span> self10
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 按照方法名、处理类放入processorMap </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>SharedServiceProcessor<span class="token punctuation">)</span> <span class="token function">AddToProcessorMap</span><span class="token punctuation">(</span>key <span class="token builtin">string</span><span class="token punctuation">,</span> processor thrift<span class="token punctuation">.</span>TProcessorFunction<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  p<span class="token punctuation">.</span>processorMap<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">=</span> processor
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<h2 id="3-1-server处理请求逻辑"><a href="#3-1-server处理请求逻辑" class="headerlink" title="(3.1) server处理请求逻辑"></a>(3.1) server处理请求逻辑</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 简化了部分代码 </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>TSimpleServer<span class="token punctuation">)</span> <span class="token function">processRequests</span><span class="token punctuation">(</span>client TTransport<span class="token punctuation">)</span> <span class="token punctuation">(</span>err <span class="token builtin">error</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token comment">// 从client获取processor</span>
+	processor <span class="token operator">:=</span> p<span class="token punctuation">.</span>processorFactory<span class="token punctuation">.</span><span class="token function">GetProcessor</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+	inputTransport<span class="token punctuation">,</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span>inputTransportFactory<span class="token punctuation">.</span><span class="token function">GetTransport</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+	<span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> err
+	<span class="token punctuation">&#125;</span>
+	inputProtocol <span class="token operator">:=</span> p<span class="token punctuation">.</span>inputProtocolFactory<span class="token punctuation">.</span><span class="token function">GetProtocol</span><span class="token punctuation">(</span>inputTransport<span class="token punctuation">)</span>
+	<span class="token keyword">var</span> outputTransport TTransport
+  <span class="token keyword">var</span> outputProtocol TProtocol
+  oTrans<span class="token punctuation">,</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span>outputTransportFactory<span class="token punctuation">.</span><span class="token function">GetTransport</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span>
+	outputTransport <span class="token operator">=</span> oTrans
+  outputProtocol <span class="token operator">=</span> p<span class="token punctuation">.</span>outputProtocolFactory<span class="token punctuation">.</span><span class="token function">GetProtocol</span><span class="token punctuation">(</span>outputTransport<span class="token punctuation">)</span>
+
+  <span class="token comment">// 调server-proxy </span>
+	ok<span class="token punctuation">,</span> err <span class="token operator">:=</span> processor<span class="token punctuation">.</span><span class="token function">Process</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> inputProtocol<span class="token punctuation">,</span> outputProtocol<span class="token punctuation">)</span>
+
+	<span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="3-2-service-processor逻辑-调用idl的Process方法"><a href="#3-2-service-processor逻辑-调用idl的Process方法" class="headerlink" title="(3.2) service-processor逻辑  (调用idl的Process方法)"></a>(3.2) service-processor逻辑  (调用idl的Process方法)</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// file /gen-go/shared/shared.go</span>
+<span class="token keyword">package</span> shared
+
+<span class="token comment">// </span>
+<span class="token keyword">type</span> SharedServiceProcessor <span class="token keyword">struct</span> <span class="token punctuation">&#123;</span>
+  processorMap <span class="token keyword">map</span><span class="token punctuation">[</span><span class="token builtin">string</span><span class="token punctuation">]</span>thrift<span class="token punctuation">.</span>TProcessorFunction  <span class="token comment">// 存储方法名和对应的方法处理函数</span>
+  handler SharedService                              <span class="token comment">// </span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 处理</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>SharedServiceProcessor<span class="token punctuation">)</span> <span class="token function">Process</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> iprot<span class="token punctuation">,</span> oprot thrift<span class="token punctuation">.</span>TProtocol<span class="token punctuation">)</span> <span class="token punctuation">(</span>success <span class="token builtin">bool</span><span class="token punctuation">,</span> err thrift<span class="token punctuation">.</span>TException<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token comment">// 从传输协议里获取 方法名、版本号、序列Id</span>
+  name<span class="token punctuation">,</span> <span class="token boolean">_</span><span class="token punctuation">,</span> seqId<span class="token punctuation">,</span> err2 <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+  <span class="token keyword">if</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span> <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span> <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// 根据方法名 从方法映射 获取对应的处理函数 </span>
+  <span class="token comment">// 从map里根据方法名拿到对应processor </span>
+  <span class="token keyword">if</span> processor<span class="token punctuation">,</span> ok <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">GetProcessorFunction</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">;</span> ok <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 调用方法处理  返回成功 </span>
+    <span class="token comment">// 返回数据会写到oprot </span>
+    <span class="token keyword">return</span> processor<span class="token punctuation">.</span><span class="token function">Process</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> seqId<span class="token punctuation">,</span> iprot<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// </span>
+  iprot<span class="token punctuation">.</span><span class="token function">Skip</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> thrift<span class="token punctuation">.</span>STRUCT<span class="token punctuation">)</span>
+  iprot<span class="token punctuation">.</span><span class="token function">ReadMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+  <span class="token comment">// 写失败原因消息 </span>
+  x5 <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTApplicationException</span><span class="token punctuation">(</span>thrift<span class="token punctuation">.</span>UNKNOWN_METHOD<span class="token punctuation">,</span> <span class="token string">"Unknown function "</span> <span class="token operator">+</span> name<span class="token punctuation">)</span>
+  oprot<span class="token punctuation">.</span><span class="token function">WriteMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> name<span class="token punctuation">,</span> thrift<span class="token punctuation">.</span>EXCEPTION<span class="token punctuation">,</span> seqId<span class="token punctuation">)</span>
+  x5<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span>
+  oprot<span class="token punctuation">.</span><span class="token function">WriteMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+  oprot<span class="token punctuation">.</span><span class="token function">Flush</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+  <span class="token comment">// 返回失败</span>
+  <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">,</span> x5
+<span class="token punctuation">&#125;</span>
+
+
+<span class="token comment">// 根据方法名 从方法映射 获取对应的处理函数 </span>
+<span class="token comment">// 从map里根据方法名拿到对应processor </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>SharedServiceProcessor<span class="token punctuation">)</span> <span class="token function">GetProcessorFunction</span><span class="token punctuation">(</span>key <span class="token builtin">string</span><span class="token punctuation">)</span> <span class="token punctuation">(</span>processor thrift<span class="token punctuation">.</span>TProcessorFunction<span class="token punctuation">,</span> ok <span class="token builtin">bool</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  processor<span class="token punctuation">,</span> ok <span class="token operator">=</span> p<span class="token punctuation">.</span>processorMap<span class="token punctuation">[</span>key<span class="token punctuation">]</span>
+  <span class="token keyword">return</span> processor<span class="token punctuation">,</span> ok
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-3-method-processor逻辑-包含调用业务方法"><a href="#3-3-method-processor逻辑-包含调用业务方法" class="headerlink" title="(3.3) method-processor逻辑 (包含调用业务方法)"></a>(3.3) method-processor逻辑 (包含调用业务方法)</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// file  /gen-go/tutorial/tutorial.go</span>
+<span class="token keyword">package</span> tutorial 
+
+<span class="token comment">// </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>calculatorProcessorAdd<span class="token punctuation">)</span> <span class="token function">Process</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> seqId <span class="token builtin">int32</span><span class="token punctuation">,</span> iprot<span class="token punctuation">,</span> oprot thrift<span class="token punctuation">.</span>TProtocol<span class="token punctuation">)</span> <span class="token punctuation">(</span>success <span class="token builtin">bool</span><span class="token punctuation">,</span> err thrift<span class="token punctuation">.</span>TException<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  args <span class="token operator">:=</span> CalculatorAddArgs<span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+  <span class="token keyword">var</span> err2 <span class="token builtin">error</span>
+
+  <span class="token comment">// 读取入参</span>
+  <span class="token keyword">if</span> err2 <span class="token operator">=</span> args<span class="token punctuation">.</span><span class="token function">Read</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> iprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 读取信息结束  </span>
+    iprot<span class="token punctuation">.</span><span class="token function">ReadMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    <span class="token comment">// </span>
+    x <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTApplicationException</span><span class="token punctuation">(</span>thrift<span class="token punctuation">.</span>PROTOCOL_ERROR<span class="token punctuation">,</span> err2<span class="token punctuation">.</span><span class="token function">Error</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token comment">// 写返回值</span>
+    <span class="token comment">// 写返回消息开始  消息方法"add"  消息类型=thrift.EXCEPTION 序列Id使用入参里的seqId</span>
+    oprot<span class="token punctuation">.</span><span class="token function">WriteMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token string">"add"</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span>EXCEPTION<span class="token punctuation">,</span> seqId<span class="token punctuation">)</span>
+    <span class="token comment">// 写返回内容</span>
+    x<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span>
+    <span class="token comment">// 写返回消息结束</span>
+    oprot<span class="token punctuation">.</span><span class="token function">WriteMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    <span class="token comment">// flush</span>
+    oprot<span class="token punctuation">.</span><span class="token function">Flush</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    <span class="token comment">// 返回</span>
+    <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 读取入参消息结束</span>
+  iprot<span class="token punctuation">.</span><span class="token function">ReadMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+
+  tickerCancel <span class="token operator">:=</span> <span class="token keyword">func</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+  <span class="token comment">// Start a goroutine to do server side connectivity check.</span>
+  <span class="token keyword">if</span> thrift<span class="token punctuation">.</span>ServerConnectivityCheckInterval <span class="token operator">></span> <span class="token number">0</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">var</span> cancel context<span class="token punctuation">.</span>CancelFunc
+    ctx<span class="token punctuation">,</span> cancel <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">WithCancel</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    <span class="token keyword">defer</span> <span class="token function">cancel</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">var</span> tickerCtx context<span class="token punctuation">.</span>Context
+    tickerCtx<span class="token punctuation">,</span> tickerCancel <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">WithCancel</span><span class="token punctuation">(</span>context<span class="token punctuation">.</span><span class="token function">Background</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">defer</span> <span class="token function">tickerCancel</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment">// 开一个goroute</span>
+    <span class="token keyword">go</span> <span class="token keyword">func</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> cancel context<span class="token punctuation">.</span>CancelFunc<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      ticker <span class="token operator">:=</span> time<span class="token punctuation">.</span><span class="token function">NewTicker</span><span class="token punctuation">(</span>thrift<span class="token punctuation">.</span>ServerConnectivityCheckInterval<span class="token punctuation">)</span>
+      <span class="token keyword">defer</span> ticker<span class="token punctuation">.</span><span class="token function">Stop</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+      <span class="token keyword">for</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">select</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> <span class="token operator">&lt;-</span>ctx<span class="token punctuation">.</span><span class="token function">Done</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+          <span class="token keyword">return</span>
+        <span class="token keyword">case</span> <span class="token operator">&lt;-</span>ticker<span class="token punctuation">.</span>C<span class="token punctuation">:</span>
+          <span class="token keyword">if</span> <span class="token operator">!</span>iprot<span class="token punctuation">.</span><span class="token function">Transport</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">IsOpen</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">cancel</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span>
+          <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">(</span>tickerCtx<span class="token punctuation">,</span> cancel<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// </span>
+  result <span class="token operator">:=</span> CalculatorAddResult<span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span>
+  <span class="token comment">// 声明返回值</span>
+  <span class="token keyword">var</span> retval <span class="token builtin">int32</span>
+  <span class="token comment">// 调对应实现方法</span>
+  <span class="token keyword">if</span> retval<span class="token punctuation">,</span> err2 <span class="token operator">=</span> p<span class="token punctuation">.</span>handler<span class="token punctuation">.</span><span class="token function">Add</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> args<span class="token punctuation">.</span>Num1<span class="token punctuation">,</span> args<span class="token punctuation">.</span>Num2<span class="token punctuation">)</span><span class="token punctuation">;</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 如果调方法异常  </span>
+    <span class="token comment">// </span>
+    <span class="token function">tickerCancel</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment">// 丢弃请求</span>
+    <span class="token keyword">if</span> err2 <span class="token operator">==</span> thrift<span class="token punctuation">.</span>ErrAbandonRequest <span class="token punctuation">&#123;</span>
+      <span class="token comment">// 返回处理失败(不处理)  返回对应异常  </span>
+      <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">//</span>
+    x <span class="token operator">:=</span> thrift<span class="token punctuation">.</span><span class="token function">NewTApplicationException</span><span class="token punctuation">(</span>thrift<span class="token punctuation">.</span>INTERNAL_ERROR<span class="token punctuation">,</span> <span class="token string">"Internal error processing add: "</span> <span class="token operator">+</span> err2<span class="token punctuation">.</span><span class="token function">Error</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    oprot<span class="token punctuation">.</span><span class="token function">WriteMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token string">"add"</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span>EXCEPTION<span class="token punctuation">,</span> seqId<span class="token punctuation">)</span>
+    x<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span>
+    oprot<span class="token punctuation">.</span><span class="token function">WriteMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    oprot<span class="token punctuation">.</span><span class="token function">Flush</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    <span class="token comment">// 返回处理成功  方法调用异常</span>
+    <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 调用成功  设置返回值  </span>
+    result<span class="token punctuation">.</span>Success <span class="token operator">=</span> <span class="token operator">&amp;</span>retval
+  <span class="token punctuation">&#125;</span>
+  <span class="token function">tickerCancel</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+  <span class="token comment">// 返回消息写到oprot </span>
+  <span class="token comment">// 写消息开始 写入方法名、消息类型=thrift.REPLY、消息序列=入参序列Id</span>
+  <span class="token keyword">if</span> err2 <span class="token operator">=</span> oprot<span class="token punctuation">.</span><span class="token function">WriteMessageBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token string">"add"</span><span class="token punctuation">,</span> thrift<span class="token punctuation">.</span>REPLY<span class="token punctuation">,</span> seqId<span class="token punctuation">)</span><span class="token punctuation">;</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    err <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 写消息内容</span>
+  <span class="token keyword">if</span> err2 <span class="token operator">=</span> result<span class="token punctuation">.</span><span class="token function">Write</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> oprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">==</span> <span class="token boolean">nil</span> <span class="token operator">&amp;&amp;</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    err <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 写消息结束</span>
+  <span class="token keyword">if</span> err2 <span class="token operator">=</span> oprot<span class="token punctuation">.</span><span class="token function">WriteMessageEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">==</span> <span class="token boolean">nil</span> <span class="token operator">&amp;&amp;</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    err <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// flush</span>
+  <span class="token keyword">if</span> err2 <span class="token operator">=</span> oprot<span class="token punctuation">.</span><span class="token function">Flush</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">==</span> <span class="token boolean">nil</span> <span class="token operator">&amp;&amp;</span> err2 <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    err <span class="token operator">=</span> thrift<span class="token punctuation">.</span><span class="token function">WrapTException</span><span class="token punctuation">(</span>err2<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 返回处理成功</span>
+  <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">,</span> err
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-4-从消息读取入参逻辑"><a href="#3-4-从消息读取入参逻辑" class="headerlink" title="(3.4) 从消息读取入参逻辑"></a>(3.4) 从消息读取入参逻辑</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// 读取入参并设置到p(*CalculatorAddArgs)</span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>CalculatorAddArgs<span class="token punctuation">)</span> <span class="token function">Read</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> iprot thrift<span class="token punctuation">.</span>TProtocol<span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// </span>
+  <span class="token keyword">if</span> <span class="token boolean">_</span><span class="token punctuation">,</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadStructBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> thrift<span class="token punctuation">.</span><span class="token function">PrependError</span><span class="token punctuation">(</span>fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"%T read error: "</span><span class="token punctuation">,</span> p<span class="token punctuation">)</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+
+
+  <span class="token keyword">for</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 读取字段开始</span>
+    <span class="token comment">// 读取 字段名(空的，所以用_)、字段类型、字段Id(对应idl里指定的序号Id)  </span>
+    <span class="token boolean">_</span><span class="token punctuation">,</span> fieldTypeId<span class="token punctuation">,</span> fieldId<span class="token punctuation">,</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadFieldBegin</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">return</span> thrift<span class="token punctuation">.</span><span class="token function">PrependError</span><span class="token punctuation">(</span>fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"%T field %d read error: "</span><span class="token punctuation">,</span> p<span class="token punctuation">,</span> fieldId<span class="token punctuation">)</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 如果字段类型是STOP，直接跳出循环</span>
+    <span class="token keyword">if</span> fieldTypeId <span class="token operator">==</span> thrift<span class="token punctuation">.</span>STOP <span class="token punctuation">&#123;</span> <span class="token keyword">break</span><span class="token punctuation">;</span> <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 这个例子里有2个字段，所以switch的时候有2个case   如果有10个字段，这儿就有10个case</span>
+    <span class="token keyword">switch</span> fieldId <span class="token punctuation">&#123;</span>
+    <span class="token keyword">case</span> <span class="token number">1</span><span class="token punctuation">:</span>
+      <span class="token comment">// 读取时会按照idl里的类型做校验，如果字段类型不一致，跳过</span>
+      <span class="token comment">// 校验第一个字段是否是I32类型</span>
+      <span class="token keyword">if</span> fieldTypeId <span class="token operator">==</span> thrift<span class="token punctuation">.</span>I32 <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 读取第一个字段  </span>
+        <span class="token keyword">if</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">ReadField1</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> iprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+          <span class="token keyword">return</span> err
+        <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 跳过  </span>
+        <span class="token keyword">if</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">Skip</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> fieldTypeId<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+          <span class="token keyword">return</span> err
+        <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token keyword">case</span> <span class="token number">2</span><span class="token punctuation">:</span>
+      <span class="token keyword">if</span> fieldTypeId <span class="token operator">==</span> thrift<span class="token punctuation">.</span>I32 <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> err <span class="token operator">:=</span> p<span class="token punctuation">.</span><span class="token function">ReadField2</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> iprot<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+          <span class="token keyword">return</span> err
+        <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">Skip</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> fieldTypeId<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+          <span class="token keyword">return</span> err
+        <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token keyword">default</span><span class="token punctuation">:</span>
+      <span class="token comment">// 默认 跳过</span>
+      <span class="token keyword">if</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">Skip</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> fieldTypeId<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> err
+      <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 读取字段结束</span>
+    <span class="token keyword">if</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadFieldEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">return</span> err
+    <span class="token punctuation">&#125;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 有异常时返回异常</span>
+  <span class="token keyword">if</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadStructEnd</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> thrift<span class="token punctuation">.</span><span class="token function">PrependError</span><span class="token punctuation">(</span>fmt<span class="token punctuation">.</span><span class="token function">Sprintf</span><span class="token punctuation">(</span><span class="token string">"%T read struct end error: "</span><span class="token punctuation">,</span> p<span class="token punctuation">)</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// 返回空</span>
+  <span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="3-4-1-读取某个字段"><a href="#3-4-1-读取某个字段" class="headerlink" title="(3.4.1) 读取某个字段"></a>(3.4.1) 读取某个字段</h3><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// </span>
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>CalculatorAddArgs<span class="token punctuation">)</span>  <span class="token function">ReadField1</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> iprot thrift<span class="token punctuation">.</span>TProtocol<span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token comment">//   </span>
+  <span class="token keyword">if</span> v<span class="token punctuation">,</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadI32</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">return</span> thrift<span class="token punctuation">.</span><span class="token function">PrependError</span><span class="token punctuation">(</span><span class="token string">"error reading field 1: "</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// 把读取到的值赋到第一个参数上  </span>
+  p<span class="token punctuation">.</span>Num1 <span class="token operator">=</span> v
+<span class="token punctuation">&#125;</span>
+  <span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span>
+
+
+<span class="token keyword">func</span> <span class="token punctuation">(</span>p <span class="token operator">*</span>CalculatorAddArgs<span class="token punctuation">)</span>  <span class="token function">ReadField2</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> iprot thrift<span class="token punctuation">.</span>TProtocol<span class="token punctuation">)</span> <span class="token builtin">error</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">if</span> v<span class="token punctuation">,</span> err <span class="token operator">:=</span> iprot<span class="token punctuation">.</span><span class="token function">ReadI32</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">return</span> thrift<span class="token punctuation">.</span><span class="token function">PrependError</span><span class="token punctuation">(</span><span class="token string">"error reading field 2: "</span><span class="token punctuation">,</span> err<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// 把读取到的值赋到第二个参数上  </span>
+  p<span class="token punctuation">.</span>Num2 <span class="token operator">=</span> v
+<span class="token punctuation">&#125;</span>
+  <span class="token keyword">return</span> <span class="token boolean">nil</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+<h1 id="4-thrift-TProcessor-源码分析-go"><a href="#4-thrift-TProcessor-源码分析-go" class="headerlink" title="(4) thrift TProcessor 源码分析-go"></a>(4) thrift TProcessor 源码分析-go</h1><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token comment">// thrift/processor_factory.go </span>
+<span class="token keyword">package</span> thrift
+
+<span class="token comment">// </span>
+<span class="token comment">// </span>
+<span class="token comment">// A processor is a generic object which operates upon an input stream and</span>
+<span class="token comment">// writes to some output stream.</span>
+<span class="token keyword">type</span> TProcessor <span class="token keyword">interface</span> <span class="token punctuation">&#123;</span>
+	<span class="token function">Process</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> in<span class="token punctuation">,</span> out TProtocol<span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token builtin">bool</span><span class="token punctuation">,</span> TException<span class="token punctuation">)</span>
+
+	<span class="token comment">// ProcessorMap returns a map of thrift method names to TProcessorFunctions.</span>
+	<span class="token function">ProcessorMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">map</span><span class="token punctuation">[</span><span class="token builtin">string</span><span class="token punctuation">]</span>TProcessorFunction
+
+	<span class="token comment">// AddToProcessorMap adds the given TProcessorFunction to the internal</span>
+	<span class="token comment">// processor map at the given key.</span>
+	<span class="token comment">//</span>
+	<span class="token comment">// If one is already set at the given key, it will be replaced with the new</span>
+	<span class="token comment">// TProcessorFunction.</span>
+	<span class="token function">AddToProcessorMap</span><span class="token punctuation">(</span><span class="token builtin">string</span><span class="token punctuation">,</span> TProcessorFunction<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">type</span> TProcessorFunction <span class="token keyword">interface</span> <span class="token punctuation">&#123;</span>
+	<span class="token function">Process</span><span class="token punctuation">(</span>ctx context<span class="token punctuation">.</span>Context<span class="token punctuation">,</span> seqId <span class="token builtin">int32</span><span class="token punctuation">,</span> in<span class="token punctuation">,</span> out TProtocol<span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token builtin">bool</span><span class="token punctuation">,</span> TException<span class="token punctuation">)</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://static.kancloud.cn/digest/thrift/118987">（四）– 方法调用模型分析</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.csdn.net/x_iya/article/details/104686447">thrift-processor</a><br>[3] <a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1135660">Thrift之TProcess类体系原理及源码详细解析</a><br>[4] <a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1805183">再识RPC-thrift</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/rpc/" rel="tag"># rpc</a>
+              <a href="/tags/thrift/" rel="tag"># thrift</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/07/10/thrift-server/" rel="prev" title="thrift Server">
+                  <i class="fa fa-chevron-left"></i> thrift Server
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>
