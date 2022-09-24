@@ -163,18 +163,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">251</span>
+          <span class="site-state-item-count">254</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-count">15</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">56</span>
+        <span class="site-state-item-count">55</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -223,6 +223,341 @@
 
 
     <div class="main-inner index posts-expand">
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/08/30/rpc-serialization/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/08/30/rpc-serialization/" class="post-title-link" itemprop="url">RPC序列化</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-08-30 15:41:31" itemprop="dateCreated datePublished" datetime="2020-08-30T15:41:31+08:00">2020-08-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-09-09 22:39:36" itemprop="dateModified" datetime="2022-09-09T22:39:36+08:00">2022-09-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/08/30/rpc-serialization/" class="post-meta-item leancloud_visitors" data-flag-title="RPC序列化" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <h1 id="为什么需要序列化？"><a href="#为什么需要序列化？" class="headerlink" title="为什么需要序列化？"></a>为什么需要序列化？</h1><p>平时编程时通常使用“对象”来进行数据</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">User</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">Long</span> id<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> age<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  当需要对数据进行存储或者传输时，“对象”就不这么好用了，往往需要把数据转化成连续空间的“二进制字节流”。</p>
+<p>一些典型的场景是：<br>(1) <code>数据库索引的磁盘存储</code>：数据库的索引在内存里是b+树，但这个格式是不能够直接存储到磁盘上的，所以需要把b+树转化为连续空间的二进制字节流，才能存储到磁盘上；<br>(2) <code>缓存的KV存储</code>：redis/memcache是KV类型的缓存，缓存存储的value必须是连续空间的二进制字节流，不能是对象；<br>(3) <code>数据的网络传输</code>：socket发送的数据必须是连续空间的二进制字节流，不能是对象；</p>
+<p>  序列化(Serialization)，就是将”对象”形态的数据转化为”连续空间二进制字节流”形态数据的过程。</p>
+<h1 id="有哪些常用的序列化？"><a href="#有哪些常用的序列化？" class="headerlink" title="有哪些常用的序列化？"></a>有哪些常用的序列化？</h1><p>文本类序列化方式：JSON、xml、csv<br>二进制类序列化方式：Hessian、Protobuf、thrift、Avro、 </p>
+<p>文本类序列化方式 优点就是可读性好，构造方便，调试也简单。不过缺点也明显，传输体积大，性能差。</p>
+<p>实际上任何一种序列化框架，核心思想就是设计一种序列化协议，将对象的类型、属性类型、属性值一一按照固定的格式写到二进制字节流中来完成序列化，再按照固定的格式一一读出对象的类型、属性类型、属性值，通过这些信息重新创建出一个新的对象，来完成反序列化</p>
+<h2 id="文本类"><a href="#文本类" class="headerlink" title="文本类"></a>文本类</h2><h3 id="JSON"><a href="#JSON" class="headerlink" title="JSON"></a>JSON</h3><h2 id="二进制类序列化方式"><a href="#二进制类序列化方式" class="headerlink" title="二进制类序列化方式"></a>二进制类序列化方式</h2><h3 id="Hessian"><a href="#Hessian" class="headerlink" title="Hessian"></a>Hessian</h3><p>Hessian 是动态类型、二进制、紧凑的，并且可跨语言移植的一种序列化框架。<br>Hessian 协议要比 JDK、JSON 更加紧凑，性能上要比 JDK、JSON 序列化高效很多，而且生成的字节数也更小。</p>
+<p> Hessian 本身也有问题，官方版本对 Java 里面一些常见对象的类型不支持，比如：<br> Linked 系列，LinkedHashMap、LinkedHashSet 等，但是可以通过扩展 CollectionDeserializer 类修复；<br> Locale 类，可以通过扩展 ContextSerializerFactory 类修复；<br> Byte/Short 反序列化的时候变成 Integer。</p>
+<h3 id="Protobuf"><a href="#Protobuf" class="headerlink" title="Protobuf"></a>Protobuf</h3><p>Protobuf  是 Google 公司内部的混合语言数据标准，是一种轻便、高效的结构化数据存储格式，可以用于结构化数据序列化，支持 Java、Python、C++、Go 等语言。</p>
+<p>Protobuf 使用的时候需要定义 IDL（Interface description language），然后使用不同语言的 IDL 编译器，生成序列化工具类</p>
+<p>优点是：<br>序列化后体积相比 JSON、Hessian 小很多；<br>IDL 能清晰地描述语义，所以足以帮助并保证应用程序之间的类型不会丢失，无需类似 XML 解析器；<br>序列化反序列化速度很快，不需要通过反射获取类型；<br>消息格式升级和兼容性不错，可以做到向后兼容。</p>
+<h3 id="thrift"><a href="#thrift" class="headerlink" title="thrift"></a>thrift</h3><p>thrift TProtocol </p>
+<h1 id="序列化协议要考虑什么因素？"><a href="#序列化协议要考虑什么因素？" class="headerlink" title="序列化协议要考虑什么因素？"></a>序列化协议要考虑什么因素？</h1><p>  安全性、通用性、兼容性、性能、效率、空间开销</p>
+<p>不管使用成熟协议xml/json，还是自定义二进制协议来序列化对象，序列化协议设计时都需要考虑以下这些因素。<br>（1）解析效率：这个应该是序列化协议应该首要考虑的因素，像xml/json解析起来比较耗时，需要解析doom树，二进制自定义协议解析起来效率就很高；<br>（2）压缩率，传输有效性：同样一个对象，xml/json传输起来有大量的xml标签，信息有效性低，二进制自定义协议占用的空间相对来说就小多了；<br>（3）扩展性与兼容性：是否能够方便的增加字段，增加字段后旧版客户端是否需要强制升级，都是需要考虑的问题，xml/json和上面的二进制协议都能够方便的扩展；<br>（4）可读性与可调试性：这个很好理解，xml/json的可读性就比二进制协议好很多；<br>（5）跨语言：上面的两个协议都是跨语言的，有些序列化协议是与开发语言紧密相关的，例如dubbo的序列化协议就只能支持Java的RPC调用；<br>（6）通用性：xml/json非常通用，都有很好的第三方解析库，各个语言解析起来都十分方便，上面自定义的二进制协议虽然能够跨语言，但每个语言都要写一个简易的协议客户端；</p>
+<h1 id="RPC-框架在使用时要注意哪些问题？"><a href="#RPC-框架在使用时要注意哪些问题？" class="headerlink" title="RPC 框架在使用时要注意哪些问题？"></a>RPC 框架在使用时要注意哪些问题？</h1><h2 id="对象构造得过于复杂"><a href="#对象构造得过于复杂" class="headerlink" title="对象构造得过于复杂"></a>对象构造得过于复杂</h2><p>属性很多，并且存在多层的嵌套，比如 A 对象关联 B 对象，B 对象又聚合 C 对象，C 对象又关联聚合很多其他对象，对象依赖关系过于复杂。序列化框架在序列化与反序列化对象时，对象越复杂就越浪费性能，消耗 CPU，这会严重影响 RPC 框架整体的性能；另外，对象越复杂，在序列化与反序列化的过程中，出现问题的概率就越高。</p>
+<h2 id="对象过于庞大"><a href="#对象过于庞大" class="headerlink" title="对象过于庞大"></a>对象过于庞大</h2><p>我经常遇到业务过来咨询，为啥他们的 RPC 请求经常超时，排查后发现他们的入参对象非常得大，比如为一个大 List 或者大 Map，序列化之后字节长度达到了上兆字节。这种情况同样会严重地浪费了性能、CPU，并且序列化一个如此大的对象是很耗费时间的，这肯定会直接影响到请求的耗时。</p>
+<h2 id="使用序列化框架不支持的类作为入参类"><a href="#使用序列化框架不支持的类作为入参类" class="headerlink" title="使用序列化框架不支持的类作为入参类"></a>使用序列化框架不支持的类作为入参类</h2><p>比如 Hessian 框架，他天然是不支持 LinkedHashMap、LinkedHashSet 等，而且大多数情况下最好不要使用第三方集合类，如 Guava 中的集合类，很多开源的序列化框架都是优先支持编程语言原生的对象。因此如果入参是集合类，应尽量选用原生的、最为常用的集合类，如 HashMap、ArrayList。</p>
+<h2 id="对象有复杂的继承关系"><a href="#对象有复杂的继承关系" class="headerlink" title="对象有复杂的继承关系"></a>对象有复杂的继承关系</h2><p>大多数序列化框架在序列化对象时都会将对象的属性一一进行序列化，当有继承关系时，会不停地寻找父类，遍历属性。就像问题 1 一样，对象关系越复杂，就越浪费性能，同时又很容易出现序列化上的问题。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/202779">RPC 实战与核心原理 - 03 | 序列化：对象怎么在网络中传输？</a><br>[2] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/9GZtmV4HIgg0o2OcZiqXgw">必须知道的RPC内核细节（值得收藏）！！！</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/118848">消息队列高手课 - 12 | 序列化与反序列化：如何通过网络传输结构化的数据？</a></p>
+
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/08/30/rpc/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/08/30/rpc/" class="post-title-link" itemprop="url">远程过程调用(Remote Procedure Call)</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-08-30 13:25:47" itemprop="dateCreated datePublished" datetime="2020-08-30T13:25:47+08:00">2020-08-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-11 08:38:02" itemprop="dateModified" datetime="2022-07-11T08:38:02+08:00">2022-07-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/08/30/rpc/" class="post-meta-item leancloud_visitors" data-flag-title="远程过程调用(Remote Procedure Call)" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  一个人是否了解RPC的原理和技术细节，问2个问题就可以知道，<br>  1、描述一下RPC的通信流程。<br>  2、在通信时有哪些步骤，分别用到了什么技术？</p>
+<p>  这个题没有标准答案，这个需要自己理解以后才能描述。</p>
+<br>
+
+<h1 id="1-什么是RPC"><a href="#1-什么是RPC" class="headerlink" title="(1) 什么是RPC"></a>(1) 什么是RPC</h1><p>  RPC 的全称是 Remote Procedure Call，即远程过程调用。</p>
+<p>  <img src="/img/rpc/rpc-call-process-user.png" alt="用户视角RPC调用"></p>
+<p>  像调用本地函数一样，调用一个远端服务。<br>什么是“远程”，为什么“远”？<br>先来看下什么是<code>近</code>，即<code>本地函数调用</code>。</p>
+<h2 id="1-1-本地函数调用"><a href="#1-1-本地函数调用" class="headerlink" title="(1.1) 本地函数调用"></a>(1.1) 本地函数调用</h2><p>  下面是一个两数相加的本地函数</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">int</span> result <span class="token operator">=</span> <span class="token class-name">Add</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token class-name">Add</span><span class="token punctuation">(</span><span class="token keyword">int</span> x<span class="token punctuation">,</span> <span class="token keyword">int</span> y<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> x <span class="token operator">+</span> y<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p> <img src="/img/rpc/local-function-call.png" alt="本地函数调用"></p>
+<p>这行代码的时候，到底发生了什么？<br>（1）传递两个入参；<br>（2）调用了本地代码段中的函数，执行运算逻辑；<br>（3）返回一个出参；<br>这三个动作，都发生在同一个进程空间里，这是本地函数调用。</p>
+<p>  有办法，调用一个跨进程的函数呢？</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/30/rpc/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/08/30/rpc-protocol/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/08/30/rpc-protocol/" class="post-title-link" itemprop="url">RPC通信协议</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-08-30 09:43:59" itemprop="dateCreated datePublished" datetime="2020-08-30T09:43:59+08:00">2020-08-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-09-09 22:55:45" itemprop="dateModified" datetime="2022-09-09T22:55:45+08:00">2022-09-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2020/08/30/rpc-protocol/" class="post-meta-item leancloud_visitors" data-flag-title="RPC通信协议" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>　协议大家平时都会遇到，只是没有特别注意。<br>　像平时大家阅读文章的时候都是从上到下、从左往右 按行阅读，这可以看做一种阅读(通信)协议。 ( 备注: 古人在竹简上写的文字则是从上到下、从右往左 按列阅读。)<br>　阅读作文时第一行是标题，段首要空两格的是一个自然段。遇到一个句号是一句话。<br>  这个就是一种阅读时的通信协议 </p>
+<!-- 
+  详细的标点符号用法(通信协议)参考教育部的规范  [标点符号用法 - 教育部]( http://www.moe.gov.cn/ewebeditor/uploadfile/2015/01/13/20150113091548267.pdf )
+-->  
+
+<p>  在计算机远程方法调用时，传输的都是二进制的01，调用方(写数据)和被调用方(读数据)怎么约定通信协议的？</p>
+<h1 id="1-协议是什么"><a href="#1-协议是什么" class="headerlink" title="(1) 协议是什么"></a>(1) 协议是什么</h1><p>  协议的作用就类似于文字中的符号，作为应用拆解请求消息的边界，保证二进制数据经过网络传输后，还能被正确地还原语义。</p>
+<p>  那么，服务端收到二进制数据后怎么根据协议解析出数据呢？</p>
+<p>  假如让你设计，你怎么设计一个协议 </p>
+<p>  <img src="/img/rpc/protocol/rpc-protocol-v2.png"></p>
+<h2 id="1-1-协议和序列化的区别"><a href="#1-1-协议和序列化的区别" class="headerlink" title="(1.1) 协议和序列化的区别"></a>(1.1) 协议和序列化的区别</h2><p>  序列化后的二进制数据是协议的子集 </p>
+<p>  RPC其实是把拦截到的方法参数，转成可以在网络中传输的二进制，并保证在服务提供方能正确地还原出语义，最终实现像调用本地一样地调用远程的目的。</p>
+<p>  那么客户端、服务端如何在二进制流里区分出想要的数据？</p>
+<br>
+
+
+<h1 id="2-传输协议的作用-职责"><a href="#2-传输协议的作用-职责" class="headerlink" title="(2) 传输协议的作用(职责)"></a>(2) 传输协议的作用(职责)</h1><p>  首先要有协议长度，比如用int类型表示，放在二进制数据的前4个字节<br>  需要标识是什么协议<br>  协议可能会有多个版本，需要表示协议版本，用byte类型表示<br>  需要消息Id，用来标识唯一，调用方根据消息Id来区分同一个方法的不同请求，用int类型标识，占4字节<br>  需要消息类型，用来标识是 调用、响应、异常，用byte类型标识，占1字节<br>  需要序列化方式 用byte类型，占用1字节<br>  还需要预留协议扩展字段，不定长，约定协议扩展字段的前2个字节标识扩展字段的长度<br>  协议头长度，除协议体的部分的长度，用2字节表示<br>  剩下的是协议体内容，存放序列化后的二进制数据  (协议体的长度可以根据协议长度-协议头长度获得)</p>
+<h2 id="问题一：如何规定远程调用的语法？"><a href="#问题一：如何规定远程调用的语法？" class="headerlink" title="问题一：如何规定远程调用的语法？"></a>问题一：如何规定远程调用的语法？</h2><p>客户端如何告诉服务端，我是一个加法，而另一个是乘法。 是用字符串“add”传给你，还是传给你一个整数，比如 1 表示加法，2 表示乘法？  (方法描述)<br>服务端该如何告诉客户端，这个加法，目前只能加整数，不能加小数，不能加字符串； (类型描述)<br>而另一个加法“add1”，它能实现小数和整数的混合加法。 (类型区分)<br>返回值是什么？正确的时候返回什么，错误的时候又返回什么？ (返回值描述)</p>
+<h2 id="问题二：如果传递参数？"><a href="#问题二：如果传递参数？" class="headerlink" title="问题二：如果传递参数？"></a>问题二：如果传递参数？</h2><p> 是先传两个整数，后传一个操作符“add”，还是先传操作符，再传两个整数？<br> 如果都是 UDP，想要实现一个逆波兰表达式，放在一个报文里面还好，如果是 TCP，是一个流，在这个流里面，如何将两次调用进行分界？什么时候是头，什么时候是尾？<br> 把这次的参数和上次的参数混了起来，TCP 一端发送出去的数据，另外一端不一定能一下子全部读取出来。所以，怎么才算读完呢？</p>
+<h2 id="问题三：如何表示数据？"><a href="#问题三：如何表示数据？" class="headerlink" title="问题三：如何表示数据？"></a>问题三：如何表示数据？</h2><p>  1、如果是变长的类型，是一个结构体，甚至是一个类，应该怎么处理呢？<br>  2、如果是 int，不同的平台上长度也不同，该怎么处理呢？<br>  3、在网络上传输超过一个 Byte 的类型，还有大端 Big Endian 和小端 Little Endian 的问题。假设我们要在 32 位四个 Byte 的一个空间存放整数 1，很显然只要一个 Byte 放 1，其他三个 Byte 放 0 就可以了。那问题是，最后一个 Byte 放 1 呢，还是第一个 Byte 放 1 呢？或者说 1 作为最低位，应该是放在 32 位的最后一个位置呢，还是放在第一个位置呢？最低位放在最后一个位置，叫作 Little Endian，最低位放在第一个位置，叫作 Big Endian。<br>  TCP/IP 协议栈是按照 Big Endian 来设计的，而 X86 机器多按照 Little Endian 来设计的，因而发出去的时候需要做一个转换。</p>
+<h2 id="问题四：如何知道一个服务端都实现了哪些远程调用？"><a href="#问题四：如何知道一个服务端都实现了哪些远程调用？" class="headerlink" title="问题四：如何知道一个服务端都实现了哪些远程调用？"></a>问题四：如何知道一个服务端都实现了哪些远程调用？</h2><p>  从哪个端口可以访问这个远程调用？<br>  假设服务端实现了多个远程调用，每个可能实现在不同的进程中，监听的端口也不一样，而且由于服务端都是自己实现的，不可能使用一个大家都公认的端口，而且有可能多个进程部署在一台机器上，大家需要抢占端口，为了防止冲突，往往使用随机端口，那客户端如何找到这些监听的端口呢？</p>
+<h2 id="问题五：发生了错误、重传、丢包、性能等问题怎么办？"><a href="#问题五：发生了错误、重传、丢包、性能等问题怎么办？" class="headerlink" title="问题五：发生了错误、重传、丢包、性能等问题怎么办？"></a>问题五：发生了错误、重传、丢包、性能等问题怎么办？</h2><p>  本地调用没有这个问题，但是一旦到网络上，这些问题都需要处理，因为网络是不可靠的，虽然在同一个连接中，我们还可通过 TCP 协议保证丢包、重传的问题，但是如果服务器崩溃了又重启，当前连接断开了，TCP 就保证不了了，需要应用自己进行重新调用，重新传输会不会同样的操作做两遍，远程调用性能会不会受影响呢？</p>
+<p>  协议体里面的内容都是经过序列化出来的，也就是说你要获取到你参数的值，就必须把整个协议体里面的数据经过反序列化出来。但在某些场景下，这样做的代价有点高啊！</p>
+<h1 id="3-协议核心要素"><a href="#3-协议核心要素" class="headerlink" title="(3) 协议核心要素"></a>(3) 协议核心要素</h1><p>XID 唯一标识一对请求和回复。请求为 0，回复为 1。<br>RPC 有版本号，两端要匹配 RPC 协议的版本号。如果不匹配，就会返回 Deny，原因就是 RPC_MISMATCH。<br>程序有编号。如果服务端找不到这个程序，就会返回 PROG_UNAVAIL。<br>程序有版本号。如果程序的版本号不匹配，就会返回 PROG_MISMATCH。<br>一个程序可以有多个方法，方法也有编号，如果找不到方法，就会返回 PROC_UNAVAIL。<br>调用需要认证鉴权，如果不通过，则 Deny。<br>参数列表，如果参数无法解析，则返回 GABAGE_ARGS。</p>
+<p>协议长度  RPC每次发请求发的大小都是不固定的，所以我们的协议必须能让接收方正确地读出不定长的内容。<br>序列化方式<br>协议标示<br>消息 ID<br>消息类型</p>
+<p>  断句，双工通信，配合专用的序列化方法，可以实现一套高性能的网络通信协议。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/12230">趣谈网络协议 - 第32讲 | RPC协议综述：远在天边，近在眼前</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/199651">RPC 实战与核心原理 - 02 | 协议：怎么设计可扩展且向后兼容的协议？</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/119988">消息队列高手课 - 13 | 传输协议：应用程序之间对话的语言</a></p>
+
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
 
     
 
@@ -1148,312 +1483,6 @@ ZBMAC<span class="token operator">-</span>C02PGMT0F<span class="token operator">
 <h3 id="最短路径"><a href="#最短路径" class="headerlink" title="最短路径"></a>最短路径</h3><p> <a target="_blank" rel="noopener" href="https://leetcode.cn/problems/as-far-from-land-as-possible/">1162. 地图分析</a></p>
 <h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] 《数据结构》(C语言版) 严蔚敏 吴伟民<br>[2] <a target="_blank" rel="noopener" href="https://www.programmercarl.com/%E4%BA%8C%E5%8F%89%E6%A0%91%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html">二叉树理论基础篇</a><br>[3] <a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E4%BA%8C%E5%8F%89%E6%A0%91/1602879">二叉树</a><br>[4] <a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_26399665/article/details/54565849">二叉树的性质及相关证明</a><br>[5] <a target="_blank" rel="noopener" href="https://syt-honey.github.io/2019/04/03/23-%E4%BA%8C%E5%8F%89%E6%A0%91%E5%9F%BA%E7%A1%80%EF%BC%88%E4%B8%8A%EF%BC%89%EF%BC%9A%E4%BB%80%E4%B9%88%E6%A0%B7%E7%9A%84%E4%BA%8C%E5%8F%89%E6%A0%91%E9%80%82%E5%90%88%E7%94%A8%E6%95%B0%E7%BB%84%E6%9D%A5%E5%AD%98%E5%82%A8%EF%BC%9F/">23-二叉树基础（上）：什么样的二叉树适合用数组来存储？</a></p>
 
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/07/18/data-structure-linked-list/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/07/18/data-structure-linked-list/" class="post-title-link" itemprop="url">数据结构-链表</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-07-18 17:15:22" itemprop="dateCreated datePublished" datetime="2020-07-18T17:15:22+08:00">2020-07-18</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span id="/2020/07/18/data-structure-linked-list/" class="post-meta-item leancloud_visitors" data-flag-title="数据结构-链表" title="阅读次数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-eye"></i>
-      </span>
-      <span class="post-meta-item-text">阅读次数：</span>
-      <span class="leancloud-visitors-count"></span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  链表</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/07/18/data-structure-linked-list/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/07/18/data-structure-array/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/07/18/data-structure-array/" class="post-title-link" itemprop="url">数组</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-07-18 08:57:35" itemprop="dateCreated datePublished" datetime="2020-07-18T08:57:35+08:00">2020-07-18</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span id="/2020/07/18/data-structure-array/" class="post-meta-item leancloud_visitors" data-flag-title="数组" title="阅读次数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-eye"></i>
-      </span>
-      <span class="post-meta-item-text">阅读次数：</span>
-      <span class="leancloud-visitors-count"></span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p> 数组（Array）是一种线性表数据结构。它用一组连续的内存空间，来存储一组具有相同类型的数据。</p>
-</blockquote>
-<blockquote>
-<p> 线性表（Linear List）。顾名思义，线性表就是数据排成像一条线一样的结构。每个线性表上的数据最多只有前和后两个方向。其实除了数组，链表、队列、栈等也是线性表结构。</p>
-</blockquote>
-<blockquote>
-<p> 连续的内存空间和相同类型的数据</p>
-</blockquote>
-<p>拿一个长度为 10 的 int 类型的数组 int[] a = new int[10]来举例。</p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-<p>计算机给数组 a[10]，分配了一块连续内存空间 1000～1039，其中，内存块的首地址为 base_address = 1000。<br>计算机会给每个内存单元分配一个地址，计算机通过地址来访问内存中的数据。当计算机需要随机访问数组中的某个元素时，它会首先通过下面的寻址公式，计算出该元素存储的内存地址：a[i]_address = base_address + i * data_type_size其中 data_type_size 表示数组中每个元素的大小。我们举的这个例子里，数组中存储的是 int 类型数据，所以 data_type_size 就为 4 个字节。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/07/18/data-structure-array/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/07/18/data-structure-complexity-analysis/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/07/18/data-structure-complexity-analysis/" class="post-title-link" itemprop="url">数据结构 复杂度分析</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-07-18 08:49:02" itemprop="dateCreated datePublished" datetime="2020-07-18T08:49:02+08:00">2020-07-18</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span id="/2020/07/18/data-structure-complexity-analysis/" class="post-meta-item leancloud_visitors" data-flag-title="数据结构 复杂度分析" title="阅读次数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-eye"></i>
-      </span>
-      <span class="post-meta-item-text">阅读次数：</span>
-      <span class="leancloud-visitors-count"></span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p>数据结构和算法本身解决的是“快”和“省”的问题，即如何让代码运行得更快，如何让代码更省存储空间。所以，执行效率是算法一个非常重要的考量指标。</p>
-</blockquote>
-<h1 id="1-为什么需要复杂度分析"><a href="#1-为什么需要复杂度分析" class="headerlink" title="(1) 为什么需要复杂度分析"></a>(1) 为什么需要复杂度分析</h1><blockquote>
-<p> 把代码跑一遍，通过统计、监控，就能得到算法执行的时间和占用的内存大小。为什么还要做时间、空间复杂度分析呢？</p>
-<p> 这种评估算法执行效率的方法是正确的，叫事后统计法。但是，这种统计方法有非常大的局限性。</p>
-<ol>
-<li>测试结果非常依赖测试环境</li>
-<li>测试结果受数据规模的影响很大</li>
-</ol>
-</blockquote>
-<blockquote>
-<p> 在大学刚学C语言的时候，老师交给我们一个任务，根据高斯公式计算π的值，分别精确到第六位、第七位、第八位 …，下课后直接在图书馆写代码计算，计算结果精确到第六位的时候特别快，刚点运行就计算完了，花费几ms，计算第七、八、九位也很快，不超过3s，但是精确到第十位的时候，运行了30s后，听到电脑风扇 呼呼 地响了。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/07/18/data-structure-complexity-analysis/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
       
     </div>
 
