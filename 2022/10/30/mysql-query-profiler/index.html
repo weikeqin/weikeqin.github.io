@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha256-mUZM63G8m73Mcidfrv5E+Y61y7a12O5mW4ezU3bxqW4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.9.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+<meta name="description" content="最近的一段时间里，线上数据库出现了很多慢查询，但是通过代码去看都是走了索引的，而且通过explain分析也是走了索引，但确实是有慢查询，很奇怪，就想通过mysql-query-profiler分析SQL慢查。 MySQL 的 Query Profiler 是一个使用非常方便的 Query 诊断分析工具，通过该工具可以获取一条Query 在整个执行过程中多种资源的消耗情况，如 CPU，IO，IP">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL Query Profiler 分析SQL慢查">
+<meta property="og:url" content="http://weikeqin.com/2022/10/30/mysql-query-profiler/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="最近的一段时间里，线上数据库出现了很多慢查询，但是通过代码去看都是走了索引的，而且通过explain分析也是走了索引，但确实是有慢查询，很奇怪，就想通过mysql-query-profiler分析SQL慢查。 MySQL 的 Query Profiler 是一个使用非常方便的 Query 诊断分析工具，通过该工具可以获取一条Query 在整个执行过程中多种资源的消耗情况，如 CPU，IO，IP">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-10-30T08:40:49.000Z">
+<meta property="article:modified_time" content="2022-11-13T13:39:22.365Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="mysql">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2022/10/30/mysql-query-profiler/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2022/10/30/mysql-query-profiler/","path":"2022/10/30/mysql-query-profiler/","title":"MySQL Query Profiler 分析SQL慢查"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>MySQL Query Profiler 分析SQL慢查 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Query-Profiler-%E7%9A%84%E5%85%B7%E4%BD%93%E7%94%A8%E6%B3%95"><span class="nav-number">1.</span> <span class="nav-text">(1) Query Profiler 的具体用法</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Query-Profiler%E5%AE%9E%E6%88%98-order-by%E6%8E%92%E5%BA%8F%E5%AF%BC%E8%87%B4%E7%9A%84SQL%E6%85%A2%E6%9F%A5"><span class="nav-number">2.</span> <span class="nav-text">(2) Query Profiler实战-order by排序导致的SQL慢查</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E9%A6%96%E5%85%88%E9%80%9A%E8%BF%87explain%E6%9F%A5%E7%9C%8Bsql%E8%AF%AD%E5%8F%A5%E5%88%86%E6%9E%90"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 首先通过explain查看sql语句分析</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Query-Profiler%E5%AE%9E%E6%88%98-%E5%AE%9E%E6%88%982"><span class="nav-number">3.</span> <span class="nav-text">(3) Query Profiler实战-实战2</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E9%80%9A%E8%BF%87explain%E7%A1%AE%E8%AE%A4%E8%B5%B0%E7%B4%A2%E5%BC%95"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 通过explain确认走索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-Query-Profiler%E5%88%86%E6%9E%90"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) Query Profiler分析</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83"><span class="nav-number">4.</span> <span class="nav-text">参考</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">258</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqincn@gmail.com" title="E-Mail → mailto:weikeqincn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/10/30/mysql-query-profiler/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL Query Profiler 分析SQL慢查
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-10-30 16:40:49" itemprop="dateCreated datePublished" datetime="2022-10-30T16:40:49+08:00">2022-10-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-11-13 21:39:22" itemprop="dateModified" datetime="2022-11-13T21:39:22+08:00">2022-11-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+        </span>
+    </span>
+
+  
+    <span id="/2022/10/30/mysql-query-profiler/" class="post-meta-item leancloud_visitors" data-flag-title="MySQL Query Profiler 分析SQL慢查" title="阅读次数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span class="leancloud-visitors-count"></span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  最近的一段时间里，线上数据库出现了很多慢查询，但是通过代码去看都是走了索引的，而且通过explain分析也是走了索引，但确实是有慢查询，很奇怪，就想通过mysql-query-profiler分析SQL慢查。</p>
+<p>MySQL 的 Query Profiler 是一个使用非常方便的 Query 诊断分析工具，通过该工具可以获取一条Query 在整个执行过程中多种资源的消耗情况，如 CPU，IO，IPC，SWAP 等，以及发生的 PAGE FAULTS，CONTEXT SWITCHE 等等，同时还能得到该 Query 执行过程中 MySQL 所调用的各个函数在源文件中的位置。</p>
+<h1 id="1-Query-Profiler-的具体用法"><a href="#1-Query-Profiler-的具体用法" class="headerlink" title="(1) Query Profiler 的具体用法"></a>(1) Query Profiler 的具体用法</h1><p><strong>1.1查看是否开启 Query Profiler</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 查看是否开启 Query Profiler */</span>
+mysql<span class="token operator">></span>  <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span> <span class="token punctuation">;</span>  
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token operator">|</span> Variable_name <span class="token operator">|</span> <span class="token keyword">Value</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token operator">|</span> profiling     <span class="token operator">|</span> <span class="token keyword">OFF</span>   <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.03</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<p><strong>1.2 开启 Query Profiler 功能</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 开启 Query Profiler 功能。 */</span>
+mysql<span class="token operator">></span>  <span class="token keyword">set</span> profiling <span class="token operator">=</span> <span class="token number">1</span> <span class="token punctuation">;</span>    
+Query OK<span class="token punctuation">,</span> <span class="token number">0</span> <span class="token keyword">rows</span> affected<span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<p><strong>1.3 获取系统中保存的所有 Query Profiler 概要信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 获取系统中保存的所有 Query 的 profile 概要信息 */</span>
+mysql<span class="token operator">></span>  <span class="token keyword">show</span> profiles<span class="token punctuation">;</span>  
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span> Query_ID <span class="token operator">|</span> Duration   <span class="token operator">|</span> Query                                                                                                                                                                                                                                                         <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span>        <span class="token number">1</span> <span class="token operator">|</span> <span class="token number">0.00138750</span> <span class="token operator">|</span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span>                                                                                                                                                                                                                               <span class="token operator">|</span>
+<span class="token operator">|</span>        <span class="token number">2</span> <span class="token operator">|</span> <span class="token number">0.19619525</span> <span class="token operator">|</span> <span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx <span class="token keyword">LIMIT</span> <span class="token number">10</span> <span class="token keyword">OFFSET</span> <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<span id="more"></span>
+
+<p><strong>1.4 针对单个 Query 获取详细的 profile 信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">  <span class="token comment">/** 针对单个 Query 获取详细的 profile 信息。 */</span> 
+mysql<span class="token operator">></span> <span class="token keyword">show</span> profile <span class="token keyword">for</span> query <span class="token number">2</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">Status</span>               <span class="token operator">|</span> Duration <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">starting</span>             <span class="token operator">|</span> <span class="token number">0.000092</span> <span class="token operator">|</span>
+<span class="token operator">|</span> checking permissions <span class="token operator">|</span> <span class="token number">0.000015</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Opening <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000023</span> <span class="token operator">|</span>
+<span class="token operator">|</span> init                 <span class="token operator">|</span> <span class="token number">0.000060</span> <span class="token operator">|</span>
+<span class="token operator">|</span> System <span class="token keyword">lock</span>          <span class="token operator">|</span> <span class="token number">0.000018</span> <span class="token operator">|</span>
+<span class="token operator">|</span> optimizing           <span class="token operator">|</span> <span class="token number">0.000022</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">statistics</span>           <span class="token operator">|</span> <span class="token number">0.000729</span> <span class="token operator">|</span>
+<span class="token operator">|</span> preparing            <span class="token operator">|</span> <span class="token number">0.000037</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sorting result       <span class="token operator">|</span> <span class="token number">0.000020</span> <span class="token operator">|</span>
+<span class="token operator">|</span> executing            <span class="token operator">|</span> <span class="token number">0.000014</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sending <span class="token keyword">data</span>         <span class="token operator">|</span> <span class="token number">0.000030</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Creating sort <span class="token keyword">index</span>  <span class="token operator">|</span> <span class="token number">0.194956</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">end</span>                  <span class="token operator">|</span> <span class="token number">0.000049</span> <span class="token operator">|</span>
+<span class="token operator">|</span> query <span class="token keyword">end</span>            <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>
+<span class="token operator">|</span> closing <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>
+<span class="token operator">|</span> freeing items        <span class="token operator">|</span> <span class="token number">0.000034</span> <span class="token operator">|</span>
+<span class="token operator">|</span> logging slow query   <span class="token operator">|</span> <span class="token number">0.000040</span> <span class="token operator">|</span>
+<span class="token operator">|</span> cleaning up          <span class="token operator">|</span> <span class="token number">0.000025</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token number">18</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">show</span> profile cpu<span class="token punctuation">,</span>block io <span class="token keyword">for</span> query query_id<span class="token punctuation">;</span>
+
+通过<span class="token keyword">Status</span>一列，可以看到整条<span class="token keyword">SQL</span>的运行过程
+<span class="token number">1.</span> <span class="token keyword">starting</span> <span class="token comment">//开始</span>
+<span class="token number">2.</span> checking permissions <span class="token comment">//检查权限</span>
+<span class="token number">3.</span> Opening <span class="token keyword">tables</span> <span class="token comment">//打开数据表</span>
+<span class="token number">4.</span> init <span class="token comment">//初始化</span>
+<span class="token number">5.</span> System <span class="token keyword">lock</span> <span class="token comment">//锁机制</span>
+<span class="token number">6.</span> optimizing  <span class="token comment">//优化器</span>
+<span class="token number">7.</span> <span class="token keyword">statistics</span>  <span class="token comment">//分析语法树</span>
+<span class="token number">8.</span> prepareing  <span class="token comment">//预准备</span>
+<span class="token number">9.</span> Sorting result 
+<span class="token number">10.</span> executing   <span class="token comment">//引擎执行开始</span>
+<span class="token number">11.</span> Sending <span class="token keyword">data</span>
+<span class="token number">12.</span> Creating sort <span class="token keyword">index</span> 
+<span class="token number">13.</span> <span class="token keyword">end</span>        <span class="token comment">//引擎执行结束</span>
+<span class="token number">14.</span> query <span class="token keyword">end</span>  <span class="token comment">//查询结束</span>
+<span class="token number">15.</span> closing <span class="token keyword">tables</span> <span class="token comment">//释放数据表</span>
+<span class="token number">16.</span> freeing items <span class="token comment">//释放内存</span>
+<span class="token number">17.</span> logging slow query
+<span class="token number">18.</span> cleaning up <span class="token comment">//彻底清理</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 针对单个 Query 获取详细的 profile 信息。 */</span> 
+<span class="token keyword">show</span> profile cpu<span class="token punctuation">,</span> block io<span class="token punctuation">,</span> memory<span class="token punctuation">,</span> swaps<span class="token punctuation">,</span>context switches<span class="token punctuation">,</span> source <span class="token keyword">for</span> query <span class="token number">2</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">all</span>    <span class="token comment">// 显示所有的开销信息</span>
+block io    <span class="token comment">//显示块IO相关开销</span>
+context switches    <span class="token comment">// 上下文切换相关开销</span>
+cpu    <span class="token comment">// 显示cpu相关开销</span>
+ipc    <span class="token comment">// 显示发送和接收相关开销信息</span>
+memory    <span class="token comment">// 显示内存相关开销</span>
+page faults    <span class="token comment">// 显示页面错误相关开销</span>
+source    <span class="token comment">// 显示和Source_function, Source_file, Source_line相关的开销</span>
+swaps    <span class="token comment">// 显示交换次数相关开销</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h1 id="2-Query-Profiler实战-order-by排序导致的SQL慢查"><a href="#2-Query-Profiler实战-order-by排序导致的SQL慢查" class="headerlink" title="(2) Query Profiler实战-order by排序导致的SQL慢查"></a>(2) Query Profiler实战-order by排序导致的SQL慢查</h1><p>  本次问题是外卖业务的评论服务遇到了sql慢查<br>  评论表里有订单索引、店铺索引、骑手索引，所以无论是用户、商家还是骑手查询评论，肯定是走索引的。通过explain确认一下</p>
+<h2 id="2-1-首先通过explain查看sql语句分析"><a href="#2-1-首先通过explain查看sql语句分析" class="headerlink" title="(2.1) 首先通过explain查看sql语句分析"></a>(2.1) 首先通过explain查看sql语句分析</h2><p><strong>(1)sql语句explain</strong> </p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">explain</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">SELECT</span> <span class="token operator">*</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> rider_id <span class="token operator">=</span> <span class="token number">5764611828814449467</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> c_d_score <span class="token operator">=</span> <span class="token number">10</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> c_d_has_content <span class="token operator">=</span> <span class="token number">1</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> evaluate_role <span class="token operator">=</span> <span class="token number">1</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> is_deleted <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> c_evaluate_timestamp <span class="token keyword">DESC</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">LIMIT</span> <span class="token number">10</span> <span class="token keyword">OFFSET</span> <span class="token number">0</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------------------------------+------------+------+---------------+--------------+---------+-------+------+----------+----------------------------------------------------+</span>
+<span class="token operator">|</span> id <span class="token operator">|</span> select_type <span class="token operator">|</span> <span class="token keyword">table</span>                         <span class="token operator">|</span> partitions <span class="token operator">|</span> <span class="token keyword">type</span> <span class="token operator">|</span> possible_keys <span class="token operator">|</span> <span class="token keyword">key</span>          <span class="token operator">|</span> key_len <span class="token operator">|</span> ref   <span class="token operator">|</span> <span class="token keyword">rows</span> <span class="token operator">|</span> filtered <span class="token operator">|</span> Extra                                              <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------------------------------+------------+------+---------------+--------------+---------+-------+------+----------+----------------------------------------------------+</span>
+<span class="token operator">|</span>  <span class="token number">1</span> <span class="token operator">|</span> <span class="token keyword">SIMPLE</span>      <span class="token operator">|</span> xxxx_biz_db_xxx_base_xxxxxxxx <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> ref  <span class="token operator">|</span> idx_rider_id  <span class="token operator">|</span> idx_rider_id <span class="token operator">|</span> <span class="token number">8</span>       <span class="token operator">|</span> const <span class="token operator">|</span> <span class="token number">2174</span> <span class="token operator">|</span>     <span class="token number">0.00</span> <span class="token operator">|</span> <span class="token keyword">Using</span> <span class="token keyword">index</span> condition<span class="token punctuation">;</span> <span class="token keyword">Using</span> <span class="token keyword">where</span><span class="token punctuation">;</span> <span class="token keyword">Using</span> filesort <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------------------------------+------------+------+---------------+--------------+---------+-------+------+----------+----------------------------------------------------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到走了骑手索引idx_rider_id，但是备注里提升用了文件排序 Using filesort，<br>  一看就知道是<code>order by</code>排序导致<code>Using filesort</code><br>  如果MySQL内存够用优先在内存里排序，内存不够用了才会使用文件排序，但是耗时就高了。</p>
+<p><strong>(2)sql语句优化后再explain</strong><br>  把sql语句优化了一下，把 <code>ORDER BY c_evaluate_timestamp DESC</code> 改成 <code>ORDER BY id DESC</code> 试一下</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">explain</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">SELECT</span> <span class="token operator">*</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> rider_id <span class="token operator">=</span> <span class="token number">5764611828814449467</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> c_d_score <span class="token operator">=</span> <span class="token number">10</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> c_d_has_content <span class="token operator">=</span> <span class="token number">1</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> evaluate_role <span class="token operator">=</span> <span class="token number">1</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> is_deleted <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> id <span class="token keyword">DESC</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">LIMIT</span> <span class="token number">10</span> <span class="token keyword">OFFSET</span> <span class="token number">0</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------------------------------+------------+------+---------------+--------------+---------+-------+------+----------+-------------+</span>
+<span class="token operator">|</span> id <span class="token operator">|</span> select_type <span class="token operator">|</span> <span class="token keyword">table</span>                         <span class="token operator">|</span> partitions <span class="token operator">|</span> <span class="token keyword">type</span> <span class="token operator">|</span> possible_keys <span class="token operator">|</span> <span class="token keyword">key</span>          <span class="token operator">|</span> key_len <span class="token operator">|</span> ref   <span class="token operator">|</span> <span class="token keyword">rows</span> <span class="token operator">|</span> filtered <span class="token operator">|</span> Extra       <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------------------------------+------------+------+---------------+--------------+---------+-------+------+----------+-------------+</span>
+<span class="token operator">|</span>  <span class="token number">1</span> <span class="token operator">|</span> <span class="token keyword">SIMPLE</span>      <span class="token operator">|</span> xxxx_biz_db_xxx_base_xxxxxxxx <span class="token operator">|</span> <span class="token boolean">NULL</span>       <span class="token operator">|</span> ref  <span class="token operator">|</span> idx_rider_id  <span class="token operator">|</span> idx_rider_id <span class="token operator">|</span> <span class="token number">8</span>       <span class="token operator">|</span> const <span class="token operator">|</span> <span class="token number">2174</span> <span class="token operator">|</span>     <span class="token number">0.00</span> <span class="token operator">|</span> <span class="token keyword">Using</span> <span class="token keyword">where</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----+-------------+-------------------------------+------------+------+---------------+--------------+---------+-------+------+----------+-------------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  通过explain发现，没有文件排序<code>Using filesort</code>了</p>
+<!--
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">SELECT</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> xxxxxxxx <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------+</span>
+<span class="token operator">|</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+</span>
+<span class="token operator">|</span>  <span class="token number">8380654</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">3.93</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span>
+mysql<span class="token operator">></span> <span class="token keyword">SELECT</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> rider_id <span class="token operator">=</span> <span class="token number">5764611828814449467</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------+</span>
+<span class="token operator">|</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+</span>
+<span class="token operator">|</span>     <span class="token number">2174</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.19</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>–&gt;</p>
+<h2 id="2-2-开始通过Query-Profiler分析资源消耗"><a href="#2-2-开始通过Query-Profiler分析资源消耗" class="headerlink" title="(2.2) 开始通过Query Profiler分析资源消耗"></a>(2.2) 开始通过Query Profiler分析资源消耗</h2><p><strong>(1)首先开启Query Profiler</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">set</span> profiling <span class="token operator">=</span> <span class="token number">1</span> <span class="token punctuation">;</span>
+Query OK<span class="token punctuation">,</span> <span class="token number">0</span> <span class="token keyword">rows</span> affected<span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<p><strong>(2)查看Query Profiler开启状态，确保开启成功</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token operator">|</span> Variable_name <span class="token operator">|</span> <span class="token keyword">Value</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token operator">|</span> profiling     <span class="token operator">|</span> <span class="token keyword">ON</span>    <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.01</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<p><strong>(3)执行sql</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">SELECT</span> <span class="token operator">*</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> <span class="token string">'xxxxxxxx'</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> rider_id <span class="token operator">=</span> <span class="token string">'5764611828814449467'</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> c_d_score <span class="token operator">=</span> <span class="token string">'10'</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> c_d_has_content <span class="token operator">=</span> <span class="token string">'1'</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> evaluate_role <span class="token operator">=</span> <span class="token number">1</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token operator">AND</span> is_deleted <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> c_evaluate_timestamp <span class="token keyword">DESC</span>
+    <span class="token operator">-</span><span class="token operator">></span> <span class="token keyword">LIMIT</span> <span class="token number">10</span> <span class="token keyword">OFFSET</span> <span class="token number">0</span> <span class="token punctuation">;</span>
+<span class="token comment">// ...</span>
+<span class="token number">10</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.20</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<!--
++----------+---------------------+--------------+-----------------+---------------------+---------------------+--------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------+-----------+-----------------+-------------------+-----------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------+-----------+-----------+-------------+-------------+--------------+-----------+----------------------+------------+------------+------------------+------------------+---------------+-----------+-------------+----------+-------------+-----------+-------------+----------+-------------+-------------------------------------------------------------------------------------+---------------+---------------+---------------+---------------+--------+
+| id       | order_id            | shop_city_id | uid             | shop_id             | rider_id            | shop_user_id | c_b_content                                                                                                                                                                      | c_b_tags                                                                                                         | c_b_tag_ids                                               | c_b_score | c_b_score_taste | c_b_score_package | c_b_has_content | c_d_has_content | c_d_content                                                                                                                                                                                      | c_d_tags                                                                                                              | c_d_tag_ids                                                      | c_d_score | c_p_score | c_p_tag_ids | c_p_content | is_effective | is_handle | c_evaluate_timestamp | has_answer | is_deleted | create_timestamp | update_timestamp | evaluate_role | b_d_score | b_d_tag_ids | b_d_tags | b_d_content | d_b_score | d_b_tag_ids | d_b_tags | d_b_content | imgs                                                                                | c_b_effective | c_d_effective | b_d_effective | d_b_effective | status |
++----------+---------------------+--------------+-----------------+---------------------+---------------------+--------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------+-----------+-----------------+-------------------+-----------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------+-----------+-----------+-------------+-------------+--------------+-----------+----------------------+------------+------------+------------------+------------------+---------------+-----------+-------------+----------+-------------+-----------+-------------+----------+-------------+-------------------------------------------------------------------------------------+---------------+---------------+---------------+---------------+--------+
+| 16505486 | 5764619119911569781 |     xxxxxxxx | 369436339589676 | 5764607544962843801 | 5764611828814449467 |            0 |                                                                                                                                                                                  | ["Mal sabor","Porciones pequeñas","Productos faltantes","Se tardaron en preparar el pedido"]                     | [202002,202003,202001,202019]                             |       100 |               0 |                 0 |               0 |               1 | excelente                                                                                                                                                                                        | ["Buen servicio","Gran repartidor","Honesto","Rápido","Sin daños","Recomendado"]                                      | [310001,310004,310009,310010,310011,310012]                      |        10 |         0 |             |             |            0 |         0 |           1666213109 |          0 |          0 |       1666213109 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 16439910 | 5764619101171418867 |     xxxxxxxx | 369435975944993 | 5764607640647500145 | 5764611828814449467 |            0 | podrían mejorar el empaquetado del producto, ya que llegaron un poco aplastadas la hamburguesas, pero la comida muy rica                                                         | ["Satisfecho"]                                                                                                   | [210014]                                                  |       500 |               0 |                 0 |               1 |               1 | excelente servicio                                                                                                                                                                               | ["Buen servicio"]                                                                                                     | [310001]                                                         |        10 |         0 |             |             |            0 |         0 |           1665987494 |          0 |          0 |       1665987494 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 16278746 | 5764619209657090280 |     xxxxxxxx | 369436176760014 | 5764607735501686822 | 5764611828814449467 |            0 |                                                                                                                                                                                  | ["Buen servicio","Exquisito"]                                                                                    | [210001,210003]                                           |       500 |               0 |                 0 |               0 |               1 | no tiene mucha orientación                                                                                                                                                                       |                                                                                                                       |                                                                  |        10 |         0 |             |             |            0 |         0 |           1665614038 |          0 |          0 |       1665614038 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 15555326 | 5764618518985245616 |     xxxxxxxx | 369436273082209 | 5764607640777523545 | 5764611828814449467 |            0 |                                                                                                                                                                                  | ["Buenos precios","Buena"]                                                                                       | [210007,210014]                                           |       500 |               0 |                 0 |               0 |               1 | Todo bien con la tienda y el repartidor.\nLo lamentable es la plataforma de DiDi\n0 %recomiendo                                                                                                  |                                                                                                                       |                                                                  |        10 |         0 |             |             |            0 |         0 |           1663541592 |          0 |          0 |       1663541592 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 15451484 | 5764618351947091866 |     xxxxxxxx | 369435954430813 | 5764607647807176885 | 5764611828814449467 |            0 |                                                                                                                                                                                  | ["Buen servicio","Exquisito","Entregado caliente","Limpio","Atento","Recomendado","Satisfecho","Entrega fácil"]  | [210001,210003,210004,210009,210011,210013,210014,210016] |       500 |               0 |                 0 |               0 |               1 | lo recomiendo ampliamente                                                                                                                                                                        |                                                                                                                       |                                                                  |        10 |         0 |             |             |            0 |         0 |           1663290472 |          0 |          0 |       1663290472 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 15341426 | 5764618506515581819 |     xxxxxxxx | 369436001864394 | 5764607671144285799 | 5764611828814449467 |            0 | Se equivocaron con el pedido es la segunda vez. Es bueno el sabor pero tendrían que poner más atención                                                                           |                                                                                                                  |                                                           |       300 |               0 |                 0 |               1 |               1 | Porque aunque se tardo cuando mandé msj atendió a mi msj ya que me habían cancelado 2 anteriores                                                                                                 | ["Buen servicio","Recomendado"]                                                                                       | [310001,310012]                                                  |        10 |         0 |             |             |            0 |         0 |           1662952079 |          0 |          0 |       1662952079 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 15202422 | 5764618254173668956 |     xxxxxxxx | 369435947917469 | 5764607713758413536 | 5764611828814449467 |            0 | la comida está fria                                                                                                                                                              | ["Sin utensilios"]                                                                                               | [202018]                                                  |       100 |               0 |                 0 |               1 |               1 | el pedido tardó muchísimo en llegar y solicité la cancelación del pedido y no hubo respuesta \nincluso llamé y nadie contestó \nes una lástima que que te vendan cosas que ya no quieres         | ["Buen servicio"]                                                                                                     | [310001]                                                         |        10 |         0 |             |             |            0 |         0 |           1662616541 |          0 |          0 |       1662616541 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 15011444 | 5764618234288475940 |     xxxxxxxx | 369435933811725 | 5764607704312840308 | 5764611828814449467 |            0 |                                                                                                                                                                                  | ["Se ignoraron las instrucciones"]                                                                               | [202006]                                                  |       300 |               0 |                 0 |               0 |               1 | Excelente servicio \n                                                                                                                                                                            | ["Buen servicio","Gran repartidor"]                                                                                   | [310001,310004]                                                  |        10 |         0 |             |             |            0 |         0 |           1662099223 |          0 |          0 |       1662099223 |                0 |             1 |         0 |             |          |             |         0 |             |          |             | ["https://img0.didiglobal.com/static/soda_public/7b7b394d82680910bd23c09ba8b507bb"] |             1 |             1 |             1 |             1 |      0 |
+| 14342786 | 5764617855207278396 |     xxxxxxxx | 369436122386162 | 5764607588831068223 | 5764611828814449467 |            0 |                                                                                                                                                                                  |                                                                                                                  |                                                           |       500 |               0 |                 0 |               0 |               1 | excelente                                                                                                                                                                                        | ["Buen servicio","Cortés","Excelente","Gran repartidor"]                                                              | [310001,310002,310003,310004]                                    |        10 |         0 |             |             |            0 |         0 |           1660246730 |          0 |          0 |       1660246730 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
+| 14217060 | 5764617693730767579 |     xxxxxxxx | 369435940016699 | 5764607678404624989 | 5764611828814449467 |            0 | el pedido llegó incorrecto y con ingredientes que cobraron y están faltantes. malísima la comida y traía un plástico entre la masa de los alimentos.  jamás pido otra vez        | ["Porciones pequeñas","Productos faltantes","Se ignoraron las instrucciones"]                                    | [202003,202001,202006]                                    |       300 |               0 |                 0 |               1 |               1 | Chidisimo el bro                                                                                                                                                                                 | ["Buen servicio","Cortés","Excelente","Gran repartidor","Honesto","Rápido","Sin daños","Recomendado","¡Gracias!"]     | [310001,310002,310003,310004,310009,310010,310011,310012,310013] |        10 |         0 |             |             |            0 |         0 |           1659857126 |          0 |          0 |       1659857126 |                0 |             1 |         0 |             |          |             |         0 |             |          |             |                                                                                     |             1 |             1 |             1 |             1 |      0 |
++----------+---------------------+--------------+-----------------+---------------------+---------------------+--------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------+-----------+-----------------+-------------------+-----------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------+-----------+-----------+-------------+-------------+--------------+-----------+----------------------+------------+------------+------------------+------------------+---------------+-----------+-------------+----------+-------------+-----------+-------------+----------+-------------+-------------------------------------------------------------------------------------+---------------+---------------+---------------+---------------+--------+
+-->
+
+
+<p><strong>(4)获取系统中保存的所有 Query Profiler 概要信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">show</span> profiles<span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span> Query_ID <span class="token operator">|</span> Duration   <span class="token operator">|</span> Query                                                                                                                                                                                                                                                         <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span>        <span class="token number">1</span> <span class="token operator">|</span> <span class="token number">0.00138750</span> <span class="token operator">|</span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span>                                                                                                                                                                                                                               <span class="token operator">|</span>
+<span class="token operator">|</span>        <span class="token number">2</span> <span class="token operator">|</span> <span class="token number">0.19619525</span> <span class="token operator">|</span> <span class="token keyword">SELECT</span> <span class="token operator">*</span>
+<span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+<span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> <span class="token string">'xxxxxxxx'</span>
+<span class="token operator">AND</span> rider_id <span class="token operator">=</span> <span class="token string">'5764611828814449467'</span>
+<span class="token operator">AND</span> c_d_score <span class="token operator">=</span> <span class="token string">'10'</span>
+<span class="token operator">AND</span> c_d_has_content <span class="token operator">=</span> <span class="token string">'1'</span>
+<span class="token operator">AND</span> evaluate_role <span class="token operator">=</span> <span class="token number">1</span>
+<span class="token operator">AND</span> is_deleted <span class="token operator">=</span> <span class="token number">0</span>
+<span class="token keyword">ORDER</span> <span class="token keyword">BY</span> c_evaluate_timestamp <span class="token keyword">DESC</span>
+<span class="token keyword">LIMIT</span> <span class="token number">10</span> <span class="token keyword">OFFSET</span> <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p><strong>(5)针对刚刚的查询，获取详细的 profile 信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">show</span> profile <span class="token keyword">for</span> query <span class="token number">2</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">Status</span>               <span class="token operator">|</span> Duration <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">starting</span>             <span class="token operator">|</span> <span class="token number">0.000092</span> <span class="token operator">|</span>
+<span class="token operator">|</span> checking permissions <span class="token operator">|</span> <span class="token number">0.000015</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Opening <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000023</span> <span class="token operator">|</span>
+<span class="token operator">|</span> init                 <span class="token operator">|</span> <span class="token number">0.000060</span> <span class="token operator">|</span>
+<span class="token operator">|</span> System <span class="token keyword">lock</span>          <span class="token operator">|</span> <span class="token number">0.000018</span> <span class="token operator">|</span>
+<span class="token operator">|</span> optimizing           <span class="token operator">|</span> <span class="token number">0.000022</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">statistics</span>           <span class="token operator">|</span> <span class="token number">0.000729</span> <span class="token operator">|</span>
+<span class="token operator">|</span> preparing            <span class="token operator">|</span> <span class="token number">0.000037</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sorting result       <span class="token operator">|</span> <span class="token number">0.000020</span> <span class="token operator">|</span>
+<span class="token operator">|</span> executing            <span class="token operator">|</span> <span class="token number">0.000014</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sending <span class="token keyword">data</span>         <span class="token operator">|</span> <span class="token number">0.000030</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Creating sort <span class="token keyword">index</span>  <span class="token operator">|</span> <span class="token number">0.194956</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">end</span>                  <span class="token operator">|</span> <span class="token number">0.000049</span> <span class="token operator">|</span>
+<span class="token operator">|</span> query <span class="token keyword">end</span>            <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>
+<span class="token operator">|</span> closing <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>
+<span class="token operator">|</span> freeing items        <span class="token operator">|</span> <span class="token number">0.000034</span> <span class="token operator">|</span>
+<span class="token operator">|</span> logging slow query   <span class="token operator">|</span> <span class="token number">0.000040</span> <span class="token operator">|</span>
+<span class="token operator">|</span> cleaning up          <span class="token operator">|</span> <span class="token number">0.000025</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token number">18</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  通过Query Profiler确认，<code>Creating sort index</code>确实耗时，200ms的查询有194ms耗费在了排序上。</p>
+<br>
+
+
+<h1 id="3-Query-Profiler实战-实战2"><a href="#3-Query-Profiler实战-实战2" class="headerlink" title="(3) Query Profiler实战-实战2"></a>(3) Query Profiler实战-实战2</h1><p>  商家端会有查询某个商家评论的需求，这次遇到的问题是商家查询近x天用户评论商家的SQL</p>
+<h2 id="3-1-通过explain确认走索引"><a href="#3-1-通过explain确认走索引" class="headerlink" title="(3.1) 通过explain确认走索引"></a>(3.1) 通过explain确认走索引</h2><pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">// </span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h2 id="3-2-Query-Profiler分析"><a href="#3-2-Query-Profiler分析" class="headerlink" title="(3.2) Query Profiler分析"></a>(3.2) Query Profiler分析</h2><p><strong>(1)获取系统中保存的所有 Query Profiler 概要信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">show</span> profiles<span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span> Query_ID <span class="token operator">|</span> Duration   <span class="token operator">|</span> Query                                                                                                                                                                                                                                                                                                        <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span>        <span class="token number">1</span> <span class="token operator">|</span> <span class="token number">0.00070225</span> <span class="token operator">|</span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span>                                                                                                                                                                                                                                                                              <span class="token operator">|</span>
+<span class="token operator">|</span>        <span class="token number">2</span> <span class="token operator">|</span> <span class="token number">0.13942025</span> <span class="token operator">|</span> <span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">AS</span> count
+<span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+<span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> <span class="token string">'xxxxxxxx'</span>
+<span class="token operator">AND</span> shop_id <span class="token operator">=</span> <span class="token string">'5764607706930086100'</span>
+<span class="token operator">AND</span> c_b_score <span class="token operator">IN</span> <span class="token punctuation">(</span><span class="token string">'2'</span><span class="token punctuation">,</span> <span class="token string">'10'</span><span class="token punctuation">,</span> <span class="token string">'100'</span><span class="token punctuation">,</span> <span class="token string">'200'</span><span class="token punctuation">,</span> <span class="token string">'300'</span><span class="token punctuation">,</span> <span class="token string">'400'</span><span class="token punctuation">,</span> <span class="token string">'500'</span><span class="token punctuation">)</span>
+<span class="token operator">AND</span> c_evaluate_timestamp <span class="token operator">BETWEEN</span> <span class="token string">'1666242000'</span> <span class="token operator">AND</span> <span class="token string">'1666933199'</span>
+<span class="token operator">AND</span> evaluate_role <span class="token operator">=</span> <span class="token number">1</span>
+<span class="token operator">AND</span> is_deleted <span class="token operator">=</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p><strong>(2)针对刚刚的查询，获取详细的 profile 信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">show</span> profile <span class="token keyword">for</span> query <span class="token number">2</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">Status</span>               <span class="token operator">|</span> Duration <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">starting</span>             <span class="token operator">|</span> <span class="token number">0.000105</span> <span class="token operator">|</span>
+<span class="token operator">|</span> checking permissions <span class="token operator">|</span> <span class="token number">0.000015</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Opening <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000024</span> <span class="token operator">|</span>
+<span class="token operator">|</span> init                 <span class="token operator">|</span> <span class="token number">0.000042</span> <span class="token operator">|</span>
+<span class="token operator">|</span> System <span class="token keyword">lock</span>          <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>
+<span class="token operator">|</span> optimizing           <span class="token operator">|</span> <span class="token number">0.000023</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">statistics</span>           <span class="token operator">|</span> <span class="token number">0.000495</span> <span class="token operator">|</span>
+<span class="token operator">|</span> preparing            <span class="token operator">|</span> <span class="token number">0.000039</span> <span class="token operator">|</span>
+<span class="token operator">|</span> executing            <span class="token operator">|</span> <span class="token number">0.000013</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sending <span class="token keyword">data</span>         <span class="token operator">|</span> <span class="token number">0.138473</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">end</span>                  <span class="token operator">|</span> <span class="token number">0.000045</span> <span class="token operator">|</span>
+<span class="token operator">|</span> query <span class="token keyword">end</span>            <span class="token operator">|</span> <span class="token number">0.000016</span> <span class="token operator">|</span>
+<span class="token operator">|</span> closing <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000018</span> <span class="token operator">|</span>
+<span class="token operator">|</span> freeing items        <span class="token operator">|</span> <span class="token number">0.000032</span> <span class="token operator">|</span>
+<span class="token operator">|</span> logging slow query   <span class="token operator">|</span> <span class="token number">0.000043</span> <span class="token operator">|</span>
+<span class="token operator">|</span> cleaning up          <span class="token operator">|</span> <span class="token number">0.000022</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token number">16</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  最耗时的竟然是发送数据<code>Sending data</code>，有点不太相信</p>
+<!--
+  不科学，再来一次
+
+
+mysql>  show profiles;
++----------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Query_ID | Duration   | Query                                                                                                                                                                                                                                                                                                        |
++----------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|        1 | 0.00070225 | show variables like 'profiling'                                                                                                                                                                                                                                                                              |
+|        2 | 0.13942025 | SELECT COUNT(*) AS count
+FROM xxxx_biz_db_xxx_base_xxxxxxxx
+WHERE shop_city_id = 'xxxxxxxx'
+AND shop_id = '5764607706930086100'
+AND c_b_score IN ('2', '10', '100', '200', '300', '400', '500')
+AND c_evaluate_timestamp BETWEEN '1666242000' AND '1666933199'
+AND evaluate_role = 1
+AND is_deleted = |
+|        3 | 0.01766700 | SELECT *
+FROM xxxx_biz_db_xxx_base_xxxxxxxx
+WHERE shop_city_id = 'xxxxxxxx'
+AND rider_id = '5764611828814449467'
+AND c_d_score = '10'
+AND c_d_has_content = '1'
+AND evaluate_role = 1
+AND is_deleted = 0
+ORDER BY c_evaluate_timestamp DESC
+LIMIT 10 OFFSET 0                                                |
+|        4 | 0.00989875 | SELECT COUNT(*) AS count
+FROM xxxx_biz_db_xxx_base_xxxxxxxx
+WHERE shop_city_id = 'xxxxxxxx'
+AND shop_id = '5764607706930086100'
+AND c_b_score IN ('2', '10', '100', '200', '300', '400', '500')
+AND c_evaluate_timestamp BETWEEN '1666242000' AND '1666933199'
+AND evaluate_role = 1
+AND is_deleted = |
++----------+------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+4 rows in set, 1 warning (0.00 sec)
+
+mysql>
+
+
+  这次是query 4，
+  **针对刚刚的查询，获取详细的 profile 信息**
+
+mysql>  show profile for query 4 ;
++----------------------+----------+
+| Status               | Duration |
++----------------------+----------+
+| starting             | 0.000102 |
+| checking permissions | 0.000016 |
+| Opening tables       | 0.000027 |
+| init                 | 0.000042 |
+| System lock          | 0.000017 |
+| optimizing           | 0.000022 |
+| statistics           | 0.000120 |
+| preparing            | 0.000026 |
+| executing            | 0.000013 |
+| Sending data         | 0.009417 |
+| end                  | 0.000016 |
+| query end            | 0.000016 |
+| closing tables       | 0.000016 |
+| freeing items        | 0.000026 |
+| cleaning up          | 0.000025 |
++----------------------+----------+
+15 rows in set, 1 warning (0.00 sec)
+
+mysql>
+
+  这次有缓存，再来一次
+
+-->
+
+<p> 再来一次</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>  <span class="token keyword">show</span> profiles<span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span> Query_ID <span class="token operator">|</span> Duration   <span class="token operator">|</span> Query                                                                                                                                                                                                                                                                                                   <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span>        <span class="token number">1</span> <span class="token operator">|</span> <span class="token number">0.00204875</span> <span class="token operator">|</span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span>                                                                                                                                                                                                                                                                         <span class="token operator">|</span>
+<span class="token operator">|</span>        <span class="token number">2</span> <span class="token operator">|</span> <span class="token number">0.13039850</span> <span class="token operator">|</span> <span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">AS</span> count
+<span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx
+<span class="token keyword">WHERE</span> shop_city_id <span class="token operator">=</span> <span class="token string">'xxxxxxxx'</span>
+<span class="token operator">AND</span> shop_id <span class="token operator">=</span> <span class="token string">'5764607706930086100'</span>
+<span class="token operator">AND</span> c_b_score <span class="token operator">IN</span> <span class="token punctuation">(</span><span class="token string">'2'</span><span class="token punctuation">,</span> <span class="token string">'10'</span><span class="token punctuation">,</span> <span class="token string">'100'</span><span class="token punctuation">,</span> <span class="token string">'200'</span><span class="token punctuation">,</span> <span class="token string">'300'</span><span class="token punctuation">,</span> <span class="token string">'400'</span><span class="token punctuation">,</span> <span class="token string">'500'</span><span class="token punctuation">)</span>
+<span class="token operator">AND</span> c_evaluate_timestamp <span class="token operator">BETWEEN</span> <span class="token string">'1666242000'</span> <span class="token operator">AND</span> <span class="token string">'1666933199'</span>
+<span class="token operator">AND</span> evaluate_role <span class="token operator">=</span> <span class="token number">1</span>
+<span class="token operator">AND</span> is_deleted <span class="token operator">=</span> <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span>
+mysql<span class="token operator">></span>  <span class="token keyword">show</span> profile <span class="token keyword">for</span> query <span class="token number">2</span> <span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">Status</span>               <span class="token operator">|</span> Duration <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token operator">|</span> <span class="token keyword">starting</span>             <span class="token operator">|</span> <span class="token number">0.000145</span> <span class="token operator">|</span>
+<span class="token operator">|</span> checking permissions <span class="token operator">|</span> <span class="token number">0.000020</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Opening <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000030</span> <span class="token operator">|</span>
+<span class="token operator">|</span> init                 <span class="token operator">|</span> <span class="token number">0.000062</span> <span class="token operator">|</span>
+<span class="token operator">|</span> System <span class="token keyword">lock</span>          <span class="token operator">|</span> <span class="token number">0.000021</span> <span class="token operator">|</span>
+<span class="token operator">|</span> optimizing           <span class="token operator">|</span> <span class="token number">0.000031</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">statistics</span>           <span class="token operator">|</span> <span class="token number">0.000664</span> <span class="token operator">|</span>
+<span class="token operator">|</span> preparing            <span class="token operator">|</span> <span class="token number">0.000041</span> <span class="token operator">|</span>
+<span class="token operator">|</span> executing            <span class="token operator">|</span> <span class="token number">0.000016</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sending <span class="token keyword">data</span>         <span class="token operator">|</span> <span class="token number">0.129180</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">end</span>                  <span class="token operator">|</span> <span class="token number">0.000042</span> <span class="token operator">|</span>
+<span class="token operator">|</span> query <span class="token keyword">end</span>            <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>
+<span class="token operator">|</span> closing <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000018</span> <span class="token operator">|</span>
+<span class="token operator">|</span> freeing items        <span class="token operator">|</span> <span class="token number">0.000028</span> <span class="token operator">|</span>
+<span class="token operator">|</span> logging slow query   <span class="token operator">|</span> <span class="token number">0.000054</span> <span class="token operator">|</span>
+<span class="token operator">|</span> cleaning up          <span class="token operator">|</span> <span class="token number">0.000033</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+</span>
+<span class="token number">16</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  <strong>获取详细的 profile 信息</strong></p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span>   <span class="token keyword">show</span> profile cpu<span class="token punctuation">,</span> block io <span class="token keyword">for</span> query <span class="token number">2</span><span class="token punctuation">;</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+----------+------------+--------------+---------------+</span>
+<span class="token operator">|</span> <span class="token keyword">Status</span>               <span class="token operator">|</span> Duration <span class="token operator">|</span> CPU_user <span class="token operator">|</span> CPU_system <span class="token operator">|</span> Block_ops_in <span class="token operator">|</span> Block_ops_out <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+----------+------------+--------------+---------------+</span>
+<span class="token operator">|</span> <span class="token keyword">starting</span>             <span class="token operator">|</span> <span class="token number">0.000145</span> <span class="token operator">|</span> <span class="token number">0.000126</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> checking permissions <span class="token operator">|</span> <span class="token number">0.000020</span> <span class="token operator">|</span> <span class="token number">0.000019</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Opening <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000030</span> <span class="token operator">|</span> <span class="token number">0.000030</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> init                 <span class="token operator">|</span> <span class="token number">0.000062</span> <span class="token operator">|</span> <span class="token number">0.000062</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> System <span class="token keyword">lock</span>          <span class="token operator">|</span> <span class="token number">0.000021</span> <span class="token operator">|</span> <span class="token number">0.000020</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> optimizing           <span class="token operator">|</span> <span class="token number">0.000031</span> <span class="token operator">|</span> <span class="token number">0.000000</span> <span class="token operator">|</span>   <span class="token number">0.000074</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">statistics</span>           <span class="token operator">|</span> <span class="token number">0.000664</span> <span class="token operator">|</span> <span class="token number">0.000258</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>           <span class="token number">96</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> preparing            <span class="token operator">|</span> <span class="token number">0.000041</span> <span class="token operator">|</span> <span class="token number">0.000039</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> executing            <span class="token operator">|</span> <span class="token number">0.000016</span> <span class="token operator">|</span> <span class="token number">0.000016</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> Sending <span class="token keyword">data</span>         <span class="token operator">|</span> <span class="token number">0.129180</span> <span class="token operator">|</span> <span class="token number">0.015645</span> <span class="token operator">|</span>   <span class="token number">0.008681</span> <span class="token operator">|</span>        <span class="token number">33824</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> <span class="token keyword">end</span>                  <span class="token operator">|</span> <span class="token number">0.000042</span> <span class="token operator">|</span> <span class="token number">0.000026</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> query <span class="token keyword">end</span>            <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> closing <span class="token keyword">tables</span>       <span class="token operator">|</span> <span class="token number">0.000018</span> <span class="token operator">|</span> <span class="token number">0.000017</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> freeing items        <span class="token operator">|</span> <span class="token number">0.000028</span> <span class="token operator">|</span> <span class="token number">0.000028</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">|</span> logging slow query   <span class="token operator">|</span> <span class="token number">0.000054</span> <span class="token operator">|</span> <span class="token number">0.000054</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>            <span class="token number">16</span> <span class="token operator">|</span>
+<span class="token operator">|</span> cleaning up          <span class="token operator">|</span> <span class="token number">0.000033</span> <span class="token operator">|</span> <span class="token number">0.000033</span> <span class="token operator">|</span>   <span class="token number">0.000000</span> <span class="token operator">|</span>            <span class="token number">0</span> <span class="token operator">|</span>             <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------------------+----------+----------+------------+--------------+---------------+</span>
+<span class="token number">16</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  通过Block_ops_in可以看到确实有大量数据读取</p>
+<p>  Block_ops_in和Block_ops_out表示块存储设备输入和输出的次数，即从硬盘读取和写入数据的次数。<br>  正常情况下，只有当数据量大于内存可用量时，才会借助硬盘进行内存交换(Swap)，因此产生如此大量的硬盘读取和写入。</p>
+<p>  有几个办法：<br>  第一个办法，增大MySQL内存；<br>  第二个办法，索引覆盖<br>  第三个办法，优化查询语句，减少数据量。</p>
+<h1 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h1><p>[1] <a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/8.0/en/show-profile.html">MySQL 8.0 show-profile</a><br>[2] <a target="_blank" rel="noopener" href="https://artisan.blog.csdn.net/article/details/104150658">MySQL- SQL执行计划 &amp; 统计SQL执行每阶段的耗时</a><br>[3] <a target="_blank" rel="noopener" href="https://blog.csdn.net/zxc123e/article/details/77908432">MySQL分析SQL耗时瓶颈</a><br>[4] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/ggjucheng/archive/2012/11/15/2772058.html">MySQL Profiling 的使用</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/mysql/" rel="tag"># mysql</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/09/10/linux-network-tcp-handshakes/" rel="prev" title="网络三次握手">
+                  <i class="fa fa-chevron-left"></i> 网络三次握手
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.0/dist/search.js" integrity="sha256-vXZMYLEqsROAXkEw93GGIvaB2ab+QW6w3+1ahD9nXXA=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+
+
+  <script class="next-config" data-name="leancloud_visitors" type="application/json">{"enable":true,"app_id":"Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz","app_key":"IeozLmM20GuvfcslfWgdNXP0","server_url":"http://weikeqin.com","security":true}</script>
+  <script src="/js/third-party/statistics/lean-analytics.js"></script>
+
+
+
+</body>
+</html>
