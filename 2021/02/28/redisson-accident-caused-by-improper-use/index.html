@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="2月26，元宵节当天，出了一个P1事故，:hurt:，简单地说是一个小bug导致查库后的数据放入某个分配的缓存里，缓存然后没清理，然后第二天秒杀时线上代码使用了这个缓存，再叠加逻辑不合理+redis配置不合理，导致下单时调活动超时，下单时活动校验未通过，影响单量数万单。 (1) 问题时间线02-25 20:48 业务的一个新需求上预发，但是在预发验证时，发现代码里忘记判空，导致验证的商品缓存了全">
+<meta property="og:type" content="article">
+<meta property="og:title" content="redisson使用不当造成的重大事故">
+<meta property="og:url" content="http://weikeqin.com/2021/02/28/redisson-accident-caused-by-improper-use/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="2月26，元宵节当天，出了一个P1事故，:hurt:，简单地说是一个小bug导致查库后的数据放入某个分配的缓存里，缓存然后没清理，然后第二天秒杀时线上代码使用了这个缓存，再叠加逻辑不合理+redis配置不合理，导致下单时调活动超时，下单时活动校验未通过，影响单量数万单。 (1) 问题时间线02-25 20:48 业务的一个新需求上预发，但是在预发验证时，发现代码里忘记判空，导致验证的商品缓存了全">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210226/redis-proxy-monitor.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210226/redis-proxy-pending-monitor.png">
+<meta property="article:published_time" content="2021-02-28T12:25:01.000Z">
+<meta property="article:modified_time" content="2022-12-25T14:02:32.706Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="java">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/business/stability/20210226/redis-proxy-monitor.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2021/02/28/redisson-accident-caused-by-improper-use/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2021/02/28/redisson-accident-caused-by-improper-use/","path":"2021/02/28/redisson-accident-caused-by-improper-use/","title":"redisson使用不当造成的重大事故"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>redisson使用不当造成的重大事故 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E9%97%AE%E9%A2%98%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">1.</span> <span class="nav-text">(1) 问题时间线</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">(2) 问题分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E9%97%AE%E9%A2%98%E4%BB%A3%E7%A0%81"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 问题代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-redisson%E7%9B%B8%E5%85%B3%E6%93%8D%E4%BD%9C"><span class="nav-number">2.2.</span> <span class="nav-text">(2.3) redisson相关操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E9%97%AE%E9%A2%98lua%E8%84%9A%E6%9C%AC"><span class="nav-number">2.3.</span> <span class="nav-text">(2.2) 问题lua脚本</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E9%97%AE%E9%A2%98%E5%8E%9F%E5%9B%A0"><span class="nav-number">2.4.</span> <span class="nav-text">(2.3) 问题原因</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%80%9D%E8%80%83"><span class="nav-number">3.</span> <span class="nav-text">思考</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E8%AF%B7%E6%B1%82%E6%B6%A8%E6%B2%A1%E6%B6%A8%EF%BC%8C%E4%BD%86%E6%98%AFredis-proxy%E8%80%97%E6%97%B6%E6%80%8E%E4%B9%88%E7%AA%81%E7%84%B6%E5%8D%87%E9%AB%98%EF%BC%9F"><span class="nav-number">3.1.</span> <span class="nav-text">业务请求涨没涨，但是redis proxy耗时怎么突然升高？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#proxy%E4%B8%BA%E5%95%A5cpu%E9%83%BD%E9%A3%99%E9%AB%98%EF%BC%9F%E4%B8%BA%E5%95%A5%E6%89%80%E6%9C%89kproxy%E9%83%BD%E6%9C%89%E9%98%BB%E5%A1%9E%EF%BC%9F"><span class="nav-number">3.2.</span> <span class="nav-text">proxy为啥cpu都飙高？为啥所有kproxy都有阻塞？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1%E4%B8%AA%E5%88%86%E7%89%87%E5%BD%B1%E5%93%8D%E6%89%80%E6%9C%89proxy-%E6%98%AF%E5%90%A6%E6%98%AF%E6%9C%89%E5%BC%82%E5%B8%B8key"><span class="nav-number">3.3.</span> <span class="nav-text">1个分片影响所有proxy 是否是有异常key</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B2%A1%E6%9C%89%E6%93%8D%E4%BD%9C%E4%BD%86%E6%98%AF9-04-redis-proxy%E7%9A%84cpu%E5%88%A9%E7%94%A8%E7%8E%87%E6%81%A2%E5%A4%8D%E4%BA%86%E6%98%AF%E4%BB%80%E4%B9%88%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.4.</span> <span class="nav-text">没有操作但是9:04 redis proxy的cpu利用率恢复了是什么原因</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BC%98%E5%8C%96"><span class="nav-number">4.</span> <span class="nav-text">优化</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2021/02/28/redisson-accident-caused-by-improper-use/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="redisson使用不当造成的重大事故 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          redisson使用不当造成的重大事故
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2021-02-28 20:25:01" itemprop="dateCreated datePublished" datetime="2021-02-28T20:25:01+08:00">2021-02-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-12-25 22:02:32" itemprop="dateModified" datetime="2022-12-25T22:02:32+08:00">2022-12-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>11k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>10 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p> 2月26，元宵节当天，出了一个P1事故，:hurt:，简单地说是一个小bug导致查库后的数据放入某个分配的缓存里，缓存然后没清理，然后第二天秒杀时线上代码使用了这个缓存，再叠加逻辑不合理+redis配置不合理，导致下单时调活动超时，下单时活动校验未通过，影响单量数万单。</p>
+<h1 id="1-问题时间线"><a href="#1-问题时间线" class="headerlink" title="(1) 问题时间线"></a>(1) 问题时间线</h1><p>02-25 20:48 业务的一个新需求上预发，但是在预发验证时，发现代码里忘记判空，导致验证的商品缓存了全量的活动标签，随后redis集群里的一个分片 CPU飙高开始报警；<br>02-25 21:00 预发代码回滚完成。<br>  但是缓存没有清理。而且线上和预发用的是同一个redis集群。<br>  由于晚上流量逐渐变小，所以线上未出现问题。<br>02-26 08:32 活动服务的redis查询延时升高告警<br>02-26 08:35 ～ 09:02 redis连接延时升高、导致查询活动信息延时升高，下单下跌报警触发<br>02-26 08:55 price-center 活动查询接口超时，原因是10个proxy连接都被打满, CPU使用率接近100%，导致后面的连接响应超时，同时接口响应超时<br>02-26 09:02 由于天降惊喜相关查询减少，慢请求消失，redis QPS下降，下单恢复正常<br>02-26 13:05 删除问题缓存，代码修复发布上线，redis查询QPS趋于稳定，完全恢复</p>
+<p> 10个proxy，单个1500连接左右，redis proxy共支持15000的连接<br> 活动单台机器默认64个连接，共200台机器，共支持12800的连接</p>
+<p>  事故发生期间，redis慢查询的请求量翻倍(用户重试+redission默认重试3次)，由于慢查询耗时长响应慢，所以在同一个连接上的之后的请求响应也会变慢，导致了更多的请求响应变慢；</p>
+<p>慢查询是由于redission的Map结构在put时使用的是lua脚本形式。</p>
+<p>  8:48 ~ 8:55是查询最慢的时间 监控<br><img src="/img/business/stability/20210226/redis-proxy-monitor.png"></p>
+<!--
+事故时段：20210226 8:48 ~ 8:55 
+
+定级指标：子订单下单量 P1 不可用时长 7mins 
+事故时段单量：29562
+事故时段按照环比估计应有单量：87374（以2月19日曲线做对比）
+事故时段损失单量：57812
+事故时段损失单量占同时段预估单量比例：66.1661%
+事故时段损失单量占当日总单量比例：0.437%
+-->
+
+<br>
+
+<h1 id="2-问题分析"><a href="#2-问题分析" class="headerlink" title="(2) 问题分析"></a>(2) 问题分析</h1><h2 id="2-1-问题代码"><a href="#2-1-问题代码" class="headerlink" title="(2.1) 问题代码"></a>(2.1) 问题代码</h2><p> 活动接口 <code>/getActivityGoodsList</code> 获取活动信息时需要获取活动商品列表，其中需要商品活动标签信息</p>
+<!--
+ActivityGoodsLabelDao
+-->
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 获取商品活动标签信息
+ */</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token function">getActiveLabelByGoodsIds</span><span class="token punctuation">(</span><span class="token class-name">Long</span> cityId<span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">></span></span> goodsIdList<span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">></span></span> typeList<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span><span class="token class-name">CollectionUtils</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span>goodsIdList<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">emptyMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// key是 goods_label:cityId</span>
+        <span class="token class-name">RMapCache</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span><span class="token punctuation">></span></span> mapCache <span class="token operator">=</span> redissonClient<span class="token punctuation">.</span><span class="token function">getMapCache</span><span class="token punctuation">(</span><span class="token function">buildCacheKey</span><span class="token punctuation">(</span>cityId<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">></span></span> needQueryList <span class="token operator">=</span> <span class="token class-name">Lists</span><span class="token punctuation">.</span><span class="token function">newArrayList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span><span class="token punctuation">></span></span> resultGoodsLabelMap <span class="token operator">=</span> <span class="token class-name">Maps</span><span class="token punctuation">.</span><span class="token function">newHashMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">MapUtils</span><span class="token punctuation">.</span><span class="token function">isNotEmpty</span><span class="token punctuation">(</span>mapCache<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 按照goodsId逐个设置label</span>
+            goodsIdList<span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span>goodsId <span class="token operator">-></span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>mapCache<span class="token punctuation">.</span><span class="token function">containsKey</span><span class="token punctuation">(</span>goodsId<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">//缓存查到部分数据</span>
+                    resultGoodsLabelMap<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>goodsId<span class="token punctuation">,</span> mapCache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>goodsId<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">//未查到的数据</span>
+                    needQueryList<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>goodsId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">CollectionUtils</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span>needQueryList<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">return</span> resultGoodsLabelMap<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span><span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 需要从数据库查的goodsIdList</span>
+            needQueryList<span class="token punctuation">.</span><span class="token function">addAll</span><span class="token punctuation">(</span>goodsIdList<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 从数据库查询goodsIds对应的标签</span>
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span><span class="token punctuation">></span></span> goodsLabelMap <span class="token operator">=</span> <span class="token function">doQueryLabel</span><span class="token punctuation">(</span>typeList<span class="token punctuation">,</span> needQueryList<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 把从数据库查到的数据添加到缓存</span>
+        goodsLabelMap<span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> val<span class="token punctuation">)</span> <span class="token operator">-></span> mapCache<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> val<span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>SECONDS<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        resultGoodsLabelMap<span class="token punctuation">.</span><span class="token function">putAll</span><span class="token punctuation">(</span>goodsLabelMap<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//返回值设置</span>
+        <span class="token keyword">return</span> resultGoodsLabelMap<span class="token punctuation">;</span>
+
+    <span class="token punctuation">&#125;</span><span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+        log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"查询label出现异常，err:&#123;&#125;"</span><span class="token punctuation">,</span> e<span class="token punctuation">.</span><span class="token function">getMessage</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token function">doQueryLabel</span><span class="token punctuation">(</span>typeList<span class="token punctuation">,</span> goodsIdList<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  从数据库根据商品id查询活动标签的方法</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token function">doQueryLabel</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">></span></span> typeList<span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">></span></span> needQueryList<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 判空 &lt;!--2021-01-28 新加的判空 --></span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span><span class="token class-name">CollectionUtils</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span>needQueryList<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">emptyMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 查数据库</span>
+    <span class="token class-name">LambdaQueryWrapper</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span></span> queryWrapper <span class="token operator">=</span> <span class="token class-name">Wrappers</span><span class="token punctuation">.</span><span class="token function">lambdaQuery</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">long</span> currentTime <span class="token operator">=</span> <span class="token class-name">TimeUtils</span><span class="token punctuation">.</span><span class="token function">getCurrentTime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    queryWrapper<span class="token punctuation">.</span><span class="token function">in</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getGoodsId</span><span class="token punctuation">,</span> needQueryList<span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">eq</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getStatus</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">in</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getActivityType</span><span class="token punctuation">,</span> typeList<span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">le</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getStartTime</span><span class="token punctuation">,</span> currentTime<span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">ge</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getEndTime</span><span class="token punctuation">,</span> currentTime<span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">select</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getGoodsId</span><span class="token punctuation">,</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getActivityType</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ActivityGoodsLabel</span><span class="token punctuation">></span></span> labels <span class="token operator">=</span> activityGoodsLabelMapper<span class="token punctuation">.</span><span class="token function">selectList</span><span class="token punctuation">(</span>queryWrapper<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> labels<span class="token punctuation">.</span><span class="token function">stream</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">collect</span><span class="token punctuation">(</span><span class="token class-name">Collectors</span><span class="token punctuation">.</span><span class="token function">groupingBy</span><span class="token punctuation">(</span><span class="token class-name">ActivityGoodsLabel</span><span class="token operator">::</span><span class="token function">getGoodsId</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="2-3-redisson相关操作"><a href="#2-3-redisson相关操作" class="headerlink" title="(2.3) redisson相关操作"></a>(2.3) redisson相关操作</h2><p>代码中对redisson的操作涉及3个方法：<code>getMapCache</code>、<code>containsKey</code>、<code>put</code>下面分析下每个方法的执行逻辑</p>
+<p><strong>getMapCache</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">K</span><span class="token punctuation">,</span> <span class="token class-name">V</span><span class="token punctuation">></span></span> <span class="token class-name">RMapCache</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">K</span><span class="token punctuation">,</span> <span class="token class-name">V</span><span class="token punctuation">></span></span> <span class="token function">getMapCache</span><span class="token punctuation">(</span><span class="token class-name">String</span> name<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">RedissonMapCache</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">K</span><span class="token punctuation">,</span> <span class="token class-name">V</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>evictionScheduler<span class="token punctuation">,</span> connectionManager<span class="token punctuation">.</span><span class="token function">getCommandExecutor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> name<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+ 
+ 
+<span class="token keyword">public</span> <span class="token class-name">RedissonMapCache</span><span class="token punctuation">(</span><span class="token class-name">EvictionScheduler</span> evictionScheduler<span class="token punctuation">,</span> <span class="token class-name">CommandAsyncExecutor</span> commandExecutor<span class="token punctuation">,</span>
+                        <span class="token class-name">String</span> name<span class="token punctuation">,</span> <span class="token class-name">RedissonClient</span> redisson<span class="token punctuation">,</span> <span class="token class-name">MapOptions</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">K</span><span class="token punctuation">,</span> <span class="token class-name">V</span><span class="token punctuation">></span></span> options<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">super</span><span class="token punctuation">(</span>commandExecutor<span class="token punctuation">,</span> name<span class="token punctuation">,</span> redisson<span class="token punctuation">,</span> options<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>evictionScheduler <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        evictionScheduler<span class="token punctuation">.</span><span class="token function">schedule</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getTimeoutSetName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getIdleSetName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getExpiredChannelName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getLastAccessTimeSetName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  Redisson通过在初始化RedissonMapCache时，设置了一个EvictionScheduler,这个类通过netty的EventloopGroup线程池周期地向以redisson_map_cache_expired前缀名的频道发布消息，RedissonMapCache会订阅这个频道来处理消息。</p>
+<p><strong>containsKey</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">RFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Boolean</span><span class="token punctuation">></span></span> <span class="token function">containsKeyAsync</span><span class="token punctuation">(</span><span class="token class-name">Object</span> key<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">checkKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">;</span>
+ 
+    <span class="token keyword">return</span> commandExecutor<span class="token punctuation">.</span><span class="token function">evalWriteAsync</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> codec<span class="token punctuation">,</span> <span class="token class-name">RedisCommands</span><span class="token punctuation">.</span>EVAL_BOOLEAN<span class="token punctuation">,</span>
+    <span class="token string">"local value = redis.call('hget', KEYS[1], ARGV[2]); "</span> <span class="token operator">+</span>
+            <span class="token string">"local expireDate = 92233720368547758; "</span> <span class="token operator">+</span>
+            <span class="token string">"if value ~= false then "</span> <span class="token operator">+</span>
+            <span class="token string">""</span> <span class="token operator">+</span>
+            <span class="token string">"    local maxSize = tonumber(redis.call('hget', KEYS[5], 'max-size')); "</span> <span class="token operator">+</span>
+            <span class="token string">"    if maxSize ~= nil and maxSize ~= 0 then "</span> <span class="token operator">+</span>
+            <span class="token string">"        redis.call('zadd', KEYS[4], tonumber(ARGV[1]), ARGV[2]); "</span> <span class="token operator">+</span>
+            <span class="token string">"    end;"</span> <span class="token operator">+</span>
+            <span class="token string">""</span> <span class="token operator">+</span>
+            <span class="token string">"    local expireDateScore = redis.call('zscore', KEYS[2], ARGV[2]); "</span> <span class="token operator">+</span>
+            <span class="token string">"    if expireDateScore ~= false then "</span> <span class="token operator">+</span>
+            <span class="token string">"        expireDate = tonumber(expireDateScore) "</span> <span class="token operator">+</span>
+            <span class="token string">"    end; "</span> <span class="token operator">+</span>
+            <span class="token string">"    local t, val = struct.unpack('dLc0', value); "</span> <span class="token operator">+</span>
+            <span class="token string">"    if t ~= 0 then "</span> <span class="token operator">+</span>
+            <span class="token string">"        local expireIdle = redis.call('zscore', KEYS[3], ARGV[2]); "</span> <span class="token operator">+</span>
+            <span class="token string">"        if expireIdle ~= false then "</span> <span class="token operator">+</span>
+            <span class="token string">"            if tonumber(expireIdle) > tonumber(ARGV[1]) then "</span> <span class="token operator">+</span>
+            <span class="token string">"                local value = struct.pack('dLc0', t, string.len(val), val); "</span> <span class="token operator">+</span>
+            <span class="token string">"                redis.call('hset', KEYS[1], ARGV[2], value); "</span> <span class="token operator">+</span>
+            <span class="token string">"                redis.call('zadd', KEYS[3], t + tonumber(ARGV[1]), ARGV[2]); "</span> <span class="token operator">+</span>
+            <span class="token string">"            end ;"</span> <span class="token operator">+</span>
+            <span class="token string">"            expireDate = math.min(expireDate, tonumber(expireIdle)) "</span> <span class="token operator">+</span>
+            <span class="token string">"        end; "</span> <span class="token operator">+</span>
+            <span class="token string">"    end; "</span> <span class="token operator">+</span>
+            <span class="token string">"    if expireDate &lt;= tonumber(ARGV[1]) then "</span> <span class="token operator">+</span>
+            <span class="token string">"        return 0; "</span> <span class="token operator">+</span>
+            <span class="token string">"    end; "</span> <span class="token operator">+</span>
+            <span class="token string">"    return 1;"</span> <span class="token operator">+</span>
+            <span class="token string">"end;"</span> <span class="token operator">+</span>
+            <span class="token string">"return 0; "</span><span class="token punctuation">,</span>
+            <span class="token class-name">Arrays</span><span class="token punctuation">.</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span><span class="token function">asList</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getTimeoutSetNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getIdleSetNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getLastAccessTimeSetNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getOptionsName</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">encodeMapKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>put</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token class-name">RFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">V</span><span class="token punctuation">></span></span> <span class="token function">putOperationAsync</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">K</span> key<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token class-name">V</span> value<span class="token punctuation">,</span> <span class="token keyword">long</span> ttlTimeout<span class="token punctuation">,</span> <span class="token keyword">long</span> maxIdleTimeout<span class="token punctuation">,</span>
+        <span class="token keyword">long</span> maxIdleDelta<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">RFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">V</span><span class="token punctuation">></span></span> future <span class="token operator">=</span> commandExecutor<span class="token punctuation">.</span><span class="token function">evalWriteAsync</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> codec<span class="token punctuation">,</span> <span class="token class-name">RedisCommands</span><span class="token punctuation">.</span>EVAL_MAP_VALUE<span class="token punctuation">,</span>
+            <span class="token string">"local insertable = false; "</span>
+                    <span class="token operator">+</span> <span class="token string">"local v = redis.call('hget', KEYS[1], ARGV[5]); "</span>
+                    <span class="token operator">+</span> <span class="token string">"if v == false then "</span>
+                        <span class="token operator">+</span> <span class="token string">"insertable = true; "</span>
+                    <span class="token operator">+</span> <span class="token string">"else "</span>
+                        <span class="token operator">+</span> <span class="token string">"local t, val = struct.unpack('dLc0', v); "</span>
+                        <span class="token operator">+</span> <span class="token string">"local expireDate = 92233720368547758; "</span>
+                        <span class="token operator">+</span> <span class="token string">"local expireDateScore = redis.call('zscore', KEYS[2], ARGV[5]); "</span>
+                        <span class="token operator">+</span> <span class="token string">"if expireDateScore ~= false then "</span>
+                            <span class="token operator">+</span> <span class="token string">"expireDate = tonumber(expireDateScore) "</span>
+                        <span class="token operator">+</span> <span class="token string">"end; "</span>
+                        <span class="token operator">+</span> <span class="token string">"if t ~= 0 then "</span>
+                            <span class="token operator">+</span> <span class="token string">"local expireIdle = redis.call('zscore', KEYS[3], ARGV[5]); "</span>
+                            <span class="token operator">+</span> <span class="token string">"if expireIdle ~= false then "</span>
+                                <span class="token operator">+</span> <span class="token string">"expireDate = math.min(expireDate, tonumber(expireIdle)) "</span>
+                            <span class="token operator">+</span> <span class="token string">"end; "</span>
+                        <span class="token operator">+</span> <span class="token string">"end; "</span>
+                        <span class="token operator">+</span> <span class="token string">"if expireDate &lt;= tonumber(ARGV[1]) then "</span>
+                            <span class="token operator">+</span> <span class="token string">"insertable = true; "</span>
+                        <span class="token operator">+</span> <span class="token string">"end; "</span>
+                    <span class="token operator">+</span> <span class="token string">"end; "</span>
+ 
+                    <span class="token operator">+</span> <span class="token string">"if tonumber(ARGV[2]) > 0 then "</span>
+                        <span class="token operator">+</span> <span class="token string">"redis.call('zadd', KEYS[2], ARGV[2], ARGV[5]); "</span>
+                    <span class="token operator">+</span> <span class="token string">"else "</span>
+                        <span class="token operator">+</span> <span class="token string">"redis.call('zrem', KEYS[2], ARGV[5]); "</span>
+                    <span class="token operator">+</span> <span class="token string">"end; "</span>
+                    <span class="token operator">+</span> <span class="token string">"if tonumber(ARGV[3]) > 0 then "</span>
+                        <span class="token operator">+</span> <span class="token string">"redis.call('zadd', KEYS[3], ARGV[3], ARGV[5]); "</span>
+                    <span class="token operator">+</span> <span class="token string">"else "</span>
+                        <span class="token operator">+</span> <span class="token string">"redis.call('zrem', KEYS[3], ARGV[5]); "</span>
+                    <span class="token operator">+</span> <span class="token string">"end; "</span>
+ 
+                    <span class="token comment">// last access time</span>
+                    <span class="token operator">+</span> <span class="token string">"local maxSize = tonumber(redis.call('hget', KEYS[8], 'max-size')); "</span> <span class="token operator">+</span>
+                    <span class="token string">"if maxSize ~= nil and maxSize ~= 0 then "</span> <span class="token operator">+</span>
+                    <span class="token string">"    local currentTime = tonumber(ARGV[1]); "</span> <span class="token operator">+</span>
+                    <span class="token string">"    local lastAccessTimeSetName = KEYS[6]; "</span> <span class="token operator">+</span>
+                    <span class="token string">"    redis.call('zadd', lastAccessTimeSetName, currentTime, ARGV[5]); "</span> <span class="token operator">+</span>
+                    <span class="token string">"    local cacheSize = tonumber(redis.call('hlen', KEYS[1])); "</span> <span class="token operator">+</span>
+                    <span class="token string">"    if cacheSize >= maxSize then "</span> <span class="token operator">+</span>
+                    <span class="token string">"        local lruItems = redis.call('zrange', lastAccessTimeSetName, 0, cacheSize - maxSize); "</span> <span class="token operator">+</span>
+                    <span class="token string">"        for index, lruItem in ipairs(lruItems) do "</span> <span class="token operator">+</span>
+                    <span class="token string">"            if lruItem then "</span> <span class="token operator">+</span>
+                    <span class="token string">"                local lruItemValue = redis.call('hget', KEYS[1], lruItem); "</span> <span class="token operator">+</span>
+                    <span class="token string">"                redis.call('hdel', KEYS[1], lruItem); "</span> <span class="token operator">+</span>
+                    <span class="token string">"                redis.call('zrem', KEYS[2], lruItem); "</span> <span class="token operator">+</span>
+                    <span class="token string">"                redis.call('zrem', KEYS[3], lruItem); "</span> <span class="token operator">+</span>
+                    <span class="token string">"                redis.call('zrem', lastAccessTimeSetName, lruItem); "</span> <span class="token operator">+</span>
+                    <span class="token string">"                local removedChannelName = KEYS[7]; "</span> <span class="token operator">+</span>
+                    <span class="token string">"                local msg = struct.pack('Lc0Lc0', string.len(lruItem), lruItem, string.len(lruItemValue), lruItemValue); "</span> <span class="token operator">+</span>
+                    <span class="token string">"                redis.call('publish', removedChannelName, msg); "</span> <span class="token operator">+</span>
+                    <span class="token string">"            end; "</span> <span class="token operator">+</span>
+                    <span class="token string">"        end; "</span> <span class="token operator">+</span>
+                    <span class="token string">"    end; "</span> <span class="token operator">+</span>
+                    <span class="token string">"end; "</span>
+ 
+                    <span class="token operator">+</span> <span class="token string">"local value = struct.pack('dLc0', ARGV[4], string.len(ARGV[6]), ARGV[6]); "</span>
+                    <span class="token operator">+</span> <span class="token string">"redis.call('hset', KEYS[1], ARGV[5], value); "</span>
+ 
+                    <span class="token operator">+</span> <span class="token string">"if insertable == true then "</span>
+                        <span class="token operator">+</span> <span class="token string">"local msg = struct.pack('Lc0Lc0', string.len(ARGV[5]), ARGV[5], string.len(ARGV[6]), ARGV[6]); "</span>
+                        <span class="token operator">+</span> <span class="token string">"redis.call('publish', KEYS[4], msg); "</span>
+                        <span class="token operator">+</span> <span class="token string">"return nil;"</span>
+                    <span class="token operator">+</span> <span class="token string">"end; "</span>
+ 
+                    <span class="token operator">+</span> <span class="token string">"local t, val = struct.unpack('dLc0', v); "</span>
+ 
+                    <span class="token operator">+</span> <span class="token string">"local msg = struct.pack('Lc0Lc0Lc0', string.len(ARGV[5]), ARGV[5], string.len(ARGV[6]), ARGV[6], string.len(val), val); "</span>
+                    <span class="token operator">+</span> <span class="token string">"redis.call('publish', KEYS[5], msg); "</span>
+ 
+                    <span class="token operator">+</span> <span class="token string">"return val"</span><span class="token punctuation">,</span>
+            <span class="token class-name">Arrays</span><span class="token punctuation">.</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span><span class="token function">asList</span><span class="token punctuation">(</span><span class="token function">getName</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getTimeoutSetNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getIdleSetNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getCreatedChannelNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token function">getUpdatedChannelNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getLastAccessTimeSetNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getRemovedChannelNameByKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">getOptionsName</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> ttlTimeout<span class="token punctuation">,</span> maxIdleTimeout<span class="token punctuation">,</span> maxIdleDelta<span class="token punctuation">,</span> <span class="token function">encodeMapKey</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">encodeMapValue</span><span class="token punctuation">(</span>value<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> future<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  为Map里面的每个Key单独设置ttl</p>
+<h2 id="2-2-问题lua脚本"><a href="#2-2-问题lua脚本" class="headerlink" title="(2.2) 问题lua脚本"></a>(2.2) 问题lua脚本</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h2 id="2-3-问题原因"><a href="#2-3-问题原因" class="headerlink" title="(2.3) 问题原因"></a>(2.3) 问题原因</h2><p>  redis的请求路径 redis client–&gt; VIP:PORT –&gt; 均摊到16个proxy机器 –&gt; 由于热点key落到的某一台redis机器<br>  由于请求在proxy堆积，导致所有的proxy的cpu都飙升了。</p>
+<p>  redis大量慢查询导致正常查询阻塞，交易系统-下单服务调用活动接口超时，导致下单失败；</p>
+<p>1.redis慢查询出现的原因？<br>  redission中的Map使用了复杂的lua脚本和redis进行交互，lua脚本很耗性能，这些key全部落在一个分片上，当请求量上升时，对这个分片的查询响应变慢。</p>
+<p>2.为什么慢查询会阻塞正常的请求？<br>  a. redis 响应变慢，导致活动服务启动了更多的连接，直到达到集群连接池上限64*200=12800，那么每个proxy的连接数很高，导致proxy的CPU满载；<br>  b. 每个proxy上均匀分布着慢请求，同时由于在proxy的每个连接的请求是有序的，所以当慢请求未响应时，后面的请求也无法响应。当时redis的慢请求响应耗时99%分位在200+ms以内，那么正常的请求也会由于proxy在等待慢请求响应而超时。<br>  c. 活动服务对于redis的连接配置按照默认设置，超时时间默认3秒，默认重试3次，接口无法快速失败</p>
+<p>3.正常请求超时后，为什么下单会失败？单量下降了66%？<br>  redis的默认超时时间是3秒，查询活动接口会判断这个商品是否是秒杀、新人、万人团、促销，一共会调用redis 4次只要有一个请求超时未返回，就会导致上游接口超时  </p>
+<p>问题总结：<br>  活动接口限流降级方案不够完善<br>  redis对故障分片预案不够完善：redis集群某个分片出现问题，导致集群所有proxy的连接请求升高，CPU升高<br>  下单对于活动查询是强依赖，无法降级<br>  修改redis的超时时间</p>
+<!--
+
+2021-02-26T09:00:00.787773+08:00 wujieactivity-kproxy-sf-20df4-0 wujieactivity-kproxy.proxy3000[733]: WARNING +slowlog client_address: 10.161.193.105, redis_address: 10.161.28.7:6000, total_cost: 208770, receive_from_redis: 208770, response_to_client: 0, cmd: "EVAL" "local value = redis.call('hget', KEYS[1], ARGV[2]); if value == false then return nil; end; local t, val = struct.unpack('dLc0',"... (817 more bytes) "5" "pc:goods_label:17" "redisson__timeout__set:{pc:goods_label:17}" "redisson__idle__set:{pc:goods_label:17}" "redisson__map_cache__last_access__set:{pc:goods_label:17}" "{pc:goods_label:17}:redisson_options" "1614301200479" "[\"java.lang.Long\",35642]", reply raw: "$301\r\n[\"java.util.ArrayList\",[{\"@class\":\"com.xiaoju.wujie.price.infrastructure.entity.activity.ActivityGoodsLabel\",\"activityType"... (181 more bytes)
+
+
+2021-02-26T09:00:00.811997+08:00 wujieactivity-kproxy-sf-20df4-0 wujieactivity-kproxy.proxy3000[733]: WARNING +slowlog client_address: 10.162.252.127, redis_address: 10.161.28.7:6000, total_cost: 209510, receive_from_redis: 209510, response_to_client: 0, cmd: "EVAL" "local value = redis.call('hget', KEYS[1], ARGV[2]); local expireDate = 92233720368547758; if value ~= false then     local maxSi"... (985 more bytes) "5" "pc:goods_label:17" "redissontimeoutset:{pc:goods_label:17}" "redissonidleset:{pc:goods_label:17}" "redissonmap_cachelast_access__set:{pc:goods_label:17}" "{pc:goods_label:17}:redisson_options" "1614301200411" "[\"java.lang.Long\",40424]", reply raw: ":1\r\n"
+
+84678 EVAL
+   8827 GET
+   5939 HLEN
+    249 SET
+    291 SETEX
+      6 STRLEN
+     10 TYPE
+
+
+[licen@wujieactivity-kproxy-sf-20df4-0 kedis-log]$ head -100000 wujieactivity-kproxy.proxy3000.log.2021022609|awk -F'client_address' '{print $2}'|awk -F',' '{print $1}'|sort|uniq -c|sort -nr
+   1066 : 10.161.13.166
+   1065 : 10.160.97.70
+   1063 : 10.161.72.130
+    983 : 10.161.89.64
+    982 : 10.161.179.139
+    962 : 10.160.130.29
+    901 : 10.160.209.87
+    887 : 10.162.237.212
+    820 : 10.162.228.106
+    820 : 10.161.95.139
+    820 : 10.161.74.161
+    819 : 10.195.5.18
+    818 : 10.161.193.105
+    817 : 10.162.240.213
+    806 : 10.162.252.214
+    789 : 10.162.54.119
+    738 : 10.161.175.134
+    738 : 10.160.69.65
+    737 : 10.161.173.76
+    735 : 10.162.236.16     
+
+  10点的
+      4 EVAL
+     93 GET
+     19 HLEN
+      3 QUIT
+      1 SETEX    
+-->
+
+<h1 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h1><h2 id="业务请求涨没涨，但是redis-proxy耗时怎么突然升高？"><a href="#业务请求涨没涨，但是redis-proxy耗时怎么突然升高？" class="headerlink" title="业务请求涨没涨，但是redis proxy耗时怎么突然升高？"></a>业务请求涨没涨，但是redis proxy耗时怎么突然升高？</h2><h2 id="proxy为啥cpu都飙高？为啥所有kproxy都有阻塞？"><a href="#proxy为啥cpu都飙高？为啥所有kproxy都有阻塞？" class="headerlink" title="proxy为啥cpu都飙高？为啥所有kproxy都有阻塞？"></a>proxy为啥cpu都飙高？为啥所有kproxy都有阻塞？</h2><p> lua只是跑在一个redis分片上</p>
+<h2 id="1个分片影响所有proxy-是否是有异常key"><a href="#1个分片影响所有proxy-是否是有异常key" class="headerlink" title="1个分片影响所有proxy 是否是有异常key"></a>1个分片影响所有proxy 是否是有异常key</h2><p>pc:fl_details:prod:17<br>pc:goods_label:17<br>这两个key在同一个redis分片吗</p>
+<p>不在一个slot里</p>
+<h2 id="没有操作但是9-04-redis-proxy的cpu利用率恢复了是什么原因"><a href="#没有操作但是9-04-redis-proxy的cpu利用率恢复了是什么原因" class="headerlink" title="没有操作但是9:04 redis proxy的cpu利用率恢复了是什么原因"></a>没有操作但是9:04 redis proxy的cpu利用率恢复了是什么原因</h2><p>慢查跟总的查询数比例是多少   大致是一个4/13比例</p>
+<p>pending是啥意思，阻塞了吗  是proxy上客户端的请求，但是redis还没有返回结果给proxy层<br>这种连接占了1400多，在故障的时候，是不是就没什么连接提供给正常的请求了</p>
+<p>从监控图看，当时总qps是130k，慢查总数量在5k</p>
+<p>redis这端统计P99耗时是200多ms</p>
+<p>client限制了连接数<br>客户端最大连接数理论支持12800的链接，200台机器，单台默认64<br>后端一共16个proxy，单个1500连接左右，超过你们12800了</p>
+<p>在8:30左右，总qps是130K，pending的请求是2.4k<br> <img src="/img/business/stability/20210226/redis-proxy-pending-monitor.png"></p>
+<p>proxy是请求堆积才引起的CPU利用率升高，根因还是有一个Redis分片上请求变慢，Redis变慢的原因是这个分片上有lua脚本访问热key，请求量比别的分片高<br>但是在proxy的CPU利用率升高后，一定也会影响proxy处理请求的耗时</p>
+<br>
+
+<h1 id="优化"><a href="#优化" class="headerlink" title="优化"></a>优化</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>xiaoju<span class="token punctuation">.</span>wujie<span class="token punctuation">.</span>price<span class="token punctuation">.</span>infrastructure<span class="token punctuation">.</span>config</span><span class="token punctuation">;</span>
+
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>redisson<span class="token punctuation">.</span></span><span class="token class-name">Redisson</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>redisson<span class="token punctuation">.</span>config<span class="token punctuation">.</span></span><span class="token class-name">Config</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>springframework<span class="token punctuation">.</span>beans<span class="token punctuation">.</span>factory<span class="token punctuation">.</span>annotation<span class="token punctuation">.</span></span><span class="token class-name">Value</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>springframework<span class="token punctuation">.</span>context<span class="token punctuation">.</span>annotation<span class="token punctuation">.</span></span><span class="token class-name">Bean</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>springframework<span class="token punctuation">.</span>context<span class="token punctuation">.</span>annotation<span class="token punctuation">.</span></span><span class="token class-name">Configuration</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>springframework<span class="token punctuation">.</span>scheduling<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span></span><span class="token class-name">ThreadPoolTaskExecutor</span><span class="token punctuation">;</span>
+
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span></span><span class="token class-name">ThreadPoolExecutor</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 
+ */</span>
+<span class="token annotation punctuation">@Configuration</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">RedissonConfig</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Value</span><span class="token punctuation">(</span><span class="token string">"$&#123;redis.url&#125;"</span><span class="token punctuation">)</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> redisUrl<span class="token punctuation">;</span>
+
+    <span class="token annotation punctuation">@Value</span><span class="token punctuation">(</span><span class="token string">"$&#123;redis.poolsize&#125;"</span><span class="token punctuation">)</span>
+    <span class="token keyword">private</span> <span class="token keyword">int</span> poolSize<span class="token punctuation">;</span>
+
+    <span class="token annotation punctuation">@Bean</span><span class="token punctuation">(</span>value <span class="token operator">=</span> <span class="token string">"redisson"</span><span class="token punctuation">)</span>
+    <span class="token keyword">public</span> <span class="token class-name">Redisson</span> <span class="token function">getRedisson</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Config</span> config <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Config</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Redisson</span> redisson <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            config<span class="token punctuation">.</span><span class="token function">useSingleServer</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">setAddress</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StringBuilder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span><span class="token string">"redis://"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span>redisUrl<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">setFailedAttempts</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span> <span class="token comment">// 设置失败重试次数</span>
+                    <span class="token punctuation">.</span><span class="token function">setConnectTimeout</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span> <span class="token comment">// 设置链接超时时间</span>
+                    <span class="token punctuation">.</span><span class="token function">setRetryAttempts</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token comment">// 设置重试次数 </span>
+                    <span class="token punctuation">.</span><span class="token function">setTimeout</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 设置超时时间</span>
+
+            redisson <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">Redisson</span><span class="token punctuation">)</span> <span class="token class-name">Redisson</span><span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>config<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span> redisson<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"getRedisson error &#123;&#125;"</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token annotation punctuation">@Bean</span>
+    <span class="token keyword">public</span> <span class="token class-name">ThreadPoolTaskExecutor</span> <span class="token function">redisCacheExecutor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">ThreadPoolTaskExecutor</span> executor <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ThreadPoolTaskExecutor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 设置核心线程数</span>
+        executor<span class="token punctuation">.</span><span class="token function">setCorePoolSize</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 设置最大线程数</span>
+        executor<span class="token punctuation">.</span><span class="token function">setMaxPoolSize</span><span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 设置队列容量</span>
+        executor<span class="token punctuation">.</span><span class="token function">setQueueCapacity</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 设置线程活跃时间（秒）</span>
+        executor<span class="token punctuation">.</span><span class="token function">setKeepAliveSeconds</span><span class="token punctuation">(</span><span class="token number">200</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 设置默认线程名称</span>
+        executor<span class="token punctuation">.</span><span class="token function">setThreadNamePrefix</span><span class="token punctuation">(</span><span class="token string">"RedissonPlus-"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 设置拒绝策略</span>
+        executor<span class="token punctuation">.</span><span class="token function">setRejectedExecutionHandler</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ThreadPoolExecutor<span class="token punctuation">.</span>AbortPolicy</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 等待所有任务结束后再关闭线程池</span>
+        executor<span class="token punctuation">.</span><span class="token function">setWaitForTasksToCompleteOnShutdown</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> executor<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/java/" rel="tag"># java</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2021/02/21/system-design-jd/" rel="prev" title="电商-京东 黄金流程 PC">
+                  <i class="fa fa-chevron-left"></i> 电商-京东 黄金流程 PC
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2021/04/18/domain-driven-design/" rel="next" title="DDD笔记">
+                  DDD笔记 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="redis命令不区分大小写 用 set 或 SET 都可以  但是 key value 是区分大小的 (1) 公共查看key个数 DBSIZE127.0.0.1:6379&gt; DBSIZE (integer) 5  是否存在key (EXISTS key)127.0.0.1:6379&gt; EXISTS key1 (integer) 1 127.0.0.1:6379&gt; 127.0.0.1:6379&gt;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis命令">
+<meta property="og:url" content="http://weikeqin.com/2020/05/24/redis-commands/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="redis命令不区分大小写 用 set 或 SET 都可以  但是 key value 是区分大小的 (1) 公共查看key个数 DBSIZE127.0.0.1:6379&gt; DBSIZE (integer) 5  是否存在key (EXISTS key)127.0.0.1:6379&gt; EXISTS key1 (integer) 1 127.0.0.1:6379&gt; 127.0.0.1:6379&gt;">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-05-24T14:48:05.000Z">
+<meta property="article:modified_time" content="2022-12-03T12:36:47.045Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/05/24/redis-commands/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/05/24/redis-commands/","path":"2020/05/24/redis-commands/","title":"Redis命令"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis命令 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%85%AC%E5%85%B1"><span class="nav-number">1.</span> <span class="nav-text">(1) 公共</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8Bkey%E4%B8%AA%E6%95%B0-DBSIZE"><span class="nav-number">1.1.</span> <span class="nav-text">查看key个数 DBSIZE</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%98%AF%E5%90%A6%E5%AD%98%E5%9C%A8key-EXISTS-key"><span class="nav-number">1.2.</span> <span class="nav-text">是否存在key (EXISTS key)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#key%E8%AE%BE%E7%BD%AE%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4"><span class="nav-number">1.3.</span> <span class="nav-text">key设置过期时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8Bkey%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4"><span class="nav-number">1.4.</span> <span class="nav-text">查看key过期时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E7%9C%8Bkey%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.5.</span> <span class="nav-text">查看key的类型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#key%E9%87%8D%E5%91%BD%E5%90%8D"><span class="nav-number">1.6.</span> <span class="nav-text">key重命名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#scan"><span class="nav-number">1.7.</span> <span class="nav-text">scan</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%AD%97%E7%AC%A6%E4%B8%B2-String"><span class="nav-number">2.</span> <span class="nav-text">(2) 字符串(String)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E9%94%AE%E5%80%BC%E5%AF%B9-SET-key-value"><span class="nav-number">2.1.</span> <span class="nav-text">设置键值对 (SET key value)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AEkey%E8%8E%B7%E5%8F%96value-Get-key"><span class="nav-number">2.2.</span> <span class="nav-text">根据key获取value (Get key)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E5%B8%A6%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4%E7%9A%84%E9%94%AE%E5%80%BC%E5%AF%B9-SET-key-value-EX-seconds"><span class="nav-number">2.3.</span> <span class="nav-text">设置带过期时间的键值对(SET key value EX seconds)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E4%B8%8D%E5%AD%98%E5%9C%A8%E5%B0%B1%E8%AE%BE%E7%BD%AE%E9%94%AE%E5%80%BC%E5%AF%B9-SET-key-value-NX"><span class="nav-number">2.4.</span> <span class="nav-text">如果不存在就设置键值对(SET key value NX)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E4%B8%8D%E5%AD%98%E5%9C%A8%E5%B0%B1%E8%AE%BE%E7%BD%AE%E9%94%AE%E5%80%BC%E5%AF%B9-SETNX-key-value"><span class="nav-number">2.5.</span> <span class="nav-text">如果不存在就设置键值对(SETNX key value)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E4%B8%8D%E5%AD%98%E5%9C%A8%E8%AE%BE%E7%BD%AE%E9%94%AE%E5%80%BC%E5%AF%B9%E5%B9%B6%E5%B8%A6%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4-SET-key-value-EX-seconds-NX"><span class="nav-number">2.6.</span> <span class="nav-text">如果不存在设置键值对并带过期时间(SET key value EX seconds NX)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E5%A4%9A%E4%B8%AA%E7%BB%99%E5%AE%9Akey%E7%9A%84value-MGET-key1-key2-%E2%80%A6"><span class="nav-number">2.7.</span> <span class="nav-text">获取多个给定key的value(MGET key1 key2 …)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AEkey%E5%80%BC%E4%B8%BAvalue%E5%B9%B6%E8%BF%94%E5%9B%9Ekey%E7%9A%84%E6%97%A7%E5%80%BC-GETSET"><span class="nav-number">2.8.</span> <span class="nav-text">设置key值为value并返回key的旧值(GETSET)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96key%E5%AF%B9%E5%BA%94%E5%80%BC%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E9%95%BF%E5%BA%A6-STRLEN"><span class="nav-number">2.9.</span> <span class="nav-text">获取key对应值的字符串的长度(STRLEN)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86key%E5%AF%B9%E5%BA%94value%E7%9A%84%E6%95%B0%E5%AD%97%E5%80%BC%E5%A2%9E%E5%8A%A0%E4%B8%80-INCR-key"><span class="nav-number">2.10.</span> <span class="nav-text">将key对应value的数字值增加一(INCR key)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86key%E5%AF%B9%E5%BA%94value%E7%9A%84%E6%95%B0%E5%AD%97%E5%80%BC%E5%A2%9E%E5%8A%A0n-INCRBY-key-n"><span class="nav-number">2.11.</span> <span class="nav-text">将key对应value的数字值增加n(INCRBY key n)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86key%E5%AF%B9%E5%BA%94value%E7%9A%84%E6%95%B0%E5%AD%97%E5%80%BC%E5%A2%9E%E5%87%8F%E4%B8%80-DECR-key"><span class="nav-number">2.12.</span> <span class="nav-text">将key对应value的数字值增减一(DECR key)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86key%E5%AF%B9%E5%BA%94value%E7%9A%84%E6%95%B0%E5%AD%97%E5%80%BC%E5%A2%9E%E5%87%8Fn-DECRBY-key-n"><span class="nav-number">2.13.</span> <span class="nav-text">将key对应value的数字值增减n(DECRBY key n)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#APPEND"><span class="nav-number">2.14.</span> <span class="nav-text">APPEND</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#List"><span class="nav-number">3.</span> <span class="nav-text">List</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Hash"><span class="nav-number">4.</span> <span class="nav-text">Hash</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Set"><span class="nav-number">5.</span> <span class="nav-text">Set</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Sorted-Set"><span class="nav-number">6.</span> <span class="nav-text">Sorted Set</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">7.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/24/redis-commands/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis命令 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis命令
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-05-24 22:48:05" itemprop="dateCreated datePublished" datetime="2020-05-24T22:48:05+08:00">2020-05-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-12-03 20:36:47" itemprop="dateModified" datetime="2022-12-03T20:36:47+08:00">2022-12-03</time>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  redis命令不区分大小写 用 set 或 SET 都可以<br>  但是 key value 是区分大小的</p>
+<h1 id="1-公共"><a href="#1-公共" class="headerlink" title="(1) 公共"></a>(1) 公共</h1><h2 id="查看key个数-DBSIZE"><a href="#查看key个数-DBSIZE" class="headerlink" title="查看key个数 DBSIZE"></a>查看key个数 DBSIZE</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DBSIZE
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">5</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h2 id="是否存在key-EXISTS-key"><a href="#是否存在key-EXISTS-key" class="headerlink" title="是否存在key (EXISTS key)"></a>是否存在key (EXISTS key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> EXISTS key1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> EXISTS key2
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">0</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  exists存在key返回1，不存在key返回0</p>
+<h2 id="key设置过期时间"><a href="#key设置过期时间" class="headerlink" title="key设置过期时间"></a>key设置过期时间</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> EXPIRE key1 <span class="token number">100</span>
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL key1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">96</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="查看key过期时间"><a href="#查看key过期时间" class="headerlink" title="查看key过期时间"></a>查看key过期时间</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL key1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">96</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h2 id="查看key的类型"><a href="#查看key的类型" class="headerlink" title="查看key的类型"></a>查看key的类型</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TYPE key1
+string
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TYPE key_num_list
+list
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="key重命名"><a href="#key重命名" class="headerlink" title="key重命名"></a>key重命名</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  RENAME key1 key2
+OK<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+
+<h2 id="scan"><a href="#scan" class="headerlink" title="scan"></a>scan</h2><p>  <a target="_blank" rel="noopener" href="https://redis.io/commands/scan/">https://redis.io/commands/scan/</a></p>
+<p><strong>查看key个数</strong></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DBSIZE
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">5</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p><strong>查看具体有哪些key</strong></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> KEYS <span class="token operator">*</span>
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key1"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"key_nx_1"</span>
+<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"key_nx"</span>
+<span class="token number">4</span><span class="token operator">)</span> <span class="token string">"key_num_list"</span>
+<span class="token number">5</span><span class="token operator">)</span> <span class="token string">"key2"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>通过游标扫描</strong></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SCAN <span class="token number">0</span> COUNT <span class="token number">2</span>
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"1"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key_nx"</span>
+   <span class="token number">2</span><span class="token operator">)</span> <span class="token string">"key2"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SCAN <span class="token number">1</span> COUNT <span class="token number">2</span>
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"5"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key1"</span>
+   <span class="token number">2</span><span class="token operator">)</span> <span class="token string">"key_nx_1"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SCAN <span class="token number">5</span> COUNT <span class="token number">2</span>
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"0"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key_num_list"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="2-字符串-String"><a href="#2-字符串-String" class="headerlink" title="(2) 字符串(String)"></a>(2) 字符串(String)</h1><h2 id="设置键值对-SET-key-value"><a href="#设置键值对-SET-key-value" class="headerlink" title="设置键值对 (SET key value)"></a>设置键值对 (SET key value)</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> set key1 value1
+OK<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h2 id="根据key获取value-Get-key"><a href="#根据key获取value-Get-key" class="headerlink" title="根据key获取value (Get key)"></a>根据key获取value (Get key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1
+<span class="token string">"value1"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1000
+<span class="token operator">(</span>nil<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  key存在返回对应value，key不存在返回nil</p>
+<h2 id="设置带过期时间的键值对-SET-key-value-EX-seconds"><a href="#设置带过期时间的键值对-SET-key-value-EX-seconds" class="headerlink" title="设置带过期时间的键值对(SET key value EX seconds)"></a>设置带过期时间的键值对(SET key value EX seconds)</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_ex value_ex EX <span class="token number">100</span>
+OK
+<span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL <span class="token function">key_ex</span>
+<span class="token punctuation">(</span>integer<span class="token punctuation">)</span> <span class="token number">93</span>
+<span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL <span class="token function">key_ex</span>
+<span class="token punctuation">(</span>integer<span class="token punctuation">)</span> <span class="token number">91</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="如果不存在就设置键值对-SET-key-value-NX"><a href="#如果不存在就设置键值对-SET-key-value-NX" class="headerlink" title="如果不存在就设置键值对(SET key value NX)"></a>如果不存在就设置键值对(SET key value NX)</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_nx_1 value_nx_1 NX
+OK
+<span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_nx_1 value_nx_1 <span class="token function">NX</span>
+<span class="token punctuation">(</span>nil<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  SET key value NX 成功的结果是<code>OK</code>，失败的结果是<code>nil</code></p>
+<h2 id="如果不存在就设置键值对-SETNX-key-value"><a href="#如果不存在就设置键值对-SETNX-key-value" class="headerlink" title="如果不存在就设置键值对(SETNX key value)"></a>如果不存在就设置键值对(SETNX key value)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SETNX key_nx value_nx
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SETNX key_nx value_nx
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">0</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  setnx key value 成功的结果是1，失败的结果是0</p>
+<h2 id="如果不存在设置键值对并带过期时间-SET-key-value-EX-seconds-NX"><a href="#如果不存在设置键值对并带过期时间-SET-key-value-EX-seconds-NX" class="headerlink" title="如果不存在设置键值对并带过期时间(SET key value EX seconds NX)"></a>如果不存在设置键值对并带过期时间(SET key value EX seconds NX)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key2 value2 EX <span class="token number">100</span> NX
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key2 value2 EX <span class="token number">100</span> NX
+<span class="token operator">(</span>nil<span class="token operator">)</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="获取多个给定key的value-MGET-key1-key2-…"><a href="#获取多个给定key的value-MGET-key1-key2-…" class="headerlink" title="获取多个给定key的value(MGET key1 key2 …)"></a>获取多个给定key的value(MGET key1 key2 …)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> MGET key1 key2
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"value1"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"value2"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> MGET key1 key2 key1000
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"value1"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"value2"</span>
+<span class="token number">3</span><span class="token operator">)</span> <span class="token operator">(</span>nil<span class="token operator">)</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> MGET key1 key1000 key2
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"value1"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token operator">(</span>nil<span class="token operator">)</span>
+<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"value2"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  key都存在时返回对应value，有key不存在时对应的value为nil</p>
+<h2 id="设置key值为value并返回key的旧值-GETSET"><a href="#设置key值为value并返回key的旧值-GETSET" class="headerlink" title="设置key值为value并返回key的旧值(GETSET)"></a>设置key值为value并返回key的旧值(GETSET)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GETSET key1 value_x
+<span class="token string">"value1"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="获取key对应值的字符串的长度-STRLEN"><a href="#获取key对应值的字符串的长度-STRLEN" class="headerlink" title="获取key对应值的字符串的长度(STRLEN)"></a>获取key对应值的字符串的长度(STRLEN)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> STRLEN key1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">6</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1
+<span class="token string">"value1"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> STRLEN key_num_1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">2</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key_num_1
+<span class="token string">"99"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p> key对应的value可以是字符串，也可以是数字</p>
+<h2 id="将key对应value的数字值增加一-INCR-key"><a href="#将key对应value的数字值增加一-INCR-key" class="headerlink" title="将key对应value的数字值增加一(INCR key)"></a>将key对应value的数字值增加一(INCR key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_1 <span class="token number">100</span>
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> INCR key_num_1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">101</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key_num_10
+<span class="token string">"99_age_20"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  INCR key_num_10
+<span class="token operator">(</span>error<span class="token operator">)</span> <span class="token level error important">ERR</span> value is not an integer or out of range
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  如果key对应的value不是数字类型，会报错</p>
+<h2 id="将key对应value的数字值增加n-INCRBY-key-n"><a href="#将key对应value的数字值增加n-INCRBY-key-n" class="headerlink" title="将key对应value的数字值增加n(INCRBY key n)"></a>将key对应value的数字值增加n(INCRBY key n)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_2 <span class="token number">100</span>
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> INCRBY key_num_2 <span class="token number">10</span>
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">110</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> INCRBY key_num_2 <span class="token operator">-</span><span class="token number">20</span>
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">90</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  n可以是正数，也可以是负数</p>
+<h2 id="将key对应value的数字值增减一-DECR-key"><a href="#将key对应value的数字值增减一-DECR-key" class="headerlink" title="将key对应value的数字值增减一(DECR key)"></a>将key对应value的数字值增减一(DECR key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_3 <span class="token number">100</span>
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DECR key_num_3
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">99</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="将key对应value的数字值增减n-DECRBY-key-n"><a href="#将key对应value的数字值增减n-DECRBY-key-n" class="headerlink" title="将key对应value的数字值增减n(DECRBY key n)"></a>将key对应value的数字值增减n(DECRBY key n)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_4 <span class="token number">100</span>
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DECRBY key_num_4 <span class="token number">10</span>
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">90</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="APPEND"><a href="#APPEND" class="headerlink" title="APPEND"></a>APPEND</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  GET key1
+<span class="token string">"value1"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> APPEND key1 age<span class="token operator">:</span><span class="token number">20</span>
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">12</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1
+<span class="token string">"value1age:20"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  APPEND key_num_1 _age_20
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">9</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key_num_1
+<span class="token string">"99_age_20"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="List"><a href="#List" class="headerlink" title="List"></a>List</h1><h1 id="Hash"><a href="#Hash" class="headerlink" title="Hash"></a>Hash</h1><h1 id="Set"><a href="#Set" class="headerlink" title="Set"></a>Set</h1><h1 id="Sorted-Set"><a href="#Sorted-Set" class="headerlink" title="Sorted Set"></a>Sorted Set</h1><h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://www.runoob.com/redis/redis-commands.html">redis命令</a><br>[2] <a target="_blank" rel="noopener" href="https://redis.io/commands/">redis.io/commands</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/05/16/elasticsearch-setup/" rel="prev" title="elasticsearch配置">
+                  <i class="fa fa-chevron-left"></i> elasticsearch配置
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/05/25/redis-data-types/" rel="next" title="redis数据类型">
+                  redis数据类型 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

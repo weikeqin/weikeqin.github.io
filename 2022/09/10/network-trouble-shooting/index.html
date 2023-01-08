@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="在遇到服务网络超时时，一般会通过 监控平台、Metric、Trace、ErrorLog来观察系统状态；   可能会看到不少可疑现象，比如：监控上延迟变高、错误数变多、日志里耗时变长、线程Block、GC频率变高、CPU抖动较严重等等，   那么在这些现象中，哪些是表象，哪些是诱因，哪个是根本原因呢？如果不能定位根本原因，而是聚焦于某个表象进行优化，优化后往往发现效果并不明显；   在走过一些解">
+<meta property="og:type" content="article">
+<meta property="og:title" content="网络问题排查">
+<meta property="og:url" content="http://weikeqin.com/2022/09/10/network-trouble-shooting/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在遇到服务网络超时时，一般会通过 监控平台、Metric、Trace、ErrorLog来观察系统状态；   可能会看到不少可疑现象，比如：监控上延迟变高、错误数变多、日志里耗时变长、线程Block、GC频率变高、CPU抖动较严重等等，   那么在这些现象中，哪些是表象，哪些是诱因，哪个是根本原因呢？如果不能定位根本原因，而是聚焦于某个表象进行优化，优化后往往发现效果并不明显；   在走过一些解">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20221120/network-call-link.jpg">
+<meta property="og:image" content="http://weikeqin.com/img/linux/network/dns/domain-name-system.jpg">
+<meta property="og:image" content="http://weikeqin.com/img/linux/network/lvs/lvs-model.png">
+<meta property="og:image" content="http://weikeqin.com/img/linux/network/lvs/lvs-fullnat.png">
+<meta property="og:image" content="http://weikeqin.com/img/linux/network/linux-network-packet-sending-process.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210205/trade-dltag.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210205/order-log.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210205/open-city-log_request_out.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20221120/trade-call-risk-socket-timeout.jpg">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20221120/trade-call-risk-socket-timeout.jpg">
+<meta property="article:published_time" content="2022-09-10T12:43:02.000Z">
+<meta property="article:modified_time" content="2023-01-08T15:06:39.950Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="network">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/business/stability/20221120/network-call-link.jpg">
+
+
+<link rel="canonical" href="http://weikeqin.com/2022/09/10/network-trouble-shooting/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2022/09/10/network-trouble-shooting/","path":"2022/09/10/network-trouble-shooting/","title":"网络问题排查"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>网络问题排查 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E8%B0%83%E7%94%A8%E9%93%BE%E8%B7%AF%E5%88%86%E6%9E%90"><span class="nav-number">1.</span> <span class="nav-text">(1) 调用链路分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E5%9F%9F%E5%90%8D%E8%A7%A3%E6%9E%90"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 域名解析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E7%BD%91%E5%85%B3"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 网关</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E8%BD%AC%E5%8F%91%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.2.1.</span> <span class="nav-text">(1.2.1) 转发模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-FULLNAT%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.2.2.</span> <span class="nav-text">(1.2.2) FULLNAT模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-3-%E5%9B%9B%E5%B1%82%E8%B4%9F%E8%BD%BD%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">1.2.3.</span> <span class="nav-text">(1.2.3) 四层负载的原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-4-GW%E9%83%A8%E7%BD%B2"><span class="nav-number">1.2.4.</span> <span class="nav-text">(1.2.4) GW部署</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E6%A8%A1%E5%9D%97%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">(2) 模块分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Linux%E7%BD%91%E7%BB%9C%E5%8F%91%E5%8C%85%E6%B5%81%E7%A8%8B"><span class="nav-number">2.1.</span> <span class="nav-text">Linux网络发包流程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-TCP%E4%B8%AD%E5%8C%85%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) TCP中包类型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%9C%BA%E6%88%BF%E8%B7%AF%E7%94%B1%E4%BC%98%E5%8C%96%E5%88%87%E6%B5%81-%E5%AF%BC%E8%87%B4%E7%9A%84%E7%BD%91%E7%BB%9C%E9%97%AE%E9%A2%98"><span class="nav-number">3.</span> <span class="nav-text">(3) 机房路由优化切流-导致的网络问题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%9D%E8%80%83"><span class="nav-number">3.1.</span> <span class="nav-text">思考</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%AC%E5%9C%B0%E6%A8%A1%E6%8B%9F"><span class="nav-number">3.1.1.</span> <span class="nav-text">本地模拟</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6%E6%A1%88%E4%BE%8B-%E7%BD%91%E5%85%B3%E8%B0%83%E6%94%AF%E4%BB%98%E6%9C%8D%E5%8A%A1%E4%BA%8C%E6%AC%A1%E6%94%AF%E4%BB%98%E6%8E%A5%E5%8F%A3%E8%B6%85%E6%97%B6"><span class="nav-number">4.</span> <span class="nav-text">(4) 网络超时案例-网关调支付服务二次支付接口超时</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">4.1.</span> <span class="nav-text">时间线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90%E8%BF%87%E7%A8%8B"><span class="nav-number">4.2.</span> <span class="nav-text">问题分析过程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6%E6%A1%88%E4%BE%8B-%E4%B8%8B%E5%8D%95%E8%B0%83%E8%87%AA%E6%8F%90%E7%82%B9%E6%9C%8D%E5%8A%A1%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6"><span class="nav-number">5.</span> <span class="nav-text">(5) 网络超时案例-下单调自提点服务网络超时</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) 时间线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90%E8%BF%87%E7%A8%8B"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) 问题分析过程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%BC%82%E5%B8%B8%E5%9C%BA%E6%99%AF%E4%B8%8BhttpClientPool%E9%85%8D%E7%BD%AE%E5%AF%BC%E8%87%B4%E7%9A%84%E8%B6%85%E6%97%B6%E9%97%AE%E9%A2%98"><span class="nav-number">6.</span> <span class="nav-text">(6) 异常场景下httpClientPool配置导致的超时问题</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E4%BA%A4%E6%8D%A2%E6%9C%BA%E9%97%AE%E9%A2%98%E5%AF%BC%E8%87%B4%E7%9A%84%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6%E9%97%AE%E9%A2%98"><span class="nav-number">7.</span> <span class="nav-text">(7) 交换机问题导致的网络超时问题</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#8-%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6%E6%A1%88%E4%BE%8B-%E5%BC%B9%E6%80%A7%E4%BA%91%E5%AE%B9%E5%99%A8%E7%AB%9E%E4%BA%89%E8%B5%84%E6%BA%90%E5%BC%82%E5%B8%B8%E5%AF%BC%E8%87%B4%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6%E9%97%AE%E9%A2%98"><span class="nav-number">8.</span> <span class="nav-text">(8) 网络超时案例-弹性云容器竞争资源异常导致网络超时问题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#8-1-%E4%B8%8B%E5%8D%95%E8%B0%83%E9%A3%8E%E6%8E%A7%E7%BD%91%E7%BB%9C%E8%B6%85%E6%97%B6%E9%97%AE%E9%A2%98-%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">8.1.</span> <span class="nav-text">(8.1) 下单调风控网络超时问题-时间线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-2-%E5%88%86%E6%9E%90%E6%8E%92%E6%9F%A5%E8%BF%87%E7%A8%8B"><span class="nav-number">8.2.</span> <span class="nav-text">(8.2) 分析排查过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-1-%E9%97%AE%E9%A2%98%E5%87%BA%E7%8E%B0"><span class="nav-number">8.2.1.</span> <span class="nav-text">(8.2.1) 问题出现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-2-%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5"><span class="nav-number">8.2.2.</span> <span class="nav-text">(8.2.2) 问题排查</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-3-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90-%E6%80%80%E7%96%91%E6%98%AFweb%E5%AE%B9%E5%99%A8%E7%BA%BF%E7%A8%8B%E6%8E%92%E9%98%9F%E8%80%97%E6%97%B6"><span class="nav-number">8.2.3.</span> <span class="nav-text">(8.2.3) 问题分析-怀疑是web容器线程排队耗时</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-4-%E5%BC%80%E5%90%AFweb%E5%AE%B9%E5%99%A8%E6%97%A5%E5%BF%97-%E6%8E%92%E9%99%A4web%E5%AE%B9%E5%99%A8%E8%80%97%E6%97%B6"><span class="nav-number">8.2.4.</span> <span class="nav-text">(8.2.4) 开启web容器日志-排除web容器耗时</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-2-5-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90-%E6%80%80%E7%96%91%E6%9C%BA%E5%99%A8%E6%97%B6%E9%97%B4%E4%B8%8D%E5%90%8C%E6%AD%A5"><span class="nav-number">8.3.</span> <span class="nav-text">(8.2.5) 问题分析-怀疑机器时间不同步</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E6%AF%94%E4%B8%A4%E5%8F%B0%E5%AE%B9%E5%99%A8%E6%97%B6%E9%97%B4"><span class="nav-number">8.3.1.</span> <span class="nav-text">对比两台容器时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%A7%E7%BB%AD%E5%88%86%E6%9E%90"><span class="nav-number">8.3.2.</span> <span class="nav-text">继续分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8B%E5%8D%95%E4%BD%BF%E7%94%A8vip%EF%BC%8C%E9%80%9A%E8%BF%87%E6%8E%92%E9%99%A4%E6%B3%95%E5%8E%BB%E5%AE%9A%E4%BD%8D"><span class="nav-number">8.3.3.</span> <span class="nav-text">下单使用vip，通过排除法去定位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E6%AF%94vip%E5%92%8C%E6%9C%8D%E5%8A%A1%E5%8F%91%E7%8E%B0ip%E7%9B%B4%E8%BF%9E"><span class="nav-number">8.3.4.</span> <span class="nav-text">对比vip和服务发现ip直连</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%91%E7%8E%B0%E5%AD%98%E5%9C%A8%E8%81%9A%E9%9B%86%E6%80%A7"><span class="nav-number">8.3.5.</span> <span class="nav-text">发现存在聚集性</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">9.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/09/10/network-trouble-shooting/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="网络问题排查 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          网络问题排查
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-09-10 20:43:02" itemprop="dateCreated datePublished" datetime="2022-09-10T20:43:02+08:00">2022-09-10</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-08 23:06:39" itemprop="dateModified" datetime="2023-01-08T23:06:39+08:00">2023-01-08</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>7.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>7 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  在遇到服务网络超时时，一般会通过 监控平台、Metric、Trace、ErrorLog来观察系统状态；</p>
+<p>  可能会看到不少可疑现象，比如：监控上延迟变高、错误数变多、日志里耗时变长、线程Block、GC频率变高、CPU抖动较严重等等，</p>
+<p>  那么在这些现象中，哪些是表象，哪些是诱因，哪个是根本原因呢？如果不能定位根本原因，而是聚焦于某个表象进行优化，优化后往往发现效果并不明显；</p>
+<p>  在走过一些解决网络问题的弯路后，本系列的文章会尝试总结在面对网络问题时，我们需要哪些思考问题的思维方法与分析定位问题的视角；</p>
+<p>  但是实际排查时，难度会比较大。因为网络可能会涉及<code>前端</code>、<code>域名解析</code>、<code>网关</code>、<code>负载均衡</code>、<code>业务服务</code>等。</p>
+<p>  在分布式场景下，针对网络问题，一般会先着手分析网络链路，通过分析链路的阻塞情况与耗时分布，从而定位到某个模块、某些模块交互间的问题；然后在模块内部依据资源使用情况进行技术方案等方面的调整。因此网络问题的分析阶段分为链路分析与模块分析这两个阶段：(1) 链路分析； (2) 模块分析；</p>
+<br>
+
+
+<h1 id="1-调用链路分析"><a href="#1-调用链路分析" class="headerlink" title="(1) 调用链路分析"></a>(1) 调用链路分析</h1><p>  微信小程序/web/Android/IOS  -&gt;  域名解析  -&gt;  网关  -&gt;  路由 -&gt; 服务 -&gt; 存储</p>
+<p>  <img src="/img/business/stability/20221120/network-call-link.jpg" alt="调用链路"></p>
+<span id="more"></span>
+
+<p>　实际的调用链路会比这个更详细、更复杂一些，实际的调用链路大概如下:</p>
+<p><code>前端</code> -&gt; <code>域名解析</code> -&gt; <code>外网网关</code> -&gt; <code>机房</code> -&gt; <code>内网网关</code> -&gt; <code>负载均衡</code> -&gt; <code>服务发现</code> -&gt; <code>docker容器</code> -&gt; <code>side-car</code> -&gt; <code>业务网关</code>、<code>业务服务web容器</code>、<code>业务服务</code></p>
+<br>
+
+<h2 id="1-1-域名解析"><a href="#1-1-域名解析" class="headerlink" title="(1.1) 域名解析"></a>(1.1) 域名解析</h2><p>  域名解析(Domain Name System)是把<code>域名</code>解析成<code>IP地址</code>，让人们通过域名即可访问到您网站的一种服务。<br>  比如把 <code>weikeqin.com</code> 解析成 <code>76.76.21.21</code></p>
+<p>  域名的解析工作由DNS服务器完成。解析流程如下<br>  <img src="/img/linux/network/dns/domain-name-system.jpg" alt="域名解析流程"></p>
+<p>  DNS缺点：在做出调度策略改变以后，由于DNS各级节点的缓存并不会及时的在客户端生效</p>
+<br>
+
+<h2 id="1-2-网关"><a href="#1-2-网关" class="headerlink" title="(1.2) 网关"></a>(1.2) 网关</h2><p>  GW 全称Gateway。是一套实现四层网络（tcp udp）统一接入的集群，支持自动负载均衡的系统。GW具有可靠性高，扩展性强，性能高，抗攻击等特点。</p>
+<p>  四层负载均衡通过LVS(Linux virtual server)和Nginx组成的。</p>
+<h3 id="1-2-1-转发模式"><a href="#1-2-1-转发模式" class="headerlink" title="(1.2.1) 转发模式"></a>(1.2.1) 转发模式</h3><p>  四层负载均衡做的主要工作是转发，那就存在一个转发模式的问题，目前主要有四种转发模式：DR模式、NAT模式、TUNNEL模式、FULLNAT模式。<br>  <img src="/img/linux/network/lvs/lvs-model.png" alt="转发模式"></p>
+<h3 id="1-2-2-FULLNAT模式"><a href="#1-2-2-FULLNAT模式" class="headerlink" title="(1.2.2) FULLNAT模式"></a>(1.2.2) FULLNAT模式</h3><p>  FULLNAT模式是在NAT模式的基础上做一次源地址转换（即SNAT），做SNAT的好处是可以让应答流量经过正常的三层路由回到负载均衡上，这样负载均衡就不需要以网关的形式存在于网络中了，对网络环境要求比较低，缺点是由于做了SNAT，应用服务器会丢失客户端的真实IP地址。<br>  <img src="/img/linux/network/lvs/lvs-fullnat.png" alt="FULLNAT模式"></p>
+<h3 id="1-2-3-四层负载的原理"><a href="#1-2-3-四层负载的原理" class="headerlink" title="(1.2.3) 四层负载的原理"></a>(1.2.3) 四层负载的原理</h3><p>  四层负载的原理是替换client的数据包的IP包头和tcp+udp包头内容后把数据包转发给rs，gw不和rs建立链接，真实的tcp udp链接协商还是client↔server</p>
+<p>  四元组是：源IP地址、源端口、目的IP地址、目的端口<br>  五元组是：源IP地址、源端口、协议号、目的IP地址、目的端口<br>  七元组是：源IP地址、源端口、协议号、目的IP地址、目的端口、服务类型、接口索引</p>
+<h3 id="1-2-4-GW部署"><a href="#1-2-4-GW部署" class="headerlink" title="(1.2.4) GW部署"></a>(1.2.4) GW部署</h3><p>  1.在同机房按照公网出口不同分别对每个出口部署公网GW，提供公网vip使用。<br>  2.每个机房一套内网GW，原则上本机房内的服务器使用本机房的内网gw，内网gw不分业务，所有使用vip的业务都是同一套gw集群。</p>
+<br>
+
+
+<h1 id="2-模块分析"><a href="#2-模块分析" class="headerlink" title="(2) 模块分析"></a>(2) 模块分析</h1><h2 id="Linux网络发包流程"><a href="#Linux网络发包流程" class="headerlink" title="Linux网络发包流程"></a>Linux网络发包流程</h2><p>  <img src="/img/linux/network/linux-network-packet-sending-process.png" alt="发包流程"><br>1、业务服务调用send()方法发送数据。<br>2、调用send()方法后从用户态切到内核态，用户数据被拷贝到内核态<br>3、然后经过协议栈处理，这里对应tcp协议。<br>4、协议栈处理后进入到了环形队列RingBuffer中。<br>5、随后网卡驱动真正将数据发送了出去。<br>6、数据发送完成的时候，通过硬中断来通知CPU。<br>7、然后清理 RingBuffer。</p>
+<h2 id="2-2-TCP中包类型"><a href="#2-2-TCP中包类型" class="headerlink" title="(2.2) TCP中包类型"></a>(2.2) TCP中包类型</h2><p>  <img src=""></p>
+<!--
+除了比较熟悉的ACK、SYN、FIN包外，另外简单介绍一下RST包，因为后面分析Case时用的比较多
+-->
+
+<h1 id="3-机房路由优化切流-导致的网络问题"><a href="#3-机房路由优化切流-导致的网络问题" class="headerlink" title="(3) 机房路由优化切流-导致的网络问题"></a>(3) 机房路由优化切流-导致的网络问题</h1><!--
+各位同事：
+
+系统部将于2021-01-21 00:00:00 至 2021-01-21 06:00:00 实施变更。
+【变更描述】:番禺机房对路由进行优化，操作对业务理论无影响，有异常及时反馈，
+ 操作涉及物理机网段：10.86.18.0/25、10.86.21.0/25、10.86.26.0/25、10.86.39.0/25、10.86.41.0/25、10.86.42.0/25、10.86.44.0/25、10.86.47.0/25、10.86.50.0/25、10.86.52.0/25、10.86.58.0/25、10.86.62.0/25、10.86.63.0/25、10.86.70.0/25、10.86.77.0/25、10.86.87.0/25、10.86.93.0/25、10.86.96.0/25、10.86.97.0/25、10.86.99.0/25、10.86.103.0/25、10.86.104.0/25、10.86.107.0/25、10.86.108.0/25、10.86.109.0/25、10.86.111.0/25、10.86.116.0/25、10.86.123.0/25、10.86.124.0/25、10.86.132.0/25、10.86.136.0/25、10.86.137.0/25、10.86.159.0/25，容器网段：10.160.8.0/22、10.160.20.0/22、10.160.40.0/22、10.160.92.0/22、10.160.100.0/22、10.160.104.0/22、10.160.112.0/22、10.160.124.0/22、10.160.136.0/22、10.160.144.0/22、10.160.168.0/22、10.160.184.0/22、10.160.188.0/22、10.160.216.0/22、10.160.244.0/22、10.161.28.0/22、10.161.52.0/22、10.161.64.0/22、10.161.68.0/22、10.161.76.0/22、10.161.92.0/22、10.161.96.0/22、10.161.108.0/22、10.161.112.0/22、10.161.116.0/22、10.161.124.0/22、10.161.144.0/22、10.161.172.0/22、10.161.176.0/22、10.161.208.0/22、10.161.224.0/22、10.161.228.0/22、10.162.60.0/22
+【变更原因】:路由优化
+【业务影响描述】:理论对业务无影响，有异常及时反馈；
+请各运维接口人通知相关同事做好准备和业务的恢复确认工作。
+系统部提供7*24小时技术支持，如有问题请拨打:010-83456260（系统），010-83456261（网络）。
+STAR-工单系统
+2021-01-20
+-->
+
+<p>2021-01-21 00:25  线上报警<br>2021-01-21 00:27  用户中心两个应用都出现了接口抖动，error日志显示数据库连接超时<br>2021-01-21 00:28  xms全面无法登录，系统无法作业 </p>
+<p>2021-01-21 00:32  操作维护理论业务是无感知的<br>2021-01-21 00:33  仓配中台的刚才各接口抖了一下，现在都恢复正常了<br>2021-01-21 00:36  业务影响描述 在流量切换时间前，client访问内网gw-vip（10.85.128.*）已经建立的tcp会话（例如：长链接业务），需要client端断开重新建立一次tcp会话，否则gw会将此流量丢弃。流量切换后新建的tcp连接不会有影响。<br>2021-01-21 00:36  商品中台17分左右有接口抖动，最大毛刺2000ms，影响时间1分钟。<br>mms刚好在发版，但没有发布的机器也有大的毛刺，其他发版时间毛刺正常</p>
+<p>这个操作是有损的 需要client重连<br>2021-01-21 00:40  是的，发现17分左右有很多次异常请求Broken pipe，且proc_time&gt;2000ms</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">org.springframework.dao.InvalidDataAccessApiUsageException:</span> Unable to send command<span class="token operator">!</span> Try to increase <span class="token string">'nettyThreads'</span> and<span class="token operator">/</span>or connection pool size settings xxx after <span class="token number">3</span> retry attempts<span class="token operator">;</span>
+    <span class="token property">nested exception is org.redisson.client.RedisTimeoutException:</span> Unable to send command<span class="token operator">!</span> Try to increase <span class="token string">'nettyThreads'</span> and<span class="token operator">/</span>or connection pool size settings xxx after <span class="token number">3</span> retry attempts<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<!--
+机器信息：wj-ofc-wahouse-net-sf-2af30-14.docker.py/10.160.132.173, 请求的地址：http://10.85.128.89:8000/ofc/api/warehouse/queryByPos, 异常信息：
+org.springframework.dao.InvalidDataAccessApiUsageException: Unable to send command! Try to increase 'nettyThreads' and/or connection pool size settings Node source: NodeSource [slot=0, addr=null, redisClient=null, redirect=null, entry=MasterSlaveEntry [masterEntry=[freeSubscribeConnectionsAmount=0, freeSubscribeConnectionsCounter=value:49:queue:0, freeConnectionsAmount=20, freeConnectionsCounter=value:51:queue:0, freezed=false, freezeReason=null, client=[addr=redis://10.85.129.23:3790], nodeType=MASTER, firstFail=0]]], connection: RedisConnection@2052158157 [redisClient=[addr=redis://10.85.129.23:3790], channel=[id: 0xec900ccc, L:/10.160.132.173:44738 - R:10.85.129.23/10.85.129.23:3790], currentCommand=CommandData [promise=RedissonPromise [promise=ImmediateEventExecutor$ImmediatePromise@8f26819(failure: java.util.concurrent.CancellationException)], command=(GET), params=[[108, 101, 97, 100, 101, 114, 95, 119, 97, 114, ...]], codec=org.redisson.client.codec.ByteArrayCodec]], command: (GET), params: [[103, 101, 111, 95, 102, 101, 110, 99, 101, 95, ...]] after 3 retry attempts;
+    nested exception is org.redisson.client.RedisTimeoutException: Unable to send command! Try to increase 'nettyThreads' and/or connection pool size settings Node source: NodeSource [slot=0, addr=null, redisClient=null, redirect=null, entry=MasterSlaveEntry [masterEntry=[freeSubscribeConnectionsAmount=0, freeSubscribeConnectionsCounter=value:49:queue:0, freeConnectionsAmount=20, freeConnectionsCounter=value:51:queue:0, freezed=false, freezeReason=null, client=[addr=redis://10.85.129.23:3790], nodeType=MASTER, firstFail=0]]], connection: RedisConnection@2052158157 [redisClient=[addr=redis://10.85.129.23:3790], channel=[id: 0xec900ccc, L:/10.160.132.173:44738 - R:10.85.129.23/10.85.129.23:3790], currentCommand=CommandData [promise=RedissonPromise [promise=ImmediateEventExecutor$ImmediatePromise@8f26819(failure: java.util.concurrent.CancellationException)], command=(GET), params=[[108, 101, 97, 100, 101, 114, 95, 119, 97, 114, ...]], codec=org.redisson.client.codec.ByteArrayCodec]], command: (GET), params: [[103, 101, 111, 95, 102, 101, 110, 99, 101, 95, ...]] after 3 retry attempts
+-->
+
+<p>2021-01-21 00:41  redis也连接不上<br>2021-01-21 00:41  redis前面也有proxy也过负载均衡设备。。。所以也会受影响<br>2021-01-21 00:48  刚刚和网络部同事沟通了下，这个操作会影响所有通过inrouter，弹性云vip及redis(通过vip暴露) ，如果db也用vip暴露，也会导致之前已有的tcp链接断开重新连接</p>
+<p>业务影响描述 在流量切换时间前，client访问番禺内网gw-vip（10.85.128.*）已经建立的tcp会话（例如：长链接业务），需要client端断开重新建立一次tcp会话，否则gw会将此流量丢弃。流量切换后新建的tcp连接不会有影响。</p>
+<p> 否则gw会将此流量丢弃，需要client端断开重新建立一次tcp会话 </p>
+<p> 这个可能和底层库有关，看能否及时感知到链接断开了<br> 现在应该是超时触发的重连</p>
+<p> 已经建立的连接要等超时重连了，并且有连接池的话可能还会重试到其他废弃连接上。所以有超时抖动吧 </p>
+<p>2021-01-21 01:17 看获取商品详情影响了7.5分钟，可能要优化下<br>仓库高峰期</p>
+<p>2021-01-21 02:24 负载均衡应该是能平滑切换的吧，长链接没办法，应该不影响短链接吧<br>2021-01-21 02:29 都影响    短链接你超时重试   也会新建立tcp连接<br> 这个就是做不到无损切换，才在低峰期操作<br> 长链接好多 超时重试都是业务层面的，不新建立tcp 连接，影响大</p>
+<p>2021-01-21 02:38 切流<br>2021-01-21 02:45 数据库抖了一下<br>2021-01-21 02:45 Redis连接超时<br>2021-01-21 02:47 tms服务链接超时 两次报警</p>
+<p>2021-01-21 03:01 今天的操作都完事了，辛苦大家。<br>不够后续还是希望业务配合下增加一下client访问vip超时 ，重新建立tcp连接的能力，我们vip 这块做不到无损，变更肯定都是凌晨，提前告知，但是设备故障也会产生同样的影响，这个时间无法预知。</p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><h3 id="本地模拟"><a href="#本地模拟" class="headerlink" title="本地模拟"></a>本地模拟</h3><p>在tcp连接出问题之后，watchdog发现连接无效之后，然后打印了一个警告日志之后，就没法有自动重连了，导致继续使用该连接的时候出问题<br><a target="_blank" rel="noopener" href="https://blog.csdn.net/sinat_32023305/article/details/108704328">Redis升降配后Redisson出错：Unable to send command!</a></p>
+<p>其他人也发现了这个问题，在github上提了issues，在 <a target="_blank" rel="noopener" href="https://github.com/redisson/redisson/commit/44ea59f9f60ee0d2f586de7b0a5750c74783a33a">Fixed - connection is not reconnected #1811</a> 中解决了这个问题</p>
+<p><a target="_blank" rel="noopener" href="https://blog.51cto.com/u_15064627/4349919?articleABtest=0">redisson分布式锁：Redis分布式锁报错，Redisson出错：Unable to send command!</a></p>
+<!--
+各位同事：
+
+系统部将于2021-01-27 02:00:00 至 2021-01-27 05:00:00 实施变更。
+
+【变更描述】:番禺内网dgw集群服务器网卡升级
+
+【变更原因】:优化网络丢包问题
+
+【业务影响描述】:业务影响描述: 变更过程中，在流量切换操作时间点前，client访问番禺内网dgw-vip（10.85.128/129.*）已经建立的tcp会话（例如：长链接业务），需要client端断开重新建立一次tcp会话，否则dgw会将此流量丢弃。流量切换点后新建的tcp连接不会有影响。
+
+请各运维接口人通知相关同事做好准备和业务的恢复确认工作。
+
+系统部提供7*24小时技术支持，如有问题请拨打:010-83456260（系统），010-83456261（网络）。
+
+
+第一次切换时间大家看，第二次切换一般在第一次切换2小时吧。
+切走抖一下，切回抖一下。
+27号1点到3点操作，其中1点切一次流量，3点切一次流量。
+
+2021-01-27 00:30  内网dgw集群服务器网卡升级，切流开始
+2021-01-27 00:36  毛刺了一下 恢复了
+2021-01-27 01:50  准备回切流量
+2021-01-27 01:51  操作完了
+-->
+
+<!--
+2021-02-01 15:42
+
+【预案演练通告】
+【内容】hnc机房联通运营商外网故障
+【操作】cmdb平台执行预案切换操作
+【操作人】方秋结
+【double check】@魏俊杰 Junjie Wei
+【时间】15:45 
+【影响】理论上无影响，如果切换后出现故障，立即回滚
+-->
+
+
+<!--
+各位同事：
+
+系统部将于2021-02-05 00:00:00 至 2021-02-05 04:00:00 实施变更。（具体流量切换时间暂定 01:00）
+
+【变更描述】:番禺内网dgw集群扩容2台服务器
+
+【变更原因】:番禺内网dgw集群扩容
+
+【业务影响描述】:业务影响描述 在流量切换时间前，client访问番禺内网dgw-vip（10.85.128.*）已经建立的tcp会话（例如：长链接业务），需要client端断开重新建立一次tcp会话，否则dgw会将此流量丢弃。流量切换后新建的tcp连接不会有影响。
+
+请各运维接口人通知相关同事做好准备和业务的恢复确认工作。
+
+系统部提供7*24小时技术支持，如有问题请拨打:010-83456260（系统），010-83456261（网络）。
+
+2021-02-05 01:05 切流
+2021-02-05 01:11 已经完成，切流时间 1:05   +1:11
+
+-->
+
+
+
+<!--
+各位同事：
+
+系统部将于2021-03-11 01:00:00 至 2021-03-11 01:30:00 实施变更。
+
+【变更描述】:更换dgw集群交换机网络模块
+
+【变更原因】:观察dgw-vip切流操作对橙心业务的影响。
+
+【业务影响描述】:业务影响描述 在流量切换时间前，client访问番禺新业务内网dgw-vip（10.85.128/129.*）已经建立的tcp会话（例如：长链接业务），需要client端断开重新建立一次tcp会话，否则dgw会将此流量丢弃。流量切换后新建的tcp连接不会有影响。
+
+请各运维接口人通知相关同事做好准备和业务的恢复确认工作。
+
+系统部提供7*24小时技术支持，如有问题请拨打:010-83456260（系统），010-83456261（网络）。
+
+2021-03-11 01:00  开始更换gw集群交换机网络模块
+2021-03-11 01:02  完成了，开启时间1:00 
+2021-03-11 01:06  活动这边也有延迟升高的报警
+2021-03-11 01:14  还在一级报警
+
+-->
+
+<!--
+  网关切换vip时宕机分析  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=529319448
+
+   宕机情景
+大量请求超时
+服务器socket突增
+linux 文件描述符被占满
+新的请求进不到服务器
+宕机原因
+切换vip网络时，redis链接断开
+服务端等待重新建立redis链接
+服务端没有空闲的文件描述符，无法建立新链接
+死循环宕机
+
+
+
+lettuce redis 默认行为
+-->
+
+
+
+<h1 id="4-网络超时案例-网关调支付服务二次支付接口超时"><a href="#4-网络超时案例-网关调支付服务二次支付接口超时" class="headerlink" title="(4) 网络超时案例-网关调支付服务二次支付接口超时"></a>(4) 网络超时案例-网关调支付服务二次支付接口超时</h1><p>背景 农历腊月十二，快年底了，运营疯狂搞活动，冲业绩，产品和研发也疯狂叠需求，每天的单量都刷新历史记录。<br>     在一个风平浪静的周末早上，交易系统-下单服务 支付服务的一台机器被干躺了<br>现象 从服务接口监控看，交易系统的QPS暴涨，每天都刷新记录。<br>    从容器监控看，有一台机器CPU idle掉底。<br>    从日志看，发现有一条耗时特别高的日志。</p>
+<h2 id="时间线"><a href="#时间线" class="headerlink" title="时间线"></a>时间线</h2><p>2021-01-24 10:00:45:345 router网关<br>2021-01-24 10:00:45:347 流量网关服务收到请求<br>?<br>2021-01-24 10:00:49.062 交易系统-支付服务收到请求</p>
+<!--
+2021-01-24T10:00:49.063 调用用户接口
+2021-01-24T10:00:49.080 用户接口处理完成 耗时16ms
+2021-01-24T10:00:49.081 调用支付收银接口
+2021-01-24T10:00:49.372 支付收银接口处理完成 耗时291ms
+-->
+<p>2021-01-24 10:00:49.373 交易系统-支付服务请求处理完成 总耗时311ms</p>
+<h2 id="问题分析过程"><a href="#问题分析过程" class="headerlink" title="问题分析过程"></a>问题分析过程</h2><p>  虽然支付服务耗时是311ms，但是在<code>2021-01-24 10:00:45:347</code> ~ <code>2021-01-24 10:00:49.062</code> 差了将近4s的时间。</p>
+<br>
+
+
+
+<h1 id="5-网络超时案例-下单调自提点服务网络超时"><a href="#5-网络超时案例-下单调自提点服务网络超时" class="headerlink" title="(5) 网络超时案例-下单调自提点服务网络超时"></a>(5) 网络超时案例-下单调自提点服务网络超时</h1><p>背景：<br>现象：</p>
+<h2 id="5-1-时间线"><a href="#5-1-时间线" class="headerlink" title="(5.1) 时间线"></a>(5.1) 时间线</h2><h2 id="5-2-问题分析过程"><a href="#5-2-问题分析过程" class="headerlink" title="(5.2) 问题分析过程"></a>(5.2) 问题分析过程</h2><p>  曾经有一次，负责的交易系统-下单模块调用下游的开城服务判断自提点是否在开城范围内，通过日志发现调他们超时了。</p>
+<p>  从日志监控概览看，有大量超时<br>  <img src="/img/business/stability/20210205/trade-dltag.png" alt="日志dltag监控"></p>
+<p>  从日志看，调运营单元确实超时了<br>  <img src="/img/business/stability/20210205/order-log.png" alt="日志监控-下单校验运营单元异常"></p>
+<p>  但是他们却告诉我，他们接口耗时只有3ms，而且日志有记录，日志里确实只有3ms<br>  <img src="/img/business/stability/20210205/open-city-log_request_out.png" alt="运营单元服务日志"></p>
+<p>2021-02-05 00:40:48.694  请求到网关<br>2021-02-05 00:40:49:022  开始请求开城服务<br>2021-02-05 00:40:49:156  开城服务业务服务接收到请求，打印日志<br>2021-02-05 00:40:49:159  开城服务业务服务处理完成，打印日志，耗时3ms</p>
+<p>  这个问题由多个原因导致，但是当时由于时间紧迫，通过一个治标不治本办法快速解决了，后来在思考，如果再遇到了怎么去排查并且定位问题？</p>
+<br>
+
+
+ 
+
+
+
+<h1 id="6-异常场景下httpClientPool配置导致的超时问题"><a href="#6-异常场景下httpClientPool配置导致的超时问题" class="headerlink" title="(6) 异常场景下httpClientPool配置导致的超时问题"></a>(6) 异常场景下httpClientPool配置导致的超时问题</h1><p>2021-03-12<br>  maxConnectionPerRoute</p>
+<!--
+2021-03-12  网关服务超时分析  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=544260567
+-->
+
+
+<h1 id="7-交换机问题导致的网络超时问题"><a href="#7-交换机问题导致的网络超时问题" class="headerlink" title="(7) 交换机问题导致的网络超时问题"></a>(7) 交换机问题导致的网络超时问题</h1><p>  背景  2021-03-20 10:31:24 ~ 2021-03-20 10:31:30  交换机遇到一个问题，xx原因，网络丢包6s。<br>  现象  </p>
+<br>
+
+
+<h1 id="8-网络超时案例-弹性云容器竞争资源异常导致网络超时问题"><a href="#8-网络超时案例-弹性云容器竞争资源异常导致网络超时问题" class="headerlink" title="(8) 网络超时案例-弹性云容器竞争资源异常导致网络超时问题"></a>(8) 网络超时案例-弹性云容器竞争资源异常导致网络超时问题</h1><p>背景: 风控团队提出了一个优化需求，需要下单服务调风控的老接口迁移到新接口</p>
+<p>现象: (1) 通过监控发现调风控新接口的错误数会随服务qps增大而变多<br>     (2) 通过日志发现有很多<code>xxx timed out after 200ms</code>，是下单调风控新接口达到200ms的超时时间报错</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">Operation timed out after <span class="token number">200</span> milliseconds with <span class="token number">0</span> bytes received
+Connection timed out after <span class="token number">200</span> milliseconds<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h2 id="8-1-下单调风控网络超时问题-时间线"><a href="#8-1-下单调风控网络超时问题-时间线" class="headerlink" title="(8.1) 下单调风控网络超时问题-时间线"></a>(8.1) 下单调风控网络超时问题-时间线</h2><p>2022-11-18 上线 小流量灰度  没有问题<br>2022-11-19 全量 没有问题<br>2022-11-20 报警 发现调风控接口有很多超时<br>2022-11-20 研发一起排查 是否是风控服务<strong>web容器tomcat耗时</strong>导致<br>2022-11-20 <!--12:42--> 配置access.log后，通过日志时间看tomcat耗时几乎和风控接口耗时一样，<strong>不是tomcat容器问题</strong><br>2022-11-20 <!--13:55--> 通过日志发现时间对不上，<strong>猜测两台机器的时间不同步</strong><br>2022-11-20 <!--15:59--> SRE通过 <code>clockddiff</code> + <code>ip</code>命令查看了一下两个容器，容器所在宿主之间时间差别为0ms，<strong>两台机器的时间是同步的</strong><br>2022-11-20 猜测服务发现可能有问题，概率比较小，排除。<br>2022-11-20 <!--19:05--> 下单发出请求的时间和风控接收到请求的时间有gap<br>2022-11-20 <!--20:38--> 发现超时的每次都是某台机器或者某几台机器，<strong>超时的机器有聚集性</strong><br>2022-11-20 <strong>容器更换后通过监控看报错数变少了</strong><br>2022-11-20 <!--23:57:28--> 发现一条trace风控接口耗时930ms，通过监控发现有YoungGC，YoungGC耗时90ms左右 (整体耗时不正常 YoungGC耗时也不正常)<br>2022-11-21 <!--11:13--> 询问服务发现研发，询问后在当前场景下排除服务发现出错的可能。<br>2022-11-21 <!--11:22--> 拉弹性云研发<br>2022-11-22 <!--12:02--> 排查问题缺乏方向<br>2022-11-22 <!--12:04--> 初步决定下单通过vip调用风控新接口，vip有nginx.log，可以对比nginx.log时间和access.log时间<br>2022-11-23 <!--21:41--> 下单服务修改配置调风控使用vip，上线一半容器，一半使用vip调风控新接口，一半使用服务发现ip直连<br>2022-11-24 <!--10:04--> 对比vip和服务发现，发现问题依然存在。<strong>不是服务发现问题</strong><br>2022-11-24 <!--10:04--> 发现无论在vip组容器还是服务发现直连容器组，下游(风控)<strong>超时的容器都存在聚集性</strong>，怀疑是容器问题<br>2022-11-24 <!--11:31--> 找一条trace，对比下单<code>trade.log</code>时间、 vip走<code>nginx.log</code>的时间、风控web容器<code>access.log</code>的时间<br>2022-11-24 <!--11:33--> 通过nginx.log里的时间对比发现，上游发出请求后200ms后超时主动断开连接，<strong>确认网络耗时主要在风控服务这边</strong><br>2022-11-24 <!--11:50--> 找弹性云研发排查网络问题<br>2022-11-24  换了容器后确实超时确实减少了大部分<br>2022-11-24 <!--21:02--> 经过排查发现是容器CPU竞争资源异常，导致容器等待CPU时间片过长，再叠加gc，最终导致的服务超时。</p>
+<h2 id="8-2-分析排查过程"><a href="#8-2-分析排查过程" class="headerlink" title="(8.2) 分析排查过程"></a>(8.2) 分析排查过程</h2><h3 id="8-2-1-问题出现"><a href="#8-2-1-问题出现" class="headerlink" title="(8.2.1) 问题出现"></a>(8.2.1) 问题出现</h3><p>2022-11-18 上线 小流量灰度  没有问题<br>2022-11-19 全量 没有问题<br>2022-11-20 报警 发现调风控接口有很多超时 </p>
+<p>  <img src="/img/business/stability/20221120/trade-call-risk-socket-timeout.jpg"></p>
+<h3 id="8-2-2-问题排查"><a href="#8-2-2-问题排查" class="headerlink" title="(8.2.2) 问题排查"></a>(8.2.2) 问题排查</h3><p>2022-11-20 研发一起排查<br>  外卖下单研发 从日志看有问题的trace，调风控接口200ms后超时报错<br>  风控研发  反馈 风控接口正常返回了，而且从风控服务的日志看，对应trace耗时只有91ms </p>
+<h3 id="8-2-3-问题分析-怀疑是web容器线程排队耗时"><a href="#8-2-3-问题分析-怀疑是web容器线程排队耗时" class="headerlink" title="(8.2.3) 问题分析-怀疑是web容器线程排队耗时"></a>(8.2.3) 问题分析-怀疑是web容器线程排队耗时</h3><p>  下单调风控接口超时时间是200ms，风控服务只花费了91ms，为什么会超时？ 那109ms的时间去哪里了？</p>
+<p>  因为下单服务下游有10多个，只有掉风控新接口超时，初步怀疑是风控服务的问题。<br>  而且风控服务是新服务，开发语言用的Java，web容器用的tomcat，而风控同学查看的日志是风控服务的日志，有可能是web容器请求堆积，耗费较多时间。<br>  于是让风控同学开始web容器日志 access.log </p>
+<h3 id="8-2-4-开启web容器日志-排除web容器耗时"><a href="#8-2-4-开启web容器日志-排除web容器耗时" class="headerlink" title="(8.2.4) 开启web容器日志-排除web容器耗时"></a>(8.2.4) 开启web容器日志-排除web容器耗时</h3><p>  开启web容器日志后继续排查，发现web容器并没有耗费几ms，几乎都是0~1ms<br>  问题来了？ 100多ms到底耗费在哪里了？</p>
+<p>  <img src="/img/business/stability/20221120/trade-call-risk-socket-timeout.jpg"></p>
+<h2 id="8-2-5-问题分析-怀疑机器时间不同步"><a href="#8-2-5-问题分析-怀疑机器时间不同步" class="headerlink" title="(8.2.5) 问题分析-怀疑机器时间不同步"></a>(8.2.5) 问题分析-怀疑机器时间不同步</h2><h3 id="对比两台容器时间"><a href="#对比两台容器时间" class="headerlink" title="对比两台容器时间"></a>对比两台容器时间</h3><p>  SRE通过 <code>clockddiff</code> + <code>ip</code>命令查看了一下两个容器，容器所在宿主之间时间差别为0ms，<strong>两台机器的时间是同步的</strong></p>
+<h3 id="继续分析"><a href="#继续分析" class="headerlink" title="继续分析"></a>继续分析</h3><p>  于是梳理调用链路  外卖下单服务 -&gt;  服务发现 -&gt; 获取下游ip和端口  通过ip:port直连下游服务 -&gt; 调用风控接口  </p>
+<p>  怀疑是服务发现的问题，拉了服务发现的研发，他们说只有在启动时服务发现会耗时，后续都是ip和端口直连，不会再走服务发现。</p>
+<p>  虽然理论上服务发现后是直连，但是不保证服务发现没有问题。</p>
+<h3 id="下单使用vip，通过排除法去定位"><a href="#下单使用vip，通过排除法去定位" class="headerlink" title="下单使用vip，通过排除法去定位"></a>下单使用vip，通过排除法去定位</h3><h3 id="对比vip和服务发现ip直连"><a href="#对比vip和服务发现ip直连" class="headerlink" title="对比vip和服务发现ip直连"></a>对比vip和服务发现ip直连</h3><p>  而且由于缺少日志，想了一个办法，外卖下单服务一半走服务发现，一般走vip，对比一下<br>  而且vip是用nginx代理的，还可以看到nginx日志，顺便对比一下日志时间</p>
+<p>  通过对比三个日志时间，确认问题发生在风控侧。</p>
+<h3 id="发现存在聚集性"><a href="#发现存在聚集性" class="headerlink" title="发现存在聚集性"></a>发现存在聚集性</h3><p>  花了很长时间验证，但是我们没法是上游的问题还是下游的问题。<br>  直到今天切换成vip以后，我们发现和连接的关系不大。<br>  特别是早上芳菁发的这个统计，发现聚集性很大。只在某台机器上有。通过查看机器的gc日志，与运维的沟通。<br>  我们发现是容器的cpu资源存在竞争，某些容器的等待cpu时间片过长，导致有问题的容器的服务的gc时间比平均时间过长，存在毛刺。所以会有部分请求超时，部分请求不超时。</p>
+<p>throt_wait_sum</p>
+<p>通常一个容器中会有多个线/进程运行, 并且容器有一个quota限(比如8核cpu，这里不考虑内存和其他资源)。那么在运行的过程中可能会出现三个方向的影响：</p>
+<p>容器外部 exter_wait_sum: CPU被容器外的进程占用, 容器内的线程需要wait. 简而言之该容器被其它容器干扰。解法：此时建议将容器漂移到其它空闲的物理机或根据实际情况提高服务优先级.<br>容器内部 throt_wait_sum: 容器达到cpu quota(容器规格)的限制, 内核限制容器的运行时间, 。解法：此时建议扩大容器的规格或扩大容器数量.<br>容器内部 inner_wait_sum: 业务线程的突发运行, 但未达到容器的cpu quota限制。解法：此时建议优化业务代码,减少大量进程突发.</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://tech.meituan.com/2017/01/05/mgw.html">MGW——美团点评高性能四层负载均衡</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.csdn.net/lcl_xiaowugui/article/details/81701949">LVS原理篇：LVS简介、结构、四种模式、十种算法</a><br>[3] <a target="_blank" rel="noopener" href="http://zh.linuxvirtualserver.org/">LVS中文站点</a><br>[4] <a target="_blank" rel="noopener" href="https://www.linuxidc.com/Linux/2018-11/155542.htm">LVS负载均衡之LVS-NAT与LVS-DR模式原理详解</a><br>[5] <a target="_blank" rel="noopener" href="https://www.kancloud.cn/hiyang/linux/360095">LVS调度方法</a><br>[6] <a target="_blank" rel="noopener" href="https://blog.csdn.net/huang987246510/article/details/118424808">cpu throttle原理浅析</a></p>
+<!--
+ DGW 基本信息  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=100899805 
+ LVS的原理-工作模式  https://i.xiaojukeji.com/way/article/15906?type=1 
+
+ 网络问题排查思路-网络链路篇  https://i.xiaojukeji.com/way/article/10976694
+ 滴滴支付服务性能优化总结  https://i.xiaojukeji.com/way/article/29357?share-from=1006617&type=1
+ 两轮车数据库连接池优化实践之连接保障  https://i.xiaojukeji.com/way/article/28757?type=1
+-->
+
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/network/" rel="tag"># network</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/09/10/linux-network-tcp-handshakes/" rel="prev" title="网络三次握手">
+                  <i class="fa fa-chevron-left"></i> 网络三次握手
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/10/30/mysql-query-profiler/" rel="next" title="MySQL Query Profiler 分析SQL慢查">
+                  MySQL Query Profiler 分析SQL慢查 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

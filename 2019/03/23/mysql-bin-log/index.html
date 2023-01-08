@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="(1) 归档日志(binlog)是什么  我们经常听DBA说MySQL可以恢复到任意时刻的数据，为什么呢？  因为有binlog，准确的说有某个时间点的全量备份和这个时间点之后的实施备份  全量备份就是把截止到某个时间点的数据存一份，类似于历史账本，这个是全量备份，叫做历史归档日志。  实时备份是实时的数据，MySQL无论使用什么存储引擎，在执行新增、修改、删除语句时会写一条日志，记录更改，类似于">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 归档日志(binlog)">
+<meta property="og:url" content="http://weikeqin.com/2019/03/23/mysql-bin-log/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="(1) 归档日志(binlog)是什么  我们经常听DBA说MySQL可以恢复到任意时刻的数据，为什么呢？  因为有binlog，准确的说有某个时间点的全量备份和这个时间点之后的实施备份  全量备份就是把截止到某个时间点的数据存一份，类似于历史账本，这个是全量备份，叫做历史归档日志。  实时备份是实时的数据，MySQL无论使用什么存储引擎，在执行新增、修改、删除语句时会写一条日志，记录更改，类似于">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2019-03-23T07:13:23.000Z">
+<meta property="article:modified_time" content="2022-12-15T10:32:18.082Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="mysql">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2019/03/23/mysql-bin-log/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2019/03/23/mysql-bin-log/","path":"2019/03/23/mysql-bin-log/","title":"MySQL 归档日志(binlog)"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>MySQL 归档日志(binlog) | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%BD%92%E6%A1%A3%E6%97%A5%E5%BF%97-binlog-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) 归档日志(binlog)是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%BD%92%E6%A1%A3%E6%97%A5%E5%BF%97-bin-log-%E7%9A%84%E4%BD%9C%E7%94%A8"><span class="nav-number">2.</span> <span class="nav-text">(2) 归档日志(bin log)的作用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%BD%92%E6%A1%A3%E6%97%A5%E5%BF%97%E6%A0%BC%E5%BC%8F"><span class="nav-number">3.</span> <span class="nav-text">(3) 归档日志格式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-STATMENT"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) STATMENT</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-ROW"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) ROW</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-MIXED"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) MIXED</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BC%9A%E6%9C%89%E4%B8%A4%E4%BB%BD%E6%97%A5%E5%BF%97%E5%91%A2"><span class="nav-number">3.4.</span> <span class="nav-text">(3) 为什么会有两份日志呢</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-binlog%E8%AE%BE%E7%BD%AE"><span class="nav-number">4.</span> <span class="nav-text">(4) binlog设置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-sync-binlog"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) sync_binlog</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%80%9D%E8%80%83%E9%A2%98"><span class="nav-number">5.</span> <span class="nav-text">(5) 思考题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-MySQL%E6%80%8E%E4%B9%88%E7%9F%A5%E9%81%93binlog%E6%98%AF%E5%AE%8C%E6%95%B4%E7%9A%84"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) MySQL怎么知道binlog是完整的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-redo-log-%E5%92%8C-binlog-%E6%98%AF%E6%80%8E%E4%B9%88%E5%85%B3%E8%81%94%E8%B5%B7%E6%9D%A5%E7%9A%84"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) redo log 和 binlog 是怎么关联起来的</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/23/mysql-bin-log/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="MySQL 归档日志(binlog) | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL 归档日志(binlog)
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-03-23 15:13:23" itemprop="dateCreated datePublished" datetime="2019-03-23T15:13:23+08:00">2019-03-23</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-12-15 18:32:18" itemprop="dateModified" datetime="2022-12-15T18:32:18+08:00">2022-12-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>2.3k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>2 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="1-归档日志-binlog-是什么"><a href="#1-归档日志-binlog-是什么" class="headerlink" title="(1) 归档日志(binlog)是什么"></a>(1) 归档日志(binlog)是什么</h1><p>  我们经常听DBA说MySQL可以恢复到任意时刻的数据，为什么呢？<br>  因为有binlog，准确的说有某个时间点的全量备份和这个时间点之后的实施备份<br>  全量备份就是把截止到某个时间点的数据存一份，类似于历史账本，这个是全量备份，叫做历史归档日志。<br>  实时备份是实时的数据，MySQL无论使用什么存储引擎，在执行新增、修改、删除语句时会写一条日志，记录更改，类似于实时记账，这条日志就是实施binlog。</p>
+<h1 id="2-归档日志-bin-log-的作用"><a href="#2-归档日志-bin-log-的作用" class="headerlink" title="(2) 归档日志(bin log)的作用"></a>(2) 归档日志(bin log)的作用</h1><p>1、可以用来恢复数据库数据<br>2、可以用来给备库传输数据</p>
+<p>  没有行不行？<br>  也可以，设置 <code>set sql_log_bin=0</code>来关闭当前线程的binlog<br>  或者 在<code>my.cnf</code>配置文件设置<code>skip-log-bin</code>永久关闭binlog</p>
+<br>
+
+<h1 id="3-归档日志格式"><a href="#3-归档日志格式" class="headerlink" title="(3) 归档日志格式"></a>(3) 归档日志格式</h1><blockquote>
+<p>binlog日志有三种格式，分别为 STATMENT、ROW 和 MIXED。<br>在 MySQL 5.7.7之前，默认的格式是STATEMENT，MySQL 5.7.7之后，默认值是ROW。<br>日志格式通过binlog-format指定。</p>
+</blockquote>
+<br>
+
+<h2 id="3-1-STATMENT"><a href="#3-1-STATMENT" class="headerlink" title="(3.1) STATMENT"></a>(3.1) STATMENT</h2><p>　基于SQL语句的复制(statement-based replication, SBR)，每一条会修改数据的sql语句会记录到binlog中。</p>
+<p>　优点：不需要记录每一行的变化，减少了binlog日志量，节约了IO, 从而提高了性能；<br>　缺点：在某些情况下会导致主从数据不一致，比如执行<code>sysdate()</code>、<code>slepp()</code>等。</p>
+<br>
+
+
+<h2 id="3-2-ROW"><a href="#3-2-ROW" class="headerlink" title="(3.2) ROW"></a>(3.2) ROW</h2><p>　基于行的复制(row-based replication, RBR)，不记录每条sql语句的上下文信息，仅需记录哪条数据被修改了。</p>
+<p>　优点：不会出现某些特定情况下的存储过程、或function、或trigger的调用和触发无法被正确复制的问题；<br>　缺点：会产生大量的日志，尤其是alter table的时候会让日志暴涨</p>
+<h2 id="3-3-MIXED"><a href="#3-3-MIXED" class="headerlink" title="(3.3) MIXED"></a>(3.3) MIXED</h2><p>　基于STATMENT和ROW两种模式的混合复制(mixed-based replication, MBR)，一般的复制使用STATEMENT模式保存binlog，对于STATEMENT模式无法复制的操作使用ROW模式保存binlog</p>
+<h2 id="3-为什么会有两份日志呢"><a href="#3-为什么会有两份日志呢" class="headerlink" title="(3) 为什么会有两份日志呢"></a>(3) 为什么会有两份日志呢</h2><p>  MySQL保证数据不会丢的能力主要体现在两方面：<br>  (1)能够恢复到任何时间点的状态；<br>  (2)能够保证MySQL在任何时间段突然奔溃，重启后之前提交的记录都不会丢失； 专业名词叫<code>crash-safe</code></p>
+<p>  对于第一点将MySQL恢复到任何时间点的状态，只要保留有足够的binlog，可以通过重跑binlog来把数据恢复到任何时间点。<br>  对于第二点的能力，也就是crash-safe，binlog无法保证，在InnoDB存储引擎中，事务提交过程中任何阶段，MySQL突然奔溃，重启后都能保证事务的完整性，已提交的数据不会丢失，未提交完整的数据会自动进行回滚。这个能力依赖的就是redo log和unod log两个日志。</p>
+<p>  因为最开始MySQL里并没有InnoDB存储引擎。<br>  MySQL自带的引擎是MyISAM，但是MyISAM没有crash-safe的能力，binlog日志只能用于归档。</p>
+<p>  而InnoDB是另一个公司以插件形式引入MySQL的，InnoDB使用另外一套日志系统——也就是<code>redo log</code>来实现crash-safe能力。</p>
+<p>  所以有2份日志<br>  binlog用来归档，备份数据；由于binlog不支持事务，所以无法保证数据的<code>原子性</code>、<code>隔离性</code>和<code>一致性</code>。<br>  redo log用来crash-safe。用来保证<code>原子性</code>和<code>一致性</code>。<br>  隔离性是通过<code>undo log</code>来实现的。</p>
+<h1 id="4-binlog设置"><a href="#4-binlog设置" class="headerlink" title="(4) binlog设置"></a>(4) binlog设置</h1><h2 id="4-1-sync-binlog"><a href="#4-1-sync-binlog" class="headerlink" title="(4.1) sync_binlog"></a>(4.1) sync_binlog</h2><p>sync_binlog：是MySQL 的二进制日志（binary log）同步到磁盘的频率。<br>取值：0-N</p>
+<p><code>sync_binlog=0</code>，当事务提交之后，MySQL不做<code>fsync</code>之类的磁盘同步指令刷新<code>binlog_cache</code>中的信息到磁盘，而让Filesystem自行决定什么时候来做同步，或者cache满了之后才同步到磁盘。这个是性能最好的。</p>
+<p><code>sync_binlog=1</code>，当每进行1次事务提交之后，MySQL将进行一次<code>fsync</code>之类的磁盘同步指令来将<code>binlog_cache</code>中的数据强制写入磁盘。</p>
+<p><code>sync_binlog=n</code>，当每进行n次事务提交之后，MySQL将进行一次<code>fsync</code>之类的磁盘同步指令来将<code>binlog_cache</code>中的数据强制写入磁盘。</p>
+<h1 id="5-思考题"><a href="#5-思考题" class="headerlink" title="(5) 思考题"></a>(5) 思考题</h1><h2 id="5-1-MySQL怎么知道binlog是完整的"><a href="#5-1-MySQL怎么知道binlog是完整的" class="headerlink" title="(5.1) MySQL怎么知道binlog是完整的"></a>(5.1) MySQL怎么知道binlog是完整的</h2><p>回答：一个事务的 binlog 是有完整格式的：<br>statement 格式的 binlog，最后会有 COMMIT；<br>row 格式的 binlog，最后会有一个 XID event。</p>
+<p>另外，在 MySQL 5.6.2 版本以后，还引入了 binlog-checksum 参数，用来验证 binlog 内容的正确性。<br>对于 binlog 日志由于磁盘原因，可能会在日志中间出错的情况，MySQL 可以通过校验 checksum 的结果来发现。<br>所以，MySQL 还是有办法验证事务 binlog 的完整性的。</p>
+<h2 id="5-2-redo-log-和-binlog-是怎么关联起来的"><a href="#5-2-redo-log-和-binlog-是怎么关联起来的" class="headerlink" title="(5.2) redo log 和 binlog 是怎么关联起来的"></a>(5.2) redo log 和 binlog 是怎么关联起来的</h2><p>回答：它们有一个共同的数据字段，叫 XID。<br>崩溃恢复的时候，会按顺序扫描 redo log：<br>如果碰到既有 prepare、又有 commit 的 redo log，就直接提交；<br>如果碰到只有 parepare、而没有 commit 的 redo log，就拿着 XID 去 binlog 找对应的事务。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲</a><br>[2] <a target="_blank" rel="noopener" href="https://xingliuhua.github.io/posts/mysql_crash_safe/">mysql的crash-safe</a><br>[3] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/f-ck-need-u/archive/2018/05/08/9010872.html">详细分析MySQL事务日志(redo log和undo log)</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/mysql/" rel="tag"># mysql</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2019/03/23/mysql-undo-log/" rel="prev" title="mysql-undo-log">
+                  <i class="fa fa-chevron-left"></i> mysql-undo-log
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2019/03/23/mysql-redo-log/" rel="next" title="MySQL 重做日志 (redo log)">
+                  MySQL 重做日志 (redo log) <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>
