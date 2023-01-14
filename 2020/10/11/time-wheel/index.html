@@ -27,7 +27,7 @@
 <meta property="og:description" content="如果一台机器上有10w个定时任务，如何做到高效触发？  rpc调用时超时怎么实现？  订单超时未支付变更订单状态怎么实现？">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2020-10-11T08:14:08.000Z">
-<meta property="article:modified_time" content="2022-07-09T14:22:11.243Z">
+<meta property="article:modified_time" content="2023-01-14T14:32:20.909Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="tech,Java,MySQL,Redis,ElasticSearch,DDD">
 <meta name="twitter:card" content="summary">
@@ -162,18 +162,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-count">285</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">15</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-count">54</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -268,7 +268,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-07-09 22:22:11" itemprop="dateModified" datetime="2022-07-09T22:22:11+08:00">2022-07-09</time>
+      <time title="修改时间：2023-01-14 22:32:20" itemprop="dateModified" datetime="2023-01-14T22:32:20+08:00">2023-01-14</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -369,9 +369,9 @@
 </ol>
 </blockquote>
 <p>  添加任务  kafka.utils.timer.TimingWheel::add</p>
-<pre class="line-numbers language-scala" data-language="scala"><code class="language-scala">
-<span class="token keyword">def</span> add<span class="token punctuation">(</span>timerTaskEntry<span class="token operator">:</span> TimerTaskEntry<span class="token punctuation">)</span><span class="token operator">:</span> <span class="token builtin">Boolean</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span>
-  <span class="token keyword">val</span> expiration <span class="token operator">=</span> timerTaskEntry<span class="token punctuation">.</span>expirationMs
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+def <span class="token function">add</span><span class="token punctuation">(</span>timerTaskEntry<span class="token operator">:</span> <span class="token class-name">TimerTaskEntry</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token class-name">Boolean</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span>
+  val expiration <span class="token operator">=</span> timerTaskEntry<span class="token punctuation">.</span>expirationMs
 
   <span class="token keyword">if</span> <span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">.</span>cancelled<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// 任务取消</span>
@@ -384,14 +384,14 @@
   <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>expiration <span class="token operator">&lt;</span> currentTime <span class="token operator">+</span> interval<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// 任务过期时间比当前时间轮时间加周期小说明任务过期时间在本时间轮周期内</span>
     <span class="token comment">// Put in its own bucket</span>
-    <span class="token keyword">val</span> virtualId <span class="token operator">=</span> expiration <span class="token operator">/</span> tickMs
+    val virtualId <span class="token operator">=</span> expiration <span class="token operator">/</span> tickMs
     <span class="token comment">//找到任务对应本时间轮的bucket</span>
-    <span class="token keyword">val</span> bucket <span class="token operator">=</span> buckets<span class="token punctuation">(</span><span class="token punctuation">(</span>virtualId <span class="token operator">%</span> wheelSize<span class="token punctuation">.</span>toLong<span class="token punctuation">)</span><span class="token punctuation">.</span>toInt<span class="token punctuation">)</span>
-    bucket<span class="token punctuation">.</span>add<span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">)</span>
+    val bucket <span class="token operator">=</span> <span class="token function">buckets</span><span class="token punctuation">(</span><span class="token punctuation">(</span>virtualId <span class="token operator">%</span> wheelSize<span class="token punctuation">.</span>toLong<span class="token punctuation">)</span><span class="token punctuation">.</span>toInt<span class="token punctuation">)</span>
+    bucket<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">)</span>
 
     <span class="token comment">// 只有本bucket内的任务都过期后才会bucket.setExpiration返回true此时将bucket放入延迟队列</span>
     <span class="token comment">// Set the bucket expiration time</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span>bucket<span class="token punctuation">.</span>setExpiration<span class="token punctuation">(</span>virtualId <span class="token operator">*</span> tickMs<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>bucket<span class="token punctuation">.</span><span class="token function">setExpiration</span><span class="token punctuation">(</span>virtualId <span class="token operator">*</span> tickMs<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
 
       <span class="token comment">// bucket是一个TimerTaskList，它实现了java.util.concurrent.Delayed接口，里面是一个多任务组成的链表</span>
       <span class="token comment">// The bucket needs to be enqueued because it was an expired bucket</span>
@@ -399,49 +399,49 @@
       <span class="token comment">// and the previous buckets gets reused; further calls to set the expiration within the same wheel cycle</span>
       <span class="token comment">// will pass in the same value and hence return false, thus the bucket with the same expiration will not</span>
       <span class="token comment">// be enqueued multiple times.</span>
-      queue<span class="token punctuation">.</span>offer<span class="token punctuation">(</span>bucket<span class="token punctuation">)</span>
+      queue<span class="token punctuation">.</span><span class="token function">offer</span><span class="token punctuation">(</span>bucket<span class="token punctuation">)</span>
     <span class="token punctuation">&#125;</span>
     <span class="token boolean">true</span>
   <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// 任务的过期时间不在本时间轮周期内说明需要升级时间轮，如果不存在则构造上一层时间轮，继续用上一层时间轮添加任务</span>
     <span class="token comment">// Out of the interval. Put it into the parent timer</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span>overflowWheel <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> addOverflowWheel<span class="token punctuation">(</span><span class="token punctuation">)</span>
-    overflowWheel<span class="token punctuation">.</span>add<span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>overflowWheel <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token function">addOverflowWheel</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    overflowWheel<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">)</span>
   <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <p>  bucket 被放入了 延时队列 DelayQueue<br>  bucket 就是 <code>TimerTaskList</code> 存放了同一 时间格/单位 里的所有延时任务<br>  <code>TimerTaskEntry</code> 是一个延时任务，被放到 <code>TimerTaskList</code> 集合</p>
-<h3 id="2-3-2-执行时间到的延时任务"><a href="#2-3-2-执行时间到的延时任务" class="headerlink" title="(2.3.2)　执行时间到的延时任务"></a>(2.3.2)　执行时间到的延时任务</h3><pre class="line-numbers language-scala" data-language="scala"><code class="language-scala"><span class="token comment">// timeout timer</span>
-<span class="token keyword">private</span><span class="token punctuation">[</span><span class="token keyword">this</span><span class="token punctuation">]</span> <span class="token keyword">val</span> taskExecutor <span class="token operator">=</span> Executors<span class="token punctuation">.</span>newFixedThreadPool<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span>
-  <span class="token punctuation">(</span>runnable<span class="token operator">:</span> Runnable<span class="token punctuation">)</span> <span class="token keyword">=></span> KafkaThread<span class="token punctuation">.</span>nonDaemon<span class="token punctuation">(</span><span class="token string">"executor-"</span> <span class="token operator">+</span> executorName<span class="token punctuation">,</span> runnable<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<h3 id="2-3-2-执行时间到的延时任务"><a href="#2-3-2-执行时间到的延时任务" class="headerlink" title="(2.3.2)　执行时间到的延时任务"></a>(2.3.2)　执行时间到的延时任务</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// timeout timer</span>
+<span class="token keyword">private</span><span class="token punctuation">[</span><span class="token keyword">this</span><span class="token punctuation">]</span> val taskExecutor <span class="token operator">=</span> <span class="token class-name">Executors</span><span class="token punctuation">.</span><span class="token function">newFixedThreadPool</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span>
+  <span class="token punctuation">(</span>runnable<span class="token operator">:</span> <span class="token class-name">Runnable</span><span class="token punctuation">)</span> <span class="token operator">=</span><span class="token operator">></span> <span class="token class-name">KafkaThread</span><span class="token punctuation">.</span><span class="token function">nonDaemon</span><span class="token punctuation">(</span><span class="token string">"executor-"</span> <span class="token operator">+</span> executorName<span class="token punctuation">,</span> runnable<span class="token punctuation">)</span><span class="token punctuation">)</span>
 
-<span class="token keyword">private</span> <span class="token keyword">def</span> addTimerTaskEntry<span class="token punctuation">(</span>timerTaskEntry<span class="token operator">:</span> TimerTaskEntry<span class="token punctuation">)</span><span class="token operator">:</span> <span class="token builtin">Unit</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span>
-  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>timingWheel<span class="token punctuation">.</span>add<span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<span class="token keyword">private</span> def <span class="token function">addTimerTaskEntry</span><span class="token punctuation">(</span>timerTaskEntry<span class="token operator">:</span> <span class="token class-name">TimerTaskEntry</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token class-name">Unit</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>timingWheel<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// Already expired or cancelled</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>timerTaskEntry<span class="token punctuation">.</span>cancelled<span class="token punctuation">)</span>
-      taskExecutor<span class="token punctuation">.</span>submit<span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">.</span>timerTask<span class="token punctuation">)</span>
+      taskExecutor<span class="token punctuation">.</span><span class="token function">submit</span><span class="token punctuation">(</span>timerTaskEntry<span class="token punctuation">.</span>timerTask<span class="token punctuation">)</span>
   <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span>
 <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <blockquote>
 <p> 可以看到其实是通过线程池启动一个固定线程去执行延时任务</p>
 </blockquote>
-<h3 id="2-3-x-kafka-utils-timer-Timer"><a href="#2-3-x-kafka-utils-timer-Timer" class="headerlink" title="(2.3.x) kafka.utils.timer.Timer"></a>(2.3.x) kafka.utils.timer.Timer</h3><pre class="line-numbers language-scala" data-language="scala"><code class="language-scala"><span class="token keyword">package</span> <span class="token namespace">kafka<span class="token punctuation">.</span>utils<span class="token punctuation">.</span>timer</span>
+<h3 id="2-3-x-kafka-utils-timer-Timer"><a href="#2-3-x-kafka-utils-timer-Timer" class="headerlink" title="(2.3.x) kafka.utils.timer.Timer"></a>(2.3.x) kafka.utils.timer.Timer</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">kafka<span class="token punctuation">.</span>utils<span class="token punctuation">.</span>timer</span>
 
-<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span></span><span class="token punctuation">&#123;</span>DelayQueue<span class="token punctuation">,</span> Executors<span class="token punctuation">,</span> TimeUnit<span class="token punctuation">&#125;</span>
-<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span>atomic<span class="token punctuation">.</span></span>AtomicInteger
-<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span>locks<span class="token punctuation">.</span></span>ReentrantReadWriteLock
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span></span><span class="token punctuation">&#123;</span><span class="token class-name">DelayQueue</span><span class="token punctuation">,</span> <span class="token class-name">Executors</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">&#125;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span>atomic<span class="token punctuation">.</span></span><span class="token class-name">AtomicInteger</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent<span class="token punctuation">.</span>locks<span class="token punctuation">.</span></span><span class="token class-name">ReentrantReadWriteLock</span>
 
 <span class="token keyword">import</span> <span class="token namespace">kafka<span class="token punctuation">.</span>utils<span class="token punctuation">.</span>threadsafe</span>
-<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>kafka<span class="token punctuation">.</span>common<span class="token punctuation">.</span>utils<span class="token punctuation">.</span></span><span class="token punctuation">&#123;</span>KafkaThread<span class="token punctuation">,</span> Time<span class="token punctuation">&#125;</span>
+<span class="token keyword">import</span> <span class="token namespace">org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>kafka<span class="token punctuation">.</span>common<span class="token punctuation">.</span>utils<span class="token punctuation">.</span></span><span class="token punctuation">&#123;</span><span class="token class-name">KafkaThread</span><span class="token punctuation">,</span> <span class="token class-name">Time</span><span class="token punctuation">&#125;</span>
 
-<span class="token keyword">trait</span> Timer <span class="token punctuation">&#123;</span>
+trait <span class="token class-name">Timer</span> <span class="token punctuation">&#123;</span>
   <span class="token comment">/** 
     * 添加新任务，在执行延迟任务后执行新增任务
     * Add a new task to this executor. It will be executed after the task's delay
     * (beginning from the time of submission)
     * @param timerTask the task to add
     */</span>
-  <span class="token keyword">def</span> add<span class="token punctuation">(</span>timerTask<span class="token operator">:</span> TimerTask<span class="token punctuation">)</span><span class="token operator">:</span> <span class="token builtin">Unit</span>
+  def <span class="token function">add</span><span class="token punctuation">(</span>timerTask<span class="token operator">:</span> <span class="token class-name">TimerTask</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token class-name">Unit</span>
 
   <span class="token comment">/**
     * Advance the internal clock, executing any tasks whose expiration has been
@@ -449,20 +449,20 @@
     * @param timeoutMs
     * @return whether or not any tasks were executed
     */</span>
-  <span class="token keyword">def</span> advanceClock<span class="token punctuation">(</span>timeoutMs<span class="token operator">:</span> <span class="token builtin">Long</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token builtin">Boolean</span>
+  def <span class="token function">advanceClock</span><span class="token punctuation">(</span>timeoutMs<span class="token operator">:</span> <span class="token class-name">Long</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token class-name">Boolean</span>
 
   <span class="token comment">/** 
     * 获取待执行的任务数
     * Get the number of tasks pending execution  
     * @return the number of tasks
     */</span>
-  <span class="token keyword">def</span> size<span class="token operator">:</span> <span class="token builtin">Int</span>
+  def size<span class="token operator">:</span> <span class="token class-name">Int</span>
 
   <span class="token comment">/** 
     * 关闭计时器服务，保留未执行的任务
     * Shutdown the timer service, leaving pending tasks unexecuted
     */</span>
-  <span class="token keyword">def</span> shutdown<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token builtin">Unit</span>
+  def <span class="token function">shutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">:</span> <span class="token class-name">Unit</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <blockquote>
@@ -487,6 +487,9 @@
 </blockquote>
 <p>这样基于时间轮可以将插入和删除操作的时间复杂度都降为O(1)</p>
 <h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/xIWKcWCV_eyH-vQOQWxGUw">时间轮在Kafka的实践</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/219903">20 | 详解时钟轮在RPC中的应用 - RPC实战与核心原理</a><br>[3] <a target="_blank" rel="noopener" href="https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/utils/timer/TimingWheel.scala">timer/TimingWheel.scala</a></p>
+<!--
+  跟Kafka学技术系列之时间轮  https://i.xiaojukeji.com/way/article/10016433 
+-->
 
     </div>
 

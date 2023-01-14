@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="(1) Dubbo中使用Sentinel Sentinel与dubbo结合的基本思路是sentinel利用了Dubbo Filter和spi机制进行拓展，这样做的好处可以做到无需改动业务代码就能支持限流、熔断等功能。  SPI对应的配置文件 &#x2F;resources&#x2F;META-INF&#x2F;dubbo&#x2F;org.apache.dubbo.rpc.Filter sentinel.dubbo.provider.f">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Sentenel对Dubbo支持">
+<meta property="og:url" content="http://weikeqin.com/2021/01/10/sentinel-dubbo/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="(1) Dubbo中使用Sentinel Sentinel与dubbo结合的基本思路是sentinel利用了Dubbo Filter和spi机制进行拓展，这样做的好处可以做到无需改动业务代码就能支持限流、熔断等功能。  SPI对应的配置文件 &#x2F;resources&#x2F;META-INF&#x2F;dubbo&#x2F;org.apache.dubbo.rpc.Filter sentinel.dubbo.provider.f">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-01-10T03:48:51.000Z">
+<meta property="article:modified_time" content="2023-01-14T15:33:18.634Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="stability">
+<meta property="article:tag" content="sentinel">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2021/01/10/sentinel-dubbo/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2021/01/10/sentinel-dubbo/","path":"2021/01/10/sentinel-dubbo/","title":"Sentenel对Dubbo支持"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Sentenel对Dubbo支持 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Dubbo%E4%B8%AD%E4%BD%BF%E7%94%A8Sentinel"><span class="nav-number">1.</span> <span class="nav-text">(1) Dubbo中使用Sentinel</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">(2) 源码解析</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">285</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">54</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2021/01/10/sentinel-dubbo/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Sentenel对Dubbo支持 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Sentenel对Dubbo支持
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2021-01-10 11:48:51" itemprop="dateCreated datePublished" datetime="2021-01-10T11:48:51+08:00">2021-01-10</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-14 23:33:18" itemprop="dateModified" datetime="2023-01-14T23:33:18+08:00">2023-01-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/sentinel/" itemprop="url" rel="index"><span itemprop="name">sentinel</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.3k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="1-Dubbo中使用Sentinel"><a href="#1-Dubbo中使用Sentinel" class="headerlink" title="(1) Dubbo中使用Sentinel"></a>(1) Dubbo中使用Sentinel</h1><p> Sentinel与dubbo结合的基本思路是sentinel利用了Dubbo Filter和spi机制进行拓展，这样做的好处可以做到无需改动业务代码就能支持限流、熔断等功能。</p>
+<p> SPI对应的配置文件 <code>/resources/META-INF/dubbo/org.apache.dubbo.rpc.Filter</code></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">sentinel<span class="token punctuation">.</span>dubbo<span class="token punctuation">.</span>provider<span class="token punctuation">.</span>filter<span class="token operator">=</span>com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>adapter<span class="token punctuation">.</span>dubbo<span class="token punctuation">.</span>SentinelDubboProviderFilter
+sentinel<span class="token punctuation">.</span>dubbo<span class="token punctuation">.</span>consumer<span class="token punctuation">.</span>filter<span class="token operator">=</span>com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>adapter<span class="token punctuation">.</span>dubbo<span class="token punctuation">.</span>SentinelDubboConsumerFilter
+dubbo<span class="token punctuation">.</span>application<span class="token punctuation">.</span>context<span class="token punctuation">.</span>name<span class="token punctuation">.</span>filter<span class="token operator">=</span>com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>adapter<span class="token punctuation">.</span>dubbo<span class="token punctuation">.</span>DubboAppContextFilter<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="2-源码解析"><a href="#2-源码解析" class="headerlink" title="(2) 源码解析"></a>(2) 源码解析</h1><p>源码 <a target="_blank" rel="noopener" href="https://github.com/alibaba/Sentinel/blob/1.8.6/sentinel-adapter/sentinel-apache-dubbo-adapter/src/main/java/com/alibaba/csp/sentinel/adapter/dubbo/SentinelDubboProviderFilter.java">https://github.com/alibaba/Sentinel/blob/1.8.6/sentinel-adapter/sentinel-apache-dubbo-adapter/src/main/java/com/alibaba/csp/sentinel/adapter/dubbo/SentinelDubboProviderFilter.java</a></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>adapter<span class="token punctuation">.</span>dubbo</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 支持与Sentinel集成的Apache Dubbo服务提供商筛选器。默认情况下自动激活。
+ * 注意：这只适用于Apache Dubbo 2.7.x或更高版本。
+ *  
+ * 如果要禁用提供程序筛选器，可以配置： dubbo:provider filter="-sentinel.dubbo.provider.filter" 
+ */</span>
+<span class="token annotation punctuation">@Activate</span><span class="token punctuation">(</span>group <span class="token operator">=</span> PROVIDER<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">SentinelDubboProviderFilter</span> <span class="token keyword">extends</span> <span class="token class-name">BaseSentinelDubboFilter</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">SentinelDubboProviderFilter</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">RecordLog</span><span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"Sentinel Apache Dubbo provider filter initialized"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token class-name">String</span> <span class="token function">getMethodName</span><span class="token punctuation">(</span><span class="token class-name">Invoker</span> invoker<span class="token punctuation">,</span> <span class="token class-name">Invocation</span> invocation<span class="token punctuation">,</span> <span class="token class-name">String</span> prefix<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token class-name">DubboUtils</span><span class="token punctuation">.</span><span class="token function">getMethodResourceName</span><span class="token punctuation">(</span>invoker<span class="token punctuation">,</span> invocation<span class="token punctuation">,</span> prefix<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token class-name">String</span> <span class="token function">getInterfaceName</span><span class="token punctuation">(</span><span class="token class-name">Invoker</span> invoker<span class="token punctuation">,</span> <span class="token class-name">String</span> prefix<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token class-name">DubboUtils</span><span class="token punctuation">.</span><span class="token function">getInterfaceName</span><span class="token punctuation">(</span>invoker<span class="token punctuation">,</span> prefix<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token class-name">Result</span> <span class="token function">invoke</span><span class="token punctuation">(</span><span class="token class-name">Invoker</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> invoker<span class="token punctuation">,</span> <span class="token class-name">Invocation</span> invocation<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">RpcException</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Get origin caller.</span>
+        <span class="token class-name">String</span> origin <span class="token operator">=</span> <span class="token class-name">DubboAdapterGlobalConfig</span><span class="token punctuation">.</span><span class="token function">getOriginParser</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">parse</span><span class="token punctuation">(</span>invoker<span class="token punctuation">,</span> invocation<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">null</span> <span class="token operator">==</span> origin<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            origin <span class="token operator">=</span> <span class="token string">""</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token class-name">Entry</span> interfaceEntry <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+        <span class="token class-name">Entry</span> methodEntry <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+        <span class="token class-name">String</span> prefix <span class="token operator">=</span> <span class="token class-name">DubboAdapterGlobalConfig</span><span class="token punctuation">.</span><span class="token function">getDubboProviderResNamePrefixKey</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 接口名</span>
+        <span class="token class-name">String</span> interfaceResourceName <span class="token operator">=</span> <span class="token function">getInterfaceName</span><span class="token punctuation">(</span>invoker<span class="token punctuation">,</span> prefix<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 方法名 </span>
+        <span class="token class-name">String</span> methodResourceName <span class="token operator">=</span> <span class="token function">getMethodName</span><span class="token punctuation">(</span>invoker<span class="token punctuation">,</span> invocation<span class="token punctuation">,</span> prefix<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Only need to create entrance context at provider side, as context will take effect</span>
+            <span class="token comment">// at entrance of invocation chain only (for inbound traffic).</span>
+            <span class="token comment">// 使用方法名作为上下文名称</span>
+            <span class="token class-name">ContextUtil</span><span class="token punctuation">.</span><span class="token function">enter</span><span class="token punctuation">(</span>methodResourceName<span class="token punctuation">,</span> origin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 使用接口名作为interfaceEntry资源名</span>
+            interfaceEntry <span class="token operator">=</span> <span class="token class-name">SphU</span><span class="token punctuation">.</span><span class="token function">entry</span><span class="token punctuation">(</span>interfaceResourceName<span class="token punctuation">,</span> <span class="token class-name">ResourceTypeConstants</span><span class="token punctuation">.</span>COMMON_RPC<span class="token punctuation">,</span> <span class="token class-name">EntryType</span><span class="token punctuation">.</span>IN<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 使用方法名作为methodEntry资源名</span>
+            methodEntry <span class="token operator">=</span> <span class="token class-name">SphU</span><span class="token punctuation">.</span><span class="token function">entry</span><span class="token punctuation">(</span>methodResourceName<span class="token punctuation">,</span> <span class="token class-name">ResourceTypeConstants</span><span class="token punctuation">.</span>COMMON_RPC<span class="token punctuation">,</span> <span class="token class-name">EntryType</span><span class="token punctuation">.</span>IN<span class="token punctuation">,</span>
+                invocation<span class="token punctuation">.</span><span class="token function">getArguments</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 调用方法    </span>
+            <span class="token class-name">Result</span> result <span class="token operator">=</span> invoker<span class="token punctuation">.</span><span class="token function">invoke</span><span class="token punctuation">(</span>invocation<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">hasException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">Tracer</span><span class="token punctuation">.</span><span class="token function">traceEntry</span><span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">getException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> interfaceEntry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">Tracer</span><span class="token punctuation">.</span><span class="token function">traceEntry</span><span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">getException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> methodEntry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">BlockException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 触发限流或熔断 </span>
+            <span class="token keyword">return</span> <span class="token class-name">DubboAdapterGlobalConfig</span><span class="token punctuation">.</span><span class="token function">getProviderFallback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">handle</span><span class="token punctuation">(</span>invoker<span class="token punctuation">,</span> invocation<span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">RpcException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">Tracer</span><span class="token punctuation">.</span><span class="token function">traceEntry</span><span class="token punctuation">(</span>e<span class="token punctuation">,</span> interfaceEntry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token class-name">Tracer</span><span class="token punctuation">.</span><span class="token function">traceEntry</span><span class="token punctuation">(</span>e<span class="token punctuation">,</span> methodEntry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">throw</span> e<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>methodEntry <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 退出</span>
+                methodEntry<span class="token punctuation">.</span><span class="token function">exit</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> invocation<span class="token punctuation">.</span><span class="token function">getArguments</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>interfaceEntry <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 退出</span>
+                interfaceEntry<span class="token punctuation">.</span><span class="token function">exit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token class-name">ContextUtil</span><span class="token punctuation">.</span><span class="token function">exit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  限流或熔断后调用的方法 <code>DefaultDubboFallback::handle()</code></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>adapter<span class="token punctuation">.</span>dubbo<span class="token punctuation">.</span>fallback</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">DefaultDubboFallback</span> <span class="token keyword">implements</span> <span class="token class-name">DubboFallback</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token class-name">Result</span> <span class="token function">handle</span><span class="token punctuation">(</span><span class="token class-name">Invoker</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> invoker<span class="token punctuation">,</span> <span class="token class-name">Invocation</span> invocation<span class="token punctuation">,</span> <span class="token class-name">BlockException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Just wrap the exception.</span>
+        <span class="token keyword">return</span> <span class="token class-name">AsyncRpcResult</span><span class="token punctuation">.</span><span class="token function">newDefaultAsyncResult</span><span class="token punctuation">(</span>ex<span class="token punctuation">.</span><span class="token function">toRuntimeException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> invocation<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<!--
+  【Sentinel源码专题一】熔断限流利器Sentinel核心流程与插件-黄益明  https://i.xiaojukeji.com/way/article/39232
+-->
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/stability/" rel="tag"># stability</a>
+              <a href="/tags/sentinel/" rel="tag"># sentinel</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2021/01/03/sentinel-spring/" rel="prev" title="Sentenel对Spring框架支持">
+                  <i class="fa fa-chevron-left"></i> Sentenel对Spring框架支持
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2021/01/17/sentinel-deshboard/" rel="next" title="Sentinel控制台">
+                  Sentinel控制台 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

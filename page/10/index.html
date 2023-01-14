@@ -159,18 +159,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-count">285</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">15</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-count">54</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -219,6 +219,1665 @@
 
 
     <div class="main-inner index posts-expand">
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/07/java-concurrent-design-pattern/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/06/07/java-concurrent-design-pattern/" class="post-title-link" itemprop="url">java并发设计模式</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-07 17:03:36" itemprop="dateCreated datePublished" datetime="2020-06-07T17:03:36+08:00">2020-06-07</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>5.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>5 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <blockquote>
+<p> 多线程设计模式是前人解决并发问题的经验总结，当我们试图解决一个并发问题时，首选方案往往是使用匹配的设计模式，这样能避免走弯路。<br> 大家都熟悉设计模式，所以使用设计模式还能提升方案和代码的可理解性。</p>
+</blockquote>
+<blockquote>
+<p>避免共享的设计模式<br><code>Immutability 模式</code>、<code>Copy-on-Write 模式</code> 和 <code>线程本地存储模式</code> 本质上都是为了避免共享，只是实现手段不同而已。</p>
+</blockquote>
+<blockquote>
+<p> 多线程版本IF的设计模式<br> <code>Guarded Suspension 模式</code> 和 <code>Balking 模式</code> 都可以简单地理解为“多线程版本的 if”，但它们的区别在于前者会等待 if 条件变为真，而后者则不需要等待。</p>
+</blockquote>
+<blockquote>
+<p> 三种最简单的分工模式<br> <code>Thread-Per-Message模式</code> 、 <code>Worker Thread 模式</code> 和 <code>生产者-消费者模式</code> 是三种最简单实用的多线程分工方法</p>
+</blockquote>
+<h1 id="1-Immutability-Pattern-不变性模式"><a href="#1-Immutability-Pattern-不变性模式" class="headerlink" title="(1) Immutability Pattern 不变性模式"></a>(1) Immutability Pattern 不变性模式</h1><blockquote>
+<p> 解决并发问题，其实最简单的办法就是让共享变量只有读操作，而没有写操作。</p>
+</blockquote>
+<blockquote>
+<p> 不变性（Immutability）模式。所谓不变性，简单来讲，就是对象一旦被创建之后，状态就不再发生变化。换句话说，就是变量一旦被赋值，就不允许修改了（没有写操作）；没有修改操作，也就是保持了不变性。</p>
+</blockquote>
+<blockquote>
+<p> Java SDK 里很多类都具备不可变性。例如经常用到的 String 和 Long、Integer、Double 等基础类型的包装类都具备不可变性，这些对象的线程安全性都是靠不可变性来保证的。仔细翻看这些类的声明、属性和方法，你会发现它们都严格遵守不可变类的三点要求：类和属性都是 final 的，所有方法均是只读的。</p>
+</blockquote>
+<blockquote>
+<p> Java所有的基础类型的包装类都不适合做锁，因为它们内部用到了享元模式，这会导致看上去私有的锁，其实是共有的。</p>
+</blockquote>
+<blockquote>
+<p> 使用 Immutability 模式的注意事项在使用 Immutability 模式的时候，需要注意以下两点：</p>
+<ol>
+<li>对象的所有属性都是 final 的，并不能保证不可变性；</li>
+<li>不可变对象也需要正确发布。 </li>
+</ol>
+</blockquote>
+<blockquote>
+<p> 在使用 Immutability 模式的时候一定要确认保持不变性的边界在哪里，是否要求属性对象也具备不可变性。<br> Foo对象是不变的，但是Foo对象的属性是可以变化的</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">class</span> <span class="token class-name">Foo</span><span class="token punctuation">&#123;</span>
+ <span class="token keyword">int</span> age<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">;</span>
+ <span class="token keyword">int</span> name<span class="token operator">=</span><span class="token string">"abc"</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">Bar</span> <span class="token punctuation">&#123;</span>
+ <span class="token keyword">final</span> <span class="token class-name">Foo</span> foo<span class="token punctuation">;</span>
+ <span class="token keyword">void</span> <span class="token function">setAge</span><span class="token punctuation">(</span><span class="token keyword">int</span> a<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+   foo<span class="token punctuation">.</span>age<span class="token operator">=</span>a<span class="token punctuation">;</span>
+ <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/06/07/java-concurrent-design-pattern/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/06/java-thread/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/06/06/java-thread/" class="post-title-link" itemprop="url">Java线程笔记</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-06 17:40:31" itemprop="dateCreated datePublished" datetime="2020-06-06T17:40:31+08:00">2020-06-06</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>5.6k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>5 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  在Java中，创建对象，仅仅是在 JVM 的堆里分配一块内存，而创建一个线程，需要调用操作系统内核的 API，然后操作系统要为线程分配一系列的资源，成本很高，所以线程是一个重量级的对象，应该避免频繁创建和销毁。</p>
+<p>  进程的运行空间一般分为用户态和内核态，用户态空间一般是进程应用运行空间，而内核态空间一般是指应用需要调用系统资源，应用不能再用户态空间直接调用系统资源，需要通过内核态来系统系统资源。</p>
+<p>  内核线程（Kernel-Level Thread, KLT）是由操作系统内核支持的线程，内核通过调度器对线程进行调度，并负责完成线程的切换。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/06/06/java-thread/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/06/java-blocking-queue/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/06/06/java-blocking-queue/" class="post-title-link" itemprop="url">Java 阻塞队列 BlockingQueue</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-06 16:30:37" itemprop="dateCreated datePublished" datetime="2020-06-06T16:30:37+08:00">2020-06-06</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-11-26 14:43:07" itemprop="dateModified" datetime="2022-11-26T14:43:07+08:00">2022-11-26</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>13k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>12 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <h1 id="1-阻塞队列是什么"><a href="#1-阻塞队列是什么" class="headerlink" title="(1) 阻塞队列是什么"></a>(1) 阻塞队列是什么</h1><p>　阻塞队列(BlockingQueue)是一个支持阻塞操作的线程安全的队列。使得数据由队列的一端输入，从另外一端输出；</p>
+<p>　BlockingQueue很好的解决了多线程中，如何高效安全“传输”数据的问题。通过这些高效并且线程安全的队列类，为我们快速搭建高质量的多线程程序带来极大的便利。</p>
+<p>阻塞队列方法概要</p>
+<table>
+<thead>
+<tr>
+<th>方法\处理方式</th>
+<th>抛异常</th>
+<th>返回特殊值</th>
+<th>一直阻塞(死等)</th>
+<th>超时退出(等一会儿)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>添加元素</td>
+<td>add(e)</td>
+<td>offer(e)</td>
+<td>put(e)</td>
+<td>offer(e, time, unit)</td>
+</tr>
+<tr>
+<td>删除元素</td>
+<td>remove()</td>
+<td>poll()</td>
+<td>take()</td>
+<td>poll(time, unit)</td>
+</tr>
+<tr>
+<td>检查元素</td>
+<td>element()</td>
+<td>peek()</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<br>
+
+
+<h1 id="2-阻塞队列应用"><a href="#2-阻塞队列应用" class="headerlink" title="(2) 阻塞队列应用"></a>(2) 阻塞队列应用</h1><p>  阻塞队列常用于生产者和消费者的场景，生产者是向队列里添加元素的线程，消费者是从队列里取元素的线程。阻塞队列就是生产者用来存放元素、消费者用来获取元素的容器。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 生产者
+ */</span>
+<span class="token keyword">class</span> <span class="token class-name">Producer</span> <span class="token keyword">implements</span> <span class="token class-name">Runnable</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">BlockingQueue</span> queue<span class="token punctuation">;</span>
+
+    <span class="token class-name">Producer</span><span class="token punctuation">(</span><span class="token class-name">BlockingQueue</span> q<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        queue <span class="token operator">=</span> q<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 往队列添加元素</span>
+                queue<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span><span class="token function">produce</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">InterruptedException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">//...handle ...</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token class-name">Object</span> <span class="token function">produce</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//    ...</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ *　消费者　
+ */</span>
+<span class="token keyword">class</span> <span class="token class-name">Consumer</span> <span class="token keyword">implements</span> <span class="token class-name">Runnable</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">BlockingQueue</span> queue<span class="token punctuation">;</span>
+
+    <span class="token class-name">Consumer</span><span class="token punctuation">(</span><span class="token class-name">BlockingQueue</span> q<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        queue <span class="token operator">=</span> q<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 从队列取元素</span>
+                <span class="token function">consume</span><span class="token punctuation">(</span>queue<span class="token punctuation">.</span><span class="token function">take</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">InterruptedException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">//...handle ...</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">void</span> <span class="token function">consume</span><span class="token punctuation">(</span><span class="token class-name">Object</span> x<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//...</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">class</span> <span class="token class-name">Setup</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">BlockingQueue</span> q <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LinkedBlockingQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Producer</span> p <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Producer</span><span class="token punctuation">(</span>q<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Consumer</span> c1 <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Consumer</span><span class="token punctuation">(</span>q<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Consumer</span> c2 <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Consumer</span><span class="token punctuation">(</span>q<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">new</span> <span class="token class-name">Thread</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">new</span> <span class="token class-name">Thread</span><span class="token punctuation">(</span>c1<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">new</span> <span class="token class-name">Thread</span><span class="token punctuation">(</span>c2<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h1 id="3-阻塞队列的原理"><a href="#3-阻塞队列的原理" class="headerlink" title="(3) 阻塞队列的原理"></a>(3) 阻塞队列的原理</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concurrent</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 一个队列，它还支持在检索元素时等待队列变为非空，并在存储元素时等待队列中的空间变为可用的操作。
+ * 
+ * BlockingQueue 方法有四种形式，用不同的方式处理不能立即满足，但可能在未来某个时间点满足的操作：
+ * 第一种抛出异常，
+ * 第二种返回特殊值（null 或 false，取决于操作），
+ * 第三个无限期地阻塞当前线程，直到操作成功，
+ * 第四个阻塞只有给定的最大时间限制才放弃。
+ * 
+ * BlockingQueue 不接受空元素。在尝试添加、放置或提供 null 时，实现会抛出 NullPointerException。
+ * 
+ * BlockingQueue 可能是容量受限的。在任何给定时间，它都可能有一个剩余容量，超出该容量就不能在不阻塞的情况下放置其他元素。
+ * 
+ * BlockingQueue 实现是线程安全的。所有排队方法都使用内部锁或其他形式的并发控制以原子方式实现其效果。
+ * 但是，批量收集操作 addAll、containAll、retainAll 和 removeAll 不一定以原子方式执行，除非在实现中另外指定。
+ * 
+ * BlockingQueue 本质上不支持任何类型的“关闭”或“关闭”操作来指示不再添加项目。此类功能的需求和使用往往取决于实现。
+ * 例如，一种常见的策略是生产者插入特殊的流尾或有毒对象，当消费者采用时会相应地解释这些对象。
+ */</span> 
+<span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">BlockingQueue</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">E</span><span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">Queue</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">E</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h2 id="3-1-添加元素"><a href="#3-1-添加元素" class="headerlink" title="(3.1) 添加元素"></a>(3.1) 添加元素</h2><p>  添加元素有4种方法 <code>add(e)</code>，<code>offer(e)</code>，<code>put(e)</code>，<code>offer(e, time, unit)</code><br>  常用的是<code>offer(e)</code>
+　</p>
+<h3 id="3-1-1-add-e"><a href="#3-1-1-add-e" class="headerlink" title="(3.1.1) add(e)"></a>(3.1.1) add(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 如果可以在不违反容量限制的情况下立即将指定的元素插入此队列，则在成功时返回 &#123;@code true&#125; 
+ * 在当前没有可用空间时抛出IllegalStateException。
+ * 使用容量受限队列时，通常最好使用 #offer(Object) 。
+ *
+ * @param e 要添加的元素
+ * @return true  
+ * @throws IllegalStateException 达到容量限制(队列已满)抛出此异常
+ * @throws ClassCastException 如果指定元素的类阻止它被添加到这个队列
+ * @throws NullPointerException 元素为null
+ * @throws IllegalArgumentException 如果指定的某些属性元素阻止它被添加到这个队列
+ */</span>
+<span class="token keyword">boolean</span> <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h3 id="3-1-2-offer-e"><a href="#3-1-2-offer-e" class="headerlink" title="(3.1.2) offer(e)"></a>(3.1.2) offer(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 如果可以在不违反容量限制的情况下立即将指定的元素插入此队列(队列未满)，则在成功时返回true，
+ * 如果当前没有可用空间(队列满了)则返回false。
+ *
+ * @param e 要添加的元素
+ * @return 添加成功返回true  添加失败返回false
+ * @throws ClassCastException 如果指定元素的类阻止它被添加到这个队列
+ * @throws NullPointerException 元素为null
+ * @throws IllegalArgumentException 如果指定的某些属性元素阻止它被添加到这个队列
+ */</span>
+<span class="token keyword">boolean</span> <span class="token function">offer</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h3 id="3-1-3-put-e"><a href="#3-1-3-put-e" class="headerlink" title="(3.1.3) put(e)"></a>(3.1.3) put(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 将指定元素插入此队列，队列已满时等待可用空间。
+ *
+ * @param e 要添加的元素
+ * @throws InterruptedException 在等待时被中断
+ * @throws ClassCastException 如果指定元素的类阻止它被添加到这个队列
+ * @throws NullPointerException 元素为null
+ * @throws IllegalArgumentException 如果指定的某些属性元素阻止它被添加到这个队列
+ */</span>
+<span class="token keyword">void</span> <span class="token function">put</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="3-1-4-offer-e-time-unit"><a href="#3-1-4-offer-e-time-unit" class="headerlink" title="(3.1.4) offer(e, time, unit)"></a>(3.1.4) offer(e, time, unit)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 将指定的元素插入此队列，如有必要，等待指定时间(等一会)以获得可用空间。
+ *
+ * @param e 要添加的元素
+ * @param timeout 放弃以前的等待时间
+ * @param unit 时间单位
+ * @return 成功返回true，失败返回false
+ * @throws InterruptedException 在等待时被中断
+ * @throws ClassCastException 如果指定元素的类阻止它被添加到这个队列
+ * @throws NullPointerException 元素为null
+ * @throws IllegalArgumentException 如果指定的某些属性元素阻止它被添加到这个队列
+ */</span>
+<span class="token keyword">boolean</span> <span class="token function">offer</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">,</span> <span class="token keyword">long</span> timeout<span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span> unit<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="3-2-移除元素"><a href="#3-2-移除元素" class="headerlink" title="(3.2) 移除元素"></a>(3.2) 移除元素</h2><br>
+
+<h3 id="3-2-1-remove-o"><a href="#3-2-1-remove-o" class="headerlink" title="(3.2.1) remove(o)"></a>(3.2.1) remove(o)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 从此队列中移除指定元素的单个实例（如果存在）。
+ * 更正式地说，如果此队列包含一个或多个此类元素，则删除元素e 使得o.equals(e)。如果此队列包含指定元素（或等效地，如果此队列因调用而更改），则返回 &#123;@code true&#125;。
+ *
+ * @param o 要从此队列中删除的元素（如果存在）
+ * @return true 移除成功返回true
+ * @throws ClassCastException 如果指定元素的类与此队列不兼容
+ * @throws NullPointerException 元素为空
+ */</span>
+<span class="token keyword">boolean</span> <span class="token function">remove</span><span class="token punctuation">(</span><span class="token class-name">Object</span> o<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="3-2-2-poll"><a href="#3-2-2-poll" class="headerlink" title="(3.2.2) poll()"></a>(3.2.2) poll()</h3><p>  poll()方法继承自Queue</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 检索并删除此队列的头部，如果此队列为空，则返回null
+ *
+ * @return 此队列的头部元素，如果此队列为空返回null
+ */</span>
+<span class="token class-name">E</span> <span class="token function">poll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h3 id="3-2-3-take"><a href="#3-2-3-take" class="headerlink" title="(3.2.3) take()"></a>(3.2.3) take()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 检索并删除此队列的头部，必要时等待直到元素可用。
+ *
+ * @return 此队列的头部元素
+ * @throws InterruptedException 如果在等待时被打断
+ */</span>
+<span class="token class-name">E</span> <span class="token function">take</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h3 id="3-2-4-poll-timeout-unit"><a href="#3-2-4-poll-timeout-unit" class="headerlink" title="(3.2.4) poll(timeout, unit)"></a>(3.2.4) poll(timeout, unit)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * Retrieves and removes the head of this queue, waiting up to the
+ * specified wait time if necessary for an element to become available.
+ *
+ * @param timeout 等待多长时间才放弃
+ * @param unit 时间单位
+ * @return 此队列的头部，等待时间用尽后返回null
+ * @throws InterruptedException 如果在等待时被打断
+ */</span>
+<span class="token class-name">E</span> <span class="token function">poll</span><span class="token punctuation">(</span><span class="token keyword">long</span> timeout<span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span> unit<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="3-3-其它"><a href="#3-3-其它" class="headerlink" title="(3.3) 其它"></a>(3.3) 其它</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 返回此队列在理想情况下(在没有内存或资源限制的情况下)可以无阻塞地接受的附加元素的数量，
+ * 如果没有内在限制，则返回 Integer.MAX_VALUE
+ *
+ * 请注意，您不能总是通过检查剩余容量来判断插入元素的尝试是否会成功，因为可能是另一个线程即将插入或删除元素。
+ *
+ * @return 剩余容量
+ */</span>
+<span class="token keyword">int</span> <span class="token function">remainingCapacity</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 如果此队列包含指定元素，则返回true。
+ * 更正式地说，返回true当且仅当此队列包含至少一个元素e使得o.equals(e)。
+ *
+ * @param o 要检查此队列中包含的对象
+ * @return true 如果此队列包含指定元素
+ * @throws ClassCastException 如果指定元素的类与此队列不兼容
+ * @throws NullPointerException 如果元素为空
+ */</span>
+<span class="token keyword">boolean</span> <span class="token function">contains</span><span class="token punctuation">(</span><span class="token class-name">Object</span> o<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 从此队列中删除所有可用元素并将它们添加到给定集合中。
+ * 此操作可能比重复轮询此队列更有效。
+ * 尝试将元素添加到集合c时遇到的失败可能会导致在抛出相关异常时元素不在任何一个或两个集合中。尝试将队列排空到自身会导致IllegalArgumentException。
+ * 此外，如果指定的集合在操作过程中被修改，则此操作的行为是未定义的。
+ *
+ * @param c 将元素转移到的集合
+ * @return 转移的元素数量
+ * @throws UnsupportedOperationException 如果指定集合不支持添加元素
+ * @throws ClassCastException 如果此队列的元素的类阻止将其添加到指定的集合
+ * @throws NullPointerException 如果指定的集合为空
+ * @throws IllegalArgumentException 如果指定的集合是这个队列，或者这个队列元素的某些属性阻止它被添加到指定的集合
+ */</span>
+<span class="token keyword">int</span> <span class="token function">drainTo</span><span class="token punctuation">(</span><span class="token class-name">Collection</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">super</span> <span class="token class-name">E</span><span class="token punctuation">></span></span> c<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 从此队列中最多移除给定数量的可用元素，并将它们添加到给定的集合中。
+ * 尝试将元素添加到集合c时遇到的失败可能会导致在抛出相关异常时元素不在任何一个或两个集合中。尝试将队列排空到自身会导致IllegalArgumentException。
+ * 此外，如果指定的集合在操作过程中被修改，则此操作的行为是未定义的。
+ * 
+ * @param c 将元素转移到的集合
+ * @param maxElements 要传输的最大元素数
+ * @return 转移的元素数量
+ * @throws UnsupportedOperationException 如果指定集合不支持添加元素
+ * @throws ClassCastException 如果此队列的元素的类阻止将其添加到指定的集合
+ * @throws NullPointerException 如果指定的集合为空
+ * @throws IllegalArgumentException 如果指定的集合是这个队列，或者这个队列元素的某些属性阻止它被添加到指定的集合
+ */</span>
+<span class="token keyword">int</span> <span class="token function">drainTo</span><span class="token punctuation">(</span><span class="token class-name">Collection</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">super</span> <span class="token class-name">E</span><span class="token punctuation">></span></span> c<span class="token punctuation">,</span> <span class="token keyword">int</span> maxElements<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+
+<h1 id="4-JDK里的阻塞队列"><a href="#4-JDK里的阻塞队列" class="headerlink" title="(4) JDK里的阻塞队列"></a>(4) JDK里的阻塞队列</h1><p>JDK里提供了多种阻塞队列<br>ArrayBlockingQueue<br>LinkedBlockingQueue<br>PriorityBlockingQueue<br>DelayQueue<br>SynchronousQueue  并发同步阻塞队列<br>LinkedTransferQueue<br>LinkedBlockingDeque</p>
+<br>
+
+
+<h1 id="5-有界数组阻塞队列-ArrayBlockingQueue"><a href="#5-有界数组阻塞队列-ArrayBlockingQueue" class="headerlink" title="(5) 有界数组阻塞队列-ArrayBlockingQueue"></a>(5) 有界数组阻塞队列-ArrayBlockingQueue</h1><p>  ArrayBlockingQueue是一个用数组实现的有界阻塞队列。<br>  此队列按照先进先出的原则对元素进行排序。</p>
+<p>  思考一下，如果要自己用数组实现一个先进先出的阻塞队列，自己怎么实现？<br>  是不是添加元素时添加到数据尾部，删除元素时也在头部删除？<br>  如果直接在头部删除元素，需要移动后面的所有元素，时间复杂度比较高，有没有优化的方案？</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ArrayBlockingQueue</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">E</span><span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">AbstractQueue</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">E</span><span class="token punctuation">></span></span>
+        <span class="token keyword">implements</span> <span class="token class-name">BlockingQueue</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">E</span><span class="token punctuation">></span></span><span class="token punctuation">,</span> <span class="token class-name"><span class="token namespace">java<span class="token punctuation">.</span>io<span class="token punctuation">.</span></span>Serializable</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/** 队列中的元素  数组 */</span>
+    <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"serial"</span><span class="token punctuation">)</span> <span class="token comment">// 有条件可序列化 Conditionally serializable</span>
+    <span class="token keyword">final</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> items<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 下一次移除元素操作的元素索引  移除元素操作有 take, poll, peek or remove */</span>
+    <span class="token keyword">int</span> takeIndex<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 下一次添加元素操作的元素索引，添加元素的操作有 put, offer, or add */</span>
+    <span class="token keyword">int</span> putIndex<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 队列中元素的个数 */</span>
+    <span class="token keyword">int</span> count<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 主锁保护所有访问 */</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 移除元素的等待条件  不为空 */</span>
+    <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"serial"</span><span class="token punctuation">)</span>  <span class="token comment">// Classes implementing Condition may be serializable.</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Condition</span> notEmpty<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 添加元素的等待条件  队列不满 */</span>
+    <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"serial"</span><span class="token punctuation">)</span>  <span class="token comment">// Classes implementing Condition may be serializable.</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Condition</span> notFull<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 当前活动迭代器的共享状态，如果已知没有，则为 null。允许队列操作更新迭代器状态。
+     */</span>
+    <span class="token keyword">transient</span> <span class="token class-name">Itrs</span> itrs<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h2 id="5-1-构造方法"><a href="#5-1-构造方法" class="headerlink" title="(5.1) 构造方法"></a>(5.1) 构造方法</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 使用给定(固定)容量和默认访问策略(非公平队列)创建ArrayBlockingQueue。
+ *
+ * @param capacity  队列容量
+ * @throws IllegalArgumentException  capacity &lt; 1会抛出异常
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">ArrayBlockingQueue</span><span class="token punctuation">(</span><span class="token keyword">int</span> capacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 默认是非公平队列</span>
+    <span class="token keyword">this</span><span class="token punctuation">(</span>capacity<span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 使用给定(固定)容量和指定访问策略(公平/非公平)创建ArrayBlockingQueue。
+ *
+ * @param 队列容量
+ * @param fair  如果是true，访问队列的线程阻塞在插入或者移除方法时，访问顺序按照先进先出顺序处理。
+ *              如果为false，则未指定访问顺序。
+ *        
+ * @throws IllegalArgumentException if &#123;@code capacity &lt; 1&#125;
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">ArrayBlockingQueue</span><span class="token punctuation">(</span><span class="token keyword">int</span> capacity<span class="token punctuation">,</span> <span class="token keyword">boolean</span> fair<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>capacity <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 指定容量    </span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>items <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">[</span>capacity<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token comment">// 通过ReentrantLock来保证公平还是非公平</span>
+    lock <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ReentrantLock</span><span class="token punctuation">(</span>fair<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    notEmpty <span class="token operator">=</span> lock<span class="token punctuation">.</span><span class="token function">newCondition</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    notFull <span class="token operator">=</span>  lock<span class="token punctuation">.</span><span class="token function">newCondition</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 创建一个具有给定(固定)容量、指定访问策略(公平/非公平)并最初包含给定集合元素的ArrayBlockingQueue，按集合迭代器的遍历顺序添加。 
+ *
+ * @param capacity 队列容量
+ * @param fair  如果是true，访问队列的线程阻塞在插入或者移除方法时，访问顺序按照先进先出顺序处理。
+ *              如果为false，则未指定访问顺序。
+ * @param c 最初包含的元素集合
+ * @throws IllegalArgumentException capacity &lt; c.size() || capacity &lt; 1 
+ * @throws NullPointerException 如果指定的集合或其任何元素为 null
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">ArrayBlockingQueue</span><span class="token punctuation">(</span><span class="token keyword">int</span> capacity<span class="token punctuation">,</span> <span class="token keyword">boolean</span> fair<span class="token punctuation">,</span>
+                          <span class="token class-name">Collection</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">extends</span> <span class="token class-name">E</span><span class="token punctuation">></span></span> c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 初始化队列</span>
+    <span class="token keyword">this</span><span class="token punctuation">(</span>capacity<span class="token punctuation">,</span> fair<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    lock<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// Lock only for visibility, not mutual exclusion</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 队列数组</span>
+        <span class="token keyword">final</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> items <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>items<span class="token punctuation">;</span>
+        <span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 把集合c里的元素添加到队列</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">E</span> e <span class="token operator">:</span> c<span class="token punctuation">)</span>
+                items<span class="token punctuation">[</span>i<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token class-name">Objects</span><span class="token punctuation">.</span><span class="token function">requireNonNull</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 这儿要求元素不为null</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">ArrayIndexOutOfBoundsException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 更新count</span>
+        count <span class="token operator">=</span> i<span class="token punctuation">;</span>
+        <span class="token comment">// 更新index  </span>
+        putIndex <span class="token operator">=</span> <span class="token punctuation">(</span>i <span class="token operator">==</span> capacity<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token number">0</span> <span class="token operator">:</span> i<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="5-2-添加元素"><a href="#5-2-添加元素" class="headerlink" title="(5.2) 添加元素"></a>(5.2) 添加元素</h2><h3 id="5-2-1-add-e"><a href="#5-2-1-add-e" class="headerlink" title="(5.2.1) add(e)"></a>(5.2.1) add(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * (队列未满)插入(尾部)成功返回true，
+ * (队列满)插入失败返回IllegalStateException     
+ *
+ * @param e 要添加的元素
+ * @return true  (as specified by &#123;@link Collection#add&#125;)
+ * @throws IllegalStateException 如果队列满了
+ * @throws NullPointerException 如果元素为null
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token keyword">super</span><span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-2-2-offer-e"><a href="#5-2-2-offer-e" class="headerlink" title="(5.2.2) offer(e)"></a>(5.2.2) offer(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * (队列未满)插入(尾部)成功返回true，
+ * (队列满)插入失败返回false
+ *
+ * @throws NullPointerException 如果元素为null
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">offer</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 要求元素不为空</span>
+    <span class="token class-name">Objects</span><span class="token punctuation">.</span><span class="token function">requireNonNull</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span> 
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁</span>
+    lock<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>count <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span>
+            <span class="token comment">// 队列已满，返回false</span>
+            <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 添加到队列尾部</span>
+            <span class="token function">enqueue</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 解锁</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-2-3-put-e"><a href="#5-2-3-put-e" class="headerlink" title="(5.2.3) put(e)"></a>(5.2.3) put(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 将指定元素插入此队列的尾部，如果队列已满，则等待(队列)可用空间。  
+ *
+ * @throws InterruptedException 其它线程调用等待线程的Thread.interrupt方法来中断等待线程的等待时
+ * @throws NullPointerException 元素为空
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">put</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 要求元素不为空</span>
+    <span class="token class-name">Objects</span><span class="token punctuation">.</span><span class="token function">requireNonNull</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁，优先响应中断 // 允许在等待时由其它线程调用等待线程的Thread.interrupt方法来中断等待线程的等待而直接返回，这时不用获取锁，而会抛出一个InterruptedException</span>
+    lock<span class="token punctuation">.</span><span class="token function">lockInterruptibly</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span>count <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span>
+            <span class="token comment">// 队列已满，等待</span>
+            notFull<span class="token punctuation">.</span><span class="token function">await</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 添加到队列尾部    </span>
+        <span class="token function">enqueue</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 解锁</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-2-4-offer-e-timeout-unit"><a href="#5-2-4-offer-e-timeout-unit" class="headerlink" title="(5.2.4) offer(e, timeout, unit)"></a>(5.2.4) offer(e, timeout, unit)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 将指定的元素插入此队列的尾部，
+ * 如果队列已满，则等待指定的时间(等一会儿)，如果在等待的时间内队列空间可用，插入返回true，否则超时返回false 
+ *
+ * @throws InterruptedException 其它线程调用等待线程的Thread.interrupt方法来中断等待线程的等待时
+ * @throws NullPointerException 元素为null
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">offer</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">,</span> <span class="token keyword">long</span> timeout<span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span> unit<span class="token punctuation">)</span>
+    <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 要求元素不为null</span>
+    <span class="token class-name">Objects</span><span class="token punctuation">.</span><span class="token function">requireNonNull</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">long</span> nanos <span class="token operator">=</span> unit<span class="token punctuation">.</span><span class="token function">toNanos</span><span class="token punctuation">(</span>timeout<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁  优先响应中断</span>
+    lock<span class="token punctuation">.</span><span class="token function">lockInterruptibly</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span>count <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>nanos <span class="token operator">&lt;=</span> <span class="token number">0L</span><span class="token punctuation">)</span>
+                <span class="token comment">// 返回失败</span>
+                <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+            <span class="token comment">// 更新等待时间    </span>
+            nanos <span class="token operator">=</span> notFull<span class="token punctuation">.</span><span class="token function">awaitNanos</span><span class="token punctuation">(</span>nanos<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 添加到队列尾部</span>
+        <span class="token function">enqueue</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="5-2-5-enqueue-e"><a href="#5-2-5-enqueue-e" class="headerlink" title="(5.2.5) enqueue(e)"></a>(5.2.5) enqueue(e)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 在当前放置位置插入元素、前进和发出信号。
+ * 仅在持有锁时调用。  
+ */</span>
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">enqueue</span><span class="token punctuation">(</span><span class="token class-name">E</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// assert lock.isHeldByCurrentThread();</span>
+    <span class="token comment">// assert lock.getHoldCount() == 1;</span>
+    <span class="token comment">// assert items[putIndex] == null;</span>
+    <span class="token comment">// 队列数组</span>
+    <span class="token keyword">final</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> items <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>items<span class="token punctuation">;</span>
+    <span class="token comment">// 把元素添加到数组尾部</span>
+    items<span class="token punctuation">[</span>putIndex<span class="token punctuation">]</span> <span class="token operator">=</span> e<span class="token punctuation">;</span>
+    <span class="token comment">// 这儿有个置0操作，可以循环写  避免了删除操作</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">++</span>putIndex <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span> putIndex <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 更新数组元素个数</span>
+    count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token comment">// 发信号 唤醒删除操作</span>
+    notEmpty<span class="token punctuation">.</span><span class="token function">signal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="5-3-删除元素"><a href="#5-3-删除元素" class="headerlink" title="(5.3) 删除元素"></a>(5.3) 删除元素</h2><h3 id="5-3-1-remove"><a href="#5-3-1-remove" class="headerlink" title="(5.3.1) remove()"></a>(5.3.1) remove()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token comment">/**
+ * Deletes item at array index removeIndex.
+ * Utility for remove(Object) and iterator.remove.
+ * Call only when holding lock.
+ */</span>
+<span class="token keyword">void</span> <span class="token function">removeAt</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token keyword">int</span> removeIndex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// assert lock.isHeldByCurrentThread();</span>
+    <span class="token comment">// assert lock.getHoldCount() == 1;</span>
+    <span class="token comment">// assert items[removeIndex] != null;</span>
+    <span class="token comment">// assert removeIndex >= 0 &amp;&amp; removeIndex &lt; items.length;</span>
+    <span class="token keyword">final</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> items <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>items<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>removeIndex <span class="token operator">==</span> takeIndex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// removing front item; just advance</span>
+        items<span class="token punctuation">[</span>takeIndex<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">++</span>takeIndex <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span> takeIndex <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        count<span class="token operator">--</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>itrs <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+            itrs<span class="token punctuation">.</span><span class="token function">elementDequeued</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// an "interior" remove</span>
+
+        <span class="token comment">// slide over all others up through putIndex.</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> removeIndex<span class="token punctuation">,</span> putIndex <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>putIndex<span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">int</span> pred <span class="token operator">=</span> i<span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">++</span>i <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>i <span class="token operator">==</span> putIndex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                items<span class="token punctuation">[</span>pred<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>putIndex <span class="token operator">=</span> pred<span class="token punctuation">;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            items<span class="token punctuation">[</span>pred<span class="token punctuation">]</span> <span class="token operator">=</span> items<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        count<span class="token operator">--</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>itrs <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+            itrs<span class="token punctuation">.</span><span class="token function">removedAt</span><span class="token punctuation">(</span>removeIndex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    notFull<span class="token punctuation">.</span><span class="token function">signal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-3-2-poll"><a href="#5-3-2-poll" class="headerlink" title="(5.3.2) poll()"></a>(5.3.2) poll()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">E</span> <span class="token function">poll</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁</span>
+    lock<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 队列为空 返回null   不为空移除元素并返回</span>
+        <span class="token keyword">return</span> <span class="token punctuation">(</span>count <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token keyword">null</span> <span class="token operator">:</span> <span class="token function">dequeue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 解锁</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-3-3-take"><a href="#5-3-3-take" class="headerlink" title="(5.3.3) take()"></a>(5.3.3) take()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 移除元素
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">E</span> <span class="token function">take</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁 可响应中断</span>
+    lock<span class="token punctuation">.</span><span class="token function">lockInterruptibly</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span>count <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span>
+            <span class="token comment">// 只要队列为空就一直等  死等 </span>
+            notEmpty<span class="token punctuation">.</span><span class="token function">await</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 移除的元素并返回</span>
+        <span class="token keyword">return</span> <span class="token function">dequeue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-3-4-poll-timeout-unit"><a href="#5-3-4-poll-timeout-unit" class="headerlink" title="(5.3.4) poll(timeout, unit)"></a>(5.3.4) poll(timeout, unit)</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 移除元素
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">E</span> <span class="token function">poll</span><span class="token punctuation">(</span><span class="token keyword">long</span> timeout<span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span> unit<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 要等待的时间</span>
+    <span class="token keyword">long</span> nanos <span class="token operator">=</span> unit<span class="token punctuation">.</span><span class="token function">toNanos</span><span class="token punctuation">(</span>timeout<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁 可响应中断</span>
+    lock<span class="token punctuation">.</span><span class="token function">lockInterruptibly</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span>count <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>nanos <span class="token operator">&lt;=</span> <span class="token number">0L</span><span class="token punctuation">)</span>
+                <span class="token comment">// 等待时间&lt;0 返回</span>
+                <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+            <span class="token comment">// 等待时间>0 继续等待</span>
+            <span class="token comment">// 更新等待时间    </span>
+            nanos <span class="token operator">=</span> notEmpty<span class="token punctuation">.</span><span class="token function">awaitNanos</span><span class="token punctuation">(</span>nanos<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 移除的元素并返回</span>
+        <span class="token keyword">return</span> <span class="token function">dequeue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 解锁</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="5-3-5-dequeue"><a href="#5-3-5-dequeue" class="headerlink" title="(5.3.5) dequeue()"></a>(5.3.5) dequeue()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 移除元素
+ * 在当前采取的位置、前进和信号中提取元素。
+ * 仅在持有锁时调用。 
+ *
+ * @return 返回被移除的元素 
+ */</span>
+<span class="token keyword">private</span> <span class="token class-name">E</span> <span class="token function">dequeue</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// assert lock.isHeldByCurrentThread();</span>
+    <span class="token comment">// assert lock.getHoldCount() == 1;</span>
+    <span class="token comment">// assert items[takeIndex] != null;</span>
+    <span class="token comment">// 队列元素 </span>
+    <span class="token keyword">final</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> items <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>items<span class="token punctuation">;</span>
+    <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"unchecked"</span><span class="token punctuation">)</span>
+    <span class="token comment">// 要移除的原因</span>
+    <span class="token class-name">E</span> e <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">E</span><span class="token punctuation">)</span> items<span class="token punctuation">[</span>takeIndex<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token comment">// 置为空</span>
+    items<span class="token punctuation">[</span>takeIndex<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token comment">// 置0  循环操作  避免了删除要移动元素的问题</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">++</span>takeIndex <span class="token operator">==</span> items<span class="token punctuation">.</span>length<span class="token punctuation">)</span> takeIndex <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 更新队列数组元素个数</span>
+    count<span class="token operator">--</span><span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>itrs <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+        itrs<span class="token punctuation">.</span><span class="token function">elementDequeued</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 发信号  唤醒添加操作</span>
+    notFull<span class="token punctuation">.</span><span class="token function">signal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> e<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="5-4-其它"><a href="#5-4-其它" class="headerlink" title="(5.4) 其它"></a>(5.4) 其它</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// this doc comment is a modified copy of the inherited doc comment,</span>
+<span class="token comment">// without the reference to unlimited queues.</span>
+<span class="token comment">/**
+ * 剩余容量
+ * 返回此队列可以理想地(在没有内存或资源限制的情况下)无阻塞地接受的附加元素的数量。
+ * 这始终等于此队列的初始容量减去此队列的当前size。
+ *
+ * 请注意，您不能总是通过检查剩余容量来判断插入元素的尝试是否会成功，因为可能是另一个线程即将插入或删除元素。
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">int</span> <span class="token function">remainingCapacity</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> lock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>lock<span class="token punctuation">;</span>
+    <span class="token comment">// 加锁</span>
+    lock<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 数组长度 - 已有元素个数 = 剩余容量</span>
+        <span class="token keyword">return</span> items<span class="token punctuation">.</span>length <span class="token operator">-</span> count<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 解锁</span>
+        lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6844903640709201934">Java并发系列 — 阻塞队列（BlockingQueue）</a></p>
+
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/06/java-doc/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/06/06/java-doc/" class="post-title-link" itemprop="url">Java文档</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-06 10:19:42" itemprop="dateCreated datePublished" datetime="2020-06-06T10:19:42+08:00">2020-06-06</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>696</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/tutorial/tutorialLearningPaths.html">https://docs.oracle.com/javase/tutorial/tutorialLearningPaths.html</a> </p>
+<p>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/tutorial/">https://docs.oracle.com/javase/tutorial/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/index.html">https://docs.oracle.com/en/java/javase/index.html</a></p>
+<p>  <a target="_blank" rel="noopener" href="https://blogs.oracle.com/java-platform-group/">https://blogs.oracle.com/java-platform-group/</a></p>
+<p>  javase14文档  <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/14/index.html">https://docs.oracle.com/en/java/javase/14/index.html</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javacomponents/index.html">https://docs.oracle.com/javacomponents/index.html</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/index.html">https://docs.oracle.com/en/java/javase/index.html</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/13/">https://docs.oracle.com/en/java/javase/13/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/12/">https://docs.oracle.com/en/java/javase/12/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/en/java/javase/11/">https://docs.oracle.com/en/java/javase/11/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/10/">https://docs.oracle.com/javase/10/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/9/">https://docs.oracle.com/javase/9/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/8/">https://docs.oracle.com/javase/8/</a><br>  <a target="_blank" rel="noopener" href="https://docs.oracle.com/javase/7/docs/index.html">https://docs.oracle.com/javase/7/docs/index.html</a></p>
+<p>  <a target="_blank" rel="noopener" href="https://dzone.com/articles/jdk-14-records-text-blocks-and-more">https://dzone.com/articles/jdk-14-records-text-blocks-and-more</a></p>
+
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/06/lock/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/06/06/lock/" class="post-title-link" itemprop="url">lock</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-06 09:48:36" itemprop="dateCreated datePublished" datetime="2020-06-06T09:48:36+08:00">2020-06-06</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>939</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  锁一般是用来解决并发问题的。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/06/06/lock/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/06/06/read-write-lock/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/06/06/read-write-lock/" class="post-title-link" itemprop="url">读写锁</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-06-06 09:44:46" itemprop="dateCreated datePublished" datetime="2020-06-06T09:44:46+08:00">2020-06-06</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>227</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <blockquote>
+<p> 读写锁，是一个广为使用的通用技术，无论是操作系统、数据库、编程语言、应用 等都有用到 </p>
+</blockquote>
+<blockquote>
+<p> 所有的读写锁都遵守以下三条基本原则：</p>
+<ol>
+<li>允许多个线程同时读共享变量；</li>
+<li>只允许一个线程写共享变量；</li>
+<li>如果一个写线程正在执行写操作，此时禁止读线程读共享变量。</li>
+</ol>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/06/06/read-write-lock/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/30/java-reflection/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/05/30/java-reflection/" class="post-title-link" itemprop="url">Java 反射 笔记</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-05-30 16:46:52" itemprop="dateCreated datePublished" datetime="2020-05-30T16:46:52+08:00">2020-05-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-11-13 21:24:31" itemprop="dateModified" datetime="2022-11-13T21:24:31+08:00">2022-11-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>19k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>17 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  在提高代码的抽象性、可扩展性时，经常需要动态地获取一些类、方法或者属性。这个时候往往需要通过反射去获取。<br>  比如 加载数据库驱动、打印日志获取类、Spring IOC加载Bean 等。 </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Class</span><span class="token punctuation">.</span><span class="token function">forName</span><span class="token punctuation">(</span><span class="token string">"com.mysql.jdbc.Driver"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Logger</span> log <span class="token operator">=</span> <span class="token class-name">LoggerFactory</span><span class="token punctuation">.</span><span class="token function">getLogger</span><span class="token punctuation">(</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/05/30/java-reflection/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/28/redis-high-performance-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2020/05/28/redis-high-performance-analysis/" class="post-title-link" itemprop="url">redis高性能分析</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-05-28 13:09:58" itemprop="dateCreated datePublished" datetime="2020-05-28T13:09:58+08:00">2020-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-11-13 21:01:56" itemprop="dateModified" datetime="2022-11-13T21:01:56+08:00">2022-11-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>6.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <blockquote>
+<p> redis高性能分析</p>
+</blockquote>
+<p>  内存<br>  高效的数据结构  时间复杂度O(1)<br>  IO模型 </p>
+<h1 id="数据类型"><a href="#数据类型" class="headerlink" title="数据类型"></a>数据类型</h1><p>  redis为了达到高性能，对数据类型做了调整，更好的适用于高并发</p>
+<blockquote>
+<p> redis的源码相关文件如下：<br> t_hash.c, t_list.c, t_set.c, t_string.c, t_zset.c and t_stream.c contains the implementation of the Redis data types. They implement both an API to access a given data type, and the client commands implementations for these data types.</p>
+<p> sds.c is the Redis string library, check <a target="_blank" rel="noopener" href="http://github.com/antirez/sds">http://github.com/antirez/sds</a> for more information.</p>
+<p> dict.c is an implementation of a non-blocking hash table which rehashes incrementally.</p>
+</blockquote>
+<h2 id="SDS"><a href="#SDS" class="headerlink" title="SDS"></a>SDS</h2><p>  SDS使用C语言编写。C语言的字符串是用一个以<code>\0</code>结尾的char[]表示。<br>  但是为什么不直接使用C语言字符串。<br>  C语言字符串的缺点：</p>
+<ol>
+<li>获取字符串长度每次需要遍历char[]数组，时间复杂度O(n)</li>
+<li>修改字符串忘记分配内存容易造成缓冲区溢出 (buffer overflow) 。</li>
+<li>修改字符串需要重新分配内存，设计系统调用。</li>
+</ol>
+<p>  SDS优点</p>
+<ol>
+<li>获取字符串长度时间复杂度O(1) 。</li>
+<li>通过封装，避免了直接操作C语言字符串忘记分配内存导致的内存泄露。</li>
+<li>减少修改字符串时内存分配次数。</li>
+</ol>
+<p>  空间预分配  惰性空间释放</p>
+<p>  二进制安全<br>    SDS的buf保存的是二进制数组</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">struct</span> <span class="token class-name">sdshdr</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> len<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> free<span class="token punctuation">;</span>
+    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  redis里的key是保存了字符串的SDS<br>  redis里的value</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/05/28/redis-high-performance-analysis/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
 
     
 
@@ -444,1085 +2103,8 @@
 
 
 
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/24/redis-commands/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/05/24/redis-commands/" class="post-title-link" itemprop="url">Redis命令</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-05-24 22:48:05" itemprop="dateCreated datePublished" datetime="2020-05-24T22:48:05+08:00">2020-05-24</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-12-03 20:36:47" itemprop="dateModified" datetime="2022-12-03T20:36:47+08:00">2022-12-03</time>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>3.1k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>3 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  redis命令不区分大小写 用 set 或 SET 都可以<br>  但是 key value 是区分大小的</p>
-<h1 id="1-公共"><a href="#1-公共" class="headerlink" title="(1) 公共"></a>(1) 公共</h1><h2 id="查看key个数-DBSIZE"><a href="#查看key个数-DBSIZE" class="headerlink" title="查看key个数 DBSIZE"></a>查看key个数 DBSIZE</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DBSIZE
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">5</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<h2 id="是否存在key-EXISTS-key"><a href="#是否存在key-EXISTS-key" class="headerlink" title="是否存在key (EXISTS key)"></a>是否存在key (EXISTS key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> EXISTS key1
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> EXISTS key2
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">0</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  exists存在key返回1，不存在key返回0</p>
-<h2 id="key设置过期时间"><a href="#key设置过期时间" class="headerlink" title="key设置过期时间"></a>key设置过期时间</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> EXPIRE key1 <span class="token number">100</span>
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL key1
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">96</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="查看key过期时间"><a href="#查看key过期时间" class="headerlink" title="查看key过期时间"></a>查看key过期时间</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL key1
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">96</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<h2 id="查看key的类型"><a href="#查看key的类型" class="headerlink" title="查看key的类型"></a>查看key的类型</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TYPE key1
-string
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TYPE key_num_list
-list
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="key重命名"><a href="#key重命名" class="headerlink" title="key重命名"></a>key重命名</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  RENAME key1 key2
-OK<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-
-<h2 id="scan"><a href="#scan" class="headerlink" title="scan"></a>scan</h2><p>  <a target="_blank" rel="noopener" href="https://redis.io/commands/scan/">https://redis.io/commands/scan/</a></p>
-<p><strong>查看key个数</strong></p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DBSIZE
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">5</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<p><strong>查看具体有哪些key</strong></p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> KEYS <span class="token operator">*</span>
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key1"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"key_nx_1"</span>
-<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"key_nx"</span>
-<span class="token number">4</span><span class="token operator">)</span> <span class="token string">"key_num_list"</span>
-<span class="token number">5</span><span class="token operator">)</span> <span class="token string">"key2"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p><strong>通过游标扫描</strong></p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SCAN <span class="token number">0</span> COUNT <span class="token number">2</span>
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"1"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key_nx"</span>
-   <span class="token number">2</span><span class="token operator">)</span> <span class="token string">"key2"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SCAN <span class="token number">1</span> COUNT <span class="token number">2</span>
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"5"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key1"</span>
-   <span class="token number">2</span><span class="token operator">)</span> <span class="token string">"key_nx_1"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SCAN <span class="token number">5</span> COUNT <span class="token number">2</span>
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"0"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"key_num_list"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h1 id="2-字符串-String"><a href="#2-字符串-String" class="headerlink" title="(2) 字符串(String)"></a>(2) 字符串(String)</h1><h2 id="设置键值对-SET-key-value"><a href="#设置键值对-SET-key-value" class="headerlink" title="设置键值对 (SET key value)"></a>设置键值对 (SET key value)</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> set key1 value1
-OK<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<h2 id="根据key获取value-Get-key"><a href="#根据key获取value-Get-key" class="headerlink" title="根据key获取value (Get key)"></a>根据key获取value (Get key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1
-<span class="token string">"value1"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1000
-<span class="token operator">(</span>nil<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<p>  key存在返回对应value，key不存在返回nil</p>
-<h2 id="设置带过期时间的键值对-SET-key-value-EX-seconds"><a href="#设置带过期时间的键值对-SET-key-value-EX-seconds" class="headerlink" title="设置带过期时间的键值对(SET key value EX seconds)"></a>设置带过期时间的键值对(SET key value EX seconds)</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_ex value_ex EX <span class="token number">100</span>
-OK
-<span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL <span class="token function">key_ex</span>
-<span class="token punctuation">(</span>integer<span class="token punctuation">)</span> <span class="token number">93</span>
-<span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> TTL <span class="token function">key_ex</span>
-<span class="token punctuation">(</span>integer<span class="token punctuation">)</span> <span class="token number">91</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="如果不存在就设置键值对-SET-key-value-NX"><a href="#如果不存在就设置键值对-SET-key-value-NX" class="headerlink" title="如果不存在就设置键值对(SET key value NX)"></a>如果不存在就设置键值对(SET key value NX)</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_nx_1 value_nx_1 NX
-OK
-<span class="token number">127.0</span><span class="token number">.0</span><span class="token number">.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_nx_1 value_nx_1 <span class="token function">NX</span>
-<span class="token punctuation">(</span>nil<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  SET key value NX 成功的结果是<code>OK</code>，失败的结果是<code>nil</code></p>
-<h2 id="如果不存在就设置键值对-SETNX-key-value"><a href="#如果不存在就设置键值对-SETNX-key-value" class="headerlink" title="如果不存在就设置键值对(SETNX key value)"></a>如果不存在就设置键值对(SETNX key value)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SETNX key_nx value_nx
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SETNX key_nx value_nx
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">0</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  setnx key value 成功的结果是1，失败的结果是0</p>
-<h2 id="如果不存在设置键值对并带过期时间-SET-key-value-EX-seconds-NX"><a href="#如果不存在设置键值对并带过期时间-SET-key-value-EX-seconds-NX" class="headerlink" title="如果不存在设置键值对并带过期时间(SET key value EX seconds NX)"></a>如果不存在设置键值对并带过期时间(SET key value EX seconds NX)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key2 value2 EX <span class="token number">100</span> NX
-OK
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key2 value2 EX <span class="token number">100</span> NX
-<span class="token operator">(</span>nil<span class="token operator">)</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="获取多个给定key的value-MGET-key1-key2-…"><a href="#获取多个给定key的value-MGET-key1-key2-…" class="headerlink" title="获取多个给定key的value(MGET key1 key2 …)"></a>获取多个给定key的value(MGET key1 key2 …)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> MGET key1 key2
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"value1"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"value2"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> MGET key1 key2 key1000
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"value1"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"value2"</span>
-<span class="token number">3</span><span class="token operator">)</span> <span class="token operator">(</span>nil<span class="token operator">)</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> MGET key1 key1000 key2
-<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"value1"</span>
-<span class="token number">2</span><span class="token operator">)</span> <span class="token operator">(</span>nil<span class="token operator">)</span>
-<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"value2"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  key都存在时返回对应value，有key不存在时对应的value为nil</p>
-<h2 id="设置key值为value并返回key的旧值-GETSET"><a href="#设置key值为value并返回key的旧值-GETSET" class="headerlink" title="设置key值为value并返回key的旧值(GETSET)"></a>设置key值为value并返回key的旧值(GETSET)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GETSET key1 value_x
-<span class="token string">"value1"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
-
-<h2 id="获取key对应值的字符串的长度-STRLEN"><a href="#获取key对应值的字符串的长度-STRLEN" class="headerlink" title="获取key对应值的字符串的长度(STRLEN)"></a>获取key对应值的字符串的长度(STRLEN)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> STRLEN key1
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">6</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1
-<span class="token string">"value1"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> STRLEN key_num_1
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">2</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key_num_1
-<span class="token string">"99"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p> key对应的value可以是字符串，也可以是数字</p>
-<h2 id="将key对应value的数字值增加一-INCR-key"><a href="#将key对应value的数字值增加一-INCR-key" class="headerlink" title="将key对应value的数字值增加一(INCR key)"></a>将key对应value的数字值增加一(INCR key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_1 <span class="token number">100</span>
-OK
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> INCR key_num_1
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">101</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key_num_10
-<span class="token string">"99_age_20"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  INCR key_num_10
-<span class="token operator">(</span>error<span class="token operator">)</span> <span class="token level error important">ERR</span> value is not an integer or out of range
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  如果key对应的value不是数字类型，会报错</p>
-<h2 id="将key对应value的数字值增加n-INCRBY-key-n"><a href="#将key对应value的数字值增加n-INCRBY-key-n" class="headerlink" title="将key对应value的数字值增加n(INCRBY key n)"></a>将key对应value的数字值增加n(INCRBY key n)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_2 <span class="token number">100</span>
-OK
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> INCRBY key_num_2 <span class="token number">10</span>
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">110</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> INCRBY key_num_2 <span class="token operator">-</span><span class="token number">20</span>
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">90</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<p>  n可以是正数，也可以是负数</p>
-<h2 id="将key对应value的数字值增减一-DECR-key"><a href="#将key对应value的数字值增减一-DECR-key" class="headerlink" title="将key对应value的数字值增减一(DECR key)"></a>将key对应value的数字值增减一(DECR key)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_3 <span class="token number">100</span>
-OK
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DECR key_num_3
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">99</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h2 id="将key对应value的数字值增减n-DECRBY-key-n"><a href="#将key对应value的数字值增减n-DECRBY-key-n" class="headerlink" title="将key对应value的数字值增减n(DECRBY key n)"></a>将key对应value的数字值增减n(DECRBY key n)</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> SET key_num_4 <span class="token number">100</span>
-OK
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> DECRBY key_num_4 <span class="token number">10</span>
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">90</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="APPEND"><a href="#APPEND" class="headerlink" title="APPEND"></a>APPEND</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  GET key1
-<span class="token string">"value1"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> APPEND key1 age<span class="token operator">:</span><span class="token number">20</span>
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">12</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key1
-<span class="token string">"value1age:20"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  APPEND key_num_1 _age_20
-<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">9</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> GET key_num_1
-<span class="token string">"99_age_20"</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h1 id="List"><a href="#List" class="headerlink" title="List"></a>List</h1><h1 id="Hash"><a href="#Hash" class="headerlink" title="Hash"></a>Hash</h1><h1 id="Set"><a href="#Set" class="headerlink" title="Set"></a>Set</h1><h1 id="Sorted-Set"><a href="#Sorted-Set" class="headerlink" title="Sorted Set"></a>Sorted Set</h1><h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://www.runoob.com/redis/redis-commands.html">redis命令</a><br>[2] <a target="_blank" rel="noopener" href="https://redis.io/commands/">redis.io/commands</a></p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/16/elasticsearch-setup/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/05/16/elasticsearch-setup/" class="post-title-link" itemprop="url">elasticsearch配置</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-05-16 17:08:13" itemprop="dateCreated datePublished" datetime="2020-05-16T17:08:13+08:00">2020-05-16</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>3.3k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>3 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  elasticsearch 配置笔记</p>
-<p>Elasticsearch has three configuration files:</p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token domain constant">elasticsearch.yml</span> for configuring Elasticsearch
-<span class="token domain constant">jvm.options</span> for configuring Elasticsearch JVM settings
-<span class="token domain constant">log4j2.properties</span> for configuring Elasticsearch logging<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
-<h1 id="ES-Server-配置"><a href="#ES-Server-配置" class="headerlink" title="ES Server 配置"></a>ES Server 配置</h1><h2 id="ES-配置"><a href="#ES-配置" class="headerlink" title="ES 配置"></a>ES 配置</h2><pre class="line-numbers language-none"><code class="language-none">#自动创建索引
-action.auto_create_index: .monitoring*,.watches,.triggered_watches,.watcher-history*,.ml*<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<blockquote>
-<p>可重新加载配置<br> Just like the settings values in elasticsearch.yml, changes to the keystore contents are not automatically applied to the running Elasticsearch node. Re-reading settings requires a node restart. However, certain secure settings are marked as reloadable. </p>
-</blockquote>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log">POST _nodes<span class="token operator">/</span>reload_secure_settings
-POST _nodes<span class="token operator">/</span><span class="token operator">&lt;</span>node_id<span class="token operator">></span><span class="token file-path string">/reload_secure_settings</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<pre class="line-numbers language-log" data-language="log"><code class="language-log">curl <span class="token operator">-</span>X POST <span class="token string">"localhost:9200/_nodes/reload_secure_settings?pretty"</span> <span class="token operator">-</span>H <span class="token string">'Content-Type: application/json'</span> <span class="token operator">-</span>d'
-<span class="token operator">&#123;</span>
-  <span class="token string">"secure_settings_password"</span><span class="token operator">:</span> <span class="token string">"s3cr3t"</span> 
-<span class="token operator">&#125;</span>
-'<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/05/16/elasticsearch-setup/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/16/elk-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/05/16/elk-notes/" class="post-title-link" itemprop="url">Elasticsearch Logstash Kibana 笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-05-16 16:21:23" itemprop="dateCreated datePublished" datetime="2020-05-16T16:21:23+08:00">2020-05-16</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>7.5k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>7 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p> Elastic Stack 是适用于数据采集、充实、存储、分析和可视化的一组开源工具。人们通常将 Elastic Stack 称为 ELK Stack（代指 Elasticsearch、Logstash 和 Kibana）</p>
-</blockquote>
-<blockquote>
-<p> Elasticsearch 是一个分布式的开源搜索和分析引擎，适用于所有类型的数据，包括文本、数字、地理空间、结构化和非结构化数据。  类似于MySQL，用来存储和分析数据。<br> Logstash可用来对数据进行聚合和处理，并将数据发送到 Elasticsearch。Logstash 是一个开源的服务器端数据处理管道，允许您在将数据索引到 Elasticsearch 之前同时从多个来源采集数据，并对数据进行充实和转换。 类似于程序，抽取解析数据并储存到ES<br> Kibana 是一款适用于 Elasticsearch 的数据可视化和管理工具。类似于使用MySQL时用的Navicat</p>
-</blockquote>
-<blockquote>
-<p> 简单的说，LogStash用来收取解析日志并发消息写入ES，Elasticsearch用来存储和分析查询，Kibana用来查看</p>
-</blockquote>
-<p>  es下载地址 <a target="_blank" rel="noopener" href="https://www.elastic.co/cn/downloads/elasticsearch">https://www.elastic.co/cn/downloads/elasticsearch</a><br>  logstash下载地址 <a target="_blank" rel="noopener" href="https://www.elastic.co/cn/downloads/logstash">https://www.elastic.co/cn/downloads/logstash</a><br>  kibana下载地址  <a target="_blank" rel="noopener" href="https://www.elastic.co/cn/downloads/kibana">https://www.elastic.co/cn/downloads/kibana</a><br>  filebeats</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/05/16/elk-notes/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/14/javac-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/05/14/javac-notes/" class="post-title-link" itemprop="url">jdk javac 使用笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-05-14 10:27:20" itemprop="dateCreated datePublished" datetime="2020-05-14T10:27:20+08:00">2020-05-14</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>13k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>11 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p> 最近有一个需求，需要测试一下新数据库(mysql优化版)某个表的写入速度和查询速度，需要从我们的测试环境数据库查数据，插入到新的测试环境的新数据库。<br> 本地连不上测试的数据库<br> 有很多应用服务器，但是所有的服务器不能连外网，只能访问公司内网。<br> 测试环境的应用可以连测试的数据库<br> 想写个python脚本，但是服务器上python是2.7的，而且很多包没有。<br> 想了想，应用服务器部署了java程序，java的包都有，想写一个java脚本来测试。(没错是java脚本)</p>
-</blockquote>
-<blockquote>
-<p> 测试环境数据库     db_test_old  192.168.1.10<br> 新测试环境新数据库  db_test_new  192.168.2.11<br> 测试环境应用       test-java    192.168.3.12</p>
-</blockquote>
-<blockquote>
-<p> 在idea里写完脚本，运行没问题，然后在 terminal 运行，被啪啪的打脸</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/05/14/javac-notes/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/05/13/guava-cache/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/05/13/guava-cache/" class="post-title-link" itemprop="url">guava缓存</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-05-13 09:19:36" itemprop="dateCreated datePublished" datetime="2020-05-13T09:19:36+08:00">2020-05-13</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>2.9k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>3 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p> google guava-cache</p>
-</blockquote>
-<blockquote>
-<p> redis做缓存很快，但是还有网络IO，在并发量大要求耗时低的情况下还是不满足需求，所以想试试本地缓存。</p>
-<p> 发现guava缓存不错，想试试 </p>
-<p> 在本地demo测试的时候发现更新缓存时有毛刺出现</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/05/13/guava-cache/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/04/26/jmeter-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/04/26/jmeter-notes/" class="post-title-link" itemprop="url">jmeter笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-04-26 19:38:48" itemprop="dateCreated datePublished" datetime="2020-04-26T19:38:48+08:00">2020-04-26</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>57</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://jmeter.apache.org/">Apache JMeter</a><br>[2] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/tankxiao/p/4045439.html">Jmeter性能测试 入门</a><br>[3] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/stulzq/p/8971531.html">使用 JMeter 进行压力测试</a></p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/04/18/vim-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/04/18/vim-notes/" class="post-title-link" itemprop="url">vim笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-04-18 14:49:16" itemprop="dateCreated datePublished" datetime="2020-04-18T14:49:16+08:00">2020-04-18</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-09-12 23:23:20" itemprop="dateModified" datetime="2022-09-12T23:23:20+08:00">2022-09-12</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/tools/" itemprop="url" rel="index"><span itemprop="name">tools</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>2.8k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>3 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p> vim有三种模式，一般模式、编辑模式、命令模式。<br> 一般模式下只能 查看文件。  (输入 <code>ESC</code> 可以进入一般模式。)<br> 编辑模式下可以对文件进行 新增、修改、删除。  (输入 <code>i</code> 可以进入编辑模式。进入后左下角可以看到 <code>INSERT</code> 标识)<br> 命令模式下可以对文件进行 保存、退出 等操作。  (输入 <code>ESC</code> + <code>:</code> 可以进入命令模式。)</p>
-</blockquote>
-<blockquote>
-<p> 输入<code>ESC</code>+<code>:</code>进入命令模式后，输入<code>q!</code>可以退出文件并且不保存修改。<br> 输入<code>ESC</code>+<code>:</code>进入命令模式后，输入<code>qw</code>可以退出文件并且保存修改。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/04/18/vim-notes/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/04/18/vs-code-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2020/04/18/vs-code-notes/" class="post-title-link" itemprop="url">vscode使用笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2020-04-18 14:49:06" itemprop="dateCreated datePublished" datetime="2020-04-18T14:49:06+08:00">2020-04-18</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-11-27 23:54:40" itemprop="dateModified" datetime="2022-11-27T23:54:40+08:00">2022-11-27</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/tools/" itemprop="url" rel="index"><span itemprop="name">tools</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>3k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>3 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p> vscode 全称 Visual Studio Code </p>
-<h1 id="1-常用设置"><a href="#1-常用设置" class="headerlink" title="(1) 常用设置"></a>(1) 常用设置</h1><h2 id="1-1-vs-code-设置语言"><a href="#1-1-vs-code-设置语言" class="headerlink" title="(1.1) vs-code 设置语言"></a>(1.1) vs-code 设置语言</h2><p>  打开命令面板 ，输入 <code>configure display language</code>，设置语言为 <code>zh-cn</code> </p>
-<p>  备注：打开命令面板快捷键  mac <code>Shift + Command + P</code>    Windows <code>Ctrl + Shift + p</code></p>
-<h2 id="1-2-vs-code-设置背景豆沙绿"><a href="#1-2-vs-code-设置背景豆沙绿" class="headerlink" title="(1.2) vs-code 设置背景豆沙绿"></a>(1.2) vs-code 设置背景豆沙绿</h2><!--
-  /Users/weikeqin/Library/Application\ Support/Code/User/settings.json
--->
-
-<p>  修改配置文件 <code>~/Library/Application Support/Code/User/settings.json</code><br>  把  <code>&quot;editor.background&quot; </code> 设置成 <code>&quot;#C7EDCC&quot;</code>，具体如下：</p>
-<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
-    <span class="token property">"workbench.colorTheme"</span><span class="token operator">:</span> <span class="token string">"Default Light+"</span><span class="token punctuation">,</span>
-    <span class="token property">"workbench.colorCustomizations"</span><span class="token operator">:</span> <span class="token punctuation">&#123;</span>
-        <span class="token property">"editor.background"</span><span class="token operator">:</span> <span class="token string">"#C7EDCC"</span>
-        <span class="token comment">//设置用户选中代码段的颜色 </span>
-        <span class="token comment">//"editor.selectionBackground": "#2f00ff",</span>
-        <span class="token comment">//搜索匹配的背景色</span>
-        <span class="token comment">//"editor.findMatchBackground": "#ff0000",</span>
-        <span class="token comment">//"editor.findMatchHighlightBackground": "#ff00ff",</span>
-        <span class="token comment">//"editor.findRangeHighlightBackground": "#ff9900"</span>
-    
-    <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
-    <span class="token property">"editor.fontSize"</span><span class="token operator">:</span> <span class="token number">16</span><span class="token punctuation">,</span>
-    <span class="token property">"window.openFoldersInNewWindow"</span><span class="token operator">:</span> <span class="token string">"off"</span><span class="token punctuation">,</span>
-    <span class="token property">"window.openWithoutArgumentsInNewWindow"</span><span class="token operator">:</span> <span class="token string">"on"</span><span class="token punctuation">,</span>
-    <span class="token property">"editor.largeFileOptimizations"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
-    <span class="token property">"editor.suggestSelection"</span><span class="token operator">:</span> <span class="token string">"first"</span><span class="token punctuation">,</span>
-    <span class="token property">"vsintellicode.modify.editor.suggestSelection"</span><span class="token operator">:</span> <span class="token string">"automaticallyOverrodeDefaultValue"</span><span class="token punctuation">,</span>
-    <span class="token property">"java.configuration.checkProjectSettingsExclusions"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
-    <span class="token property">"extensions.autoUpdate"</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
-    <span class="token property">"window.zoomLevel"</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
-    <span class="token property">"update.mode"</span><span class="token operator">:</span> <span class="token string">"none"</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/04/18/vs-code-notes/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/9/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><span class="space">&hellip;</span><a class="page-number" href="/page/28/">28</a><a class="extend next" rel="next" href="/page/11/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/9/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><span class="space">&hellip;</span><a class="page-number" href="/page/29/">29</a><a class="extend next" rel="next" href="/page/11/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 </div>

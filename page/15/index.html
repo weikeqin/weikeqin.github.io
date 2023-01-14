@@ -159,18 +159,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-count">285</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">15</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-count">54</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -219,6 +219,972 @@
 
 
     <div class="main-inner index posts-expand">
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/08/18/java-jdbc-prepared-statement/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/08/18/java-jdbc-prepared-statement/" class="post-title-link" itemprop="url">java-jdbc-prepared-statement</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-08-18 10:59:41" itemprop="dateCreated datePublished" datetime="2019-08-18T10:59:41+08:00">2019-08-18</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>9.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>8 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  在写neo4j和orientdb的通用方法时，忽然想到jdbc，然后就想试试mysql neo4j orientdb几个数据库jdbc连接方式里的 prepartdStatement一不一样。</p>
+<p>  问题的来源来自以下代码</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Map</span><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span><span class="token punctuation">></span></span> list <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">try</span> <span class="token punctuation">(</span><span class="token class-name">PreparedStatement</span> pst <span class="token operator">=</span> conn<span class="token punctuation">.</span><span class="token function">prepareStatement</span><span class="token punctuation">(</span>sql<span class="token punctuation">)</span><span class="token punctuation">;</span>
+     <span class="token class-name">ResultSet</span> rs <span class="token operator">=</span> pst<span class="token punctuation">.</span><span class="token function">executeQuery</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> fields <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>rs<span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>fields<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">ResultSetMetaData</span> metaData <span class="token operator">=</span> rs<span class="token punctuation">.</span><span class="token function">getMetaData</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 查询出的字段</span>
+            <span class="token keyword">int</span> count <span class="token operator">=</span> metaData<span class="token punctuation">.</span><span class="token function">getColumnCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> i <span class="token operator">&lt;=</span> count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                fields<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>metaData<span class="token punctuation">.</span><span class="token function">getColumnName</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> map <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">String</span> field <span class="token operator">:</span> fields<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            map<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>field<span class="token punctuation">,</span> rs<span class="token punctuation">.</span><span class="token function">getObject</span><span class="token punctuation">(</span>field<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// T r =  JSONObject.parseObject(JSON.toString(map), Object.class);</span>
+        list<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>map<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">SQLException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">SQLException</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/08/18/java-jdbc-prepared-statement/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/08/18/java-concurrent/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/08/18/java-concurrent/" class="post-title-link" itemprop="url">java 并发</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-08-18 10:17:35" itemprop="dateCreated datePublished" datetime="2019-08-18T10:17:35+08:00">2019-08-18</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>107</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  Java并发</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/08/18/java-concurrent/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/08/12/kafka-notes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/08/12/kafka-notes/" class="post-title-link" itemprop="url">kafka-notes</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-08-12 21:52:26" itemprop="dateCreated datePublished" datetime="2019-08-12T21:52:26+08:00">2019-08-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/other/" itemprop="url" rel="index"><span itemprop="name">other</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>196</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  kafka详解</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/08/12/kafka-notes/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/07/26/hbase-install-config-note/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/07/26/hbase-install-config-note/" class="post-title-link" itemprop="url">HBASE 安装使用</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-07-26 10:28:03" itemprop="dateCreated datePublished" datetime="2019-07-26T10:28:03+08:00">2019-07-26</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-11-26 16:18:03" itemprop="dateModified" datetime="2022-11-26T16:18:03+08:00">2022-11-26</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>9k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>8 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <h1 id="下载"><a href="#下载" class="headerlink" title="下载"></a>下载</h1><p>  <a target="_blank" rel="noopener" href="https://hbase.apache.org/downloads.html">hbase所有版本下载地址</a></p>
+<p>  <a target="_blank" rel="noopener" href="https://www.apache.org/dyn/closer.lua/hbase/2.2.0/hbase-2.2.0-bin.tar.gz">https://www.apache.org/dyn/closer.lua/hbase/2.2.0/hbase-2.2.0-bin.tar.gz</a></p>
+<p>  <a target="_blank" rel="noopener" href="http://mirror.bit.edu.cn/apache/hbase/2.2.0/hbase-2.2.0-bin.tar.gz">http://mirror.bit.edu.cn/apache/hbase/2.2.0/hbase-2.2.0-bin.tar.gz</a> </p>
+<p>  <a target="_blank" rel="noopener" href="http://mirrors.tuna.tsinghua.edu.cn/apache/hbase/2.2.0/hbase-2.2.0-bin.tar.gz">http://mirrors.tuna.tsinghua.edu.cn/apache/hbase/2.2.0/hbase-2.2.0-bin.tar.gz</a> </p>
+<p>  下载完解压</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/07/26/hbase-install-config-note/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/07/08/java-bio-nio-aio/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/07/08/java-bio-nio-aio/" class="post-title-link" itemprop="url">Java BIO NIO AIO</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-07-08 12:31:03" itemprop="dateCreated datePublished" datetime="2019-07-08T12:31:03+08:00">2019-07-08</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-06-04 12:58:32" itemprop="dateModified" datetime="2022-06-04T12:58:32+08:00">2022-06-04</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.5k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  转自 <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/Gq8ABlEVolLW3wJ7vsSSFw">漫画：一文学会面试中常问的 IO 问题！</a></p>
+<p>  什么是BIO、NIO和AIO？三者有什么区别？具体如何使用?</p>
+<p>  IO是Java中比较重要，且比较难的知识点，主要是因为随着Java的发展，目前有三种IO共存。分别是 BIO、NIO 和 AIO。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/07/08/java-bio-nio-aio/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/07/03/rest-vs-rpc/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/07/03/rest-vs-rpc/" class="post-title-link" itemprop="url">REST VS RPC</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-07-03 20:31:58" itemprop="dateCreated datePublished" datetime="2019-07-03T20:31:58+08:00">2019-07-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <blockquote>
+<p> 首先说一下为什么要做微服务。<br> 当你有 100台MySQL数据库，1000个Redis，1000个ES，1万个容器，部署着100种服务。</p>
+</blockquote>
+<blockquote>
+<p> 无论是微服务、SOA、还是 RPC 架构，它们都是分布式服务架构，都需要实现服务之间的互相通信，我们通常把这种通信统称为 RPC 通信。</p>
+</blockquote>
+<blockquote>
+<p> RPC（Remote Process Call），即远程服务调用，是通过网络请求远程计算机程序服务的通信技术。RPC 框架封装好了底层网络通信、序列化等技术，我们只需要在项目中引入各个服务的接口包，就可以实现在代码中调用 RPC 服务同调用本地方法一样。</p>
+</blockquote>
+<blockquote>
+<p> 小型的项目用什么语言都行，爱用什么用什么。但是，真正的企业级架构就不一样了，其中并不仅仅只是 RESTful API 或 RPC，还有各种配套设施和控制系统，比如：应用网关，服务发现、配置中心、健康检查、服务监控、服务治理（熔断、限流、幂等、重试、隔离、事务补偿）、Tracing监控、SOA/ESB、CQRS、EDA……</p>
+</blockquote>
+<p>  本文不会告诉你必须用什么，但是会告诉你两者的优缺点。</p>
+<p>  rest 以 springcloud为例，rpc以dubbo为例。</p>
+<blockquote>
+<p> 从性能上来讲，在数据量小（单个请求小于20K）并发大的场景下，rpc的性能比restful api的性能要好。<br> 从上手、使用、维护 方面来说，springcloud更容易上手、维护。</p>
+</blockquote>
+<p>各组件配置使用运行流程：<br>  1、请求统一通过API网关（Zuul）来访问内部服务.<br>  2、网关接收到请求后，从注册中心（Eureka）获取可用服务<br>  3、由Ribbon进行均衡负载后，分发到后端具体实例<br>  4、微服务之间通过Feign进行通信处理业务<br>  5、Hystrix负责处理服务超时熔断<br>  6、Turbine监控服务间的调用和熔断相关指标</p>
+<p>  springcloud提供了微服务所需的全套组件，降低了架构和开发成本，解决了微服务的多个痛点问题。具体如下：</p>
+<ol>
+<li>注册中心</li>
+<li>配置中心</li>
+<li>服务间的调用方式</li>
+<li>链路追踪</li>
+<li>服务的限流、降级、熔断</li>
+</ol>
+<p>   如果使用dubbo，配置中心、分布式跟踪这些内容都需要自己去集成，无形中增加了难度。</p>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://blog.csdn.net/kobejayandy/article/details/52078275">微服务架构的基础框架选择：Spring Cloud还是Dubbo？</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.csdn.net/u010664947/article/details/80007767">比较spring cloud和dubbo，各自的优缺点是什么</a><br>[3] <a target="_blank" rel="noopener" href="http://www.ityouknow.com/springcloud/2017/10/19/micro-service-practice.html">中小型互联网公司微服务实践-经验和教训</a><br>[4] <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/269983910">SpringBoot和SpringCloud为什么会那么火？对开发有哪些帮助？</a><br>[5] <a target="_blank" rel="noopener" href="https://blog.csdn.net/u010963948/article/details/78488045">项目中为什么首先spring cloud，而不是dubbo</a><br>[6] <a target="_blank" rel="noopener" href="https://martinfowler.com/articles/microservices.html">Microservices-微服务原文</a></p>
+
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/07/03/springcloud-notes/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/07/03/springcloud-notes/" class="post-title-link" itemprop="url">springcloud笔记</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-07-03 20:31:58" itemprop="dateCreated datePublished" datetime="2019-07-03T20:31:58+08:00">2019-07-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>392</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>各组件配置使用运行流程：<br>  1、请求统一通过API网关（Zuul）来访问内部服务.<br>  2、网关接收到请求后，从注册中心（Eureka）获取可用服务<br>  3、由Ribbon进行均衡负载后，分发到后端具体实例<br>  4、微服务之间通过Feign进行通信处理业务<br>  5、Hystrix负责处理服务超时熔断<br>  6、Turbine监控服务间的调用和熔断相关指标</p>
+<p>  springcloud提供了微服务所需的全套组件，降低了架构和开发成本，解决了微服务的多个痛点问题。具体如下：</p>
+<ol>
+<li>注册中心</li>
+<li>配置中心</li>
+<li>服务间的调用方式</li>
+<li>链路追踪</li>
+<li>服务的限流、降级、熔断</li>
+</ol>
+<h1 id="References"><a href="#References" class="headerlink" title="References"></a>References</h1><p>[1] <a target="_blank" rel="noopener" href="https://spring.io/projects/spring-cloud">spring-cloud</a><br>[2] <a target="_blank" rel="noopener" href="https://www.springcloud.cc/">springcloud中文网</a><br>[3] <a target="_blank" rel="noopener" href="http://www.ityouknow.com/springcloud/2017/05/01/simple-springcloud.html">springcloud(一)：大话Spring Cloud-纯洁的微笑</a><br>[4] <a target="_blank" rel="noopener" href="https://blog.csdn.net/forezp/article/details/70148833">史上最简单的 SpringCloud 教程 | 终章-方志朋</a><br>[5] <a target="_blank" rel="noopener" href="http://blog.didispace.com/spring-cloud-learning/">Spring Cloud 从入门到精通</a><br>[6] <a target="_blank" rel="noopener" href="http://springcloud.cn/">Spring Cloud中国社区</a></p>
+
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/06/30/orientdb-sql/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2019/06/30/orientdb-sql/" class="post-title-link" itemprop="url">orientdb 常用语句</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2019-06-30 21:33:50" itemprop="dateCreated datePublished" datetime="2019-06-30T21:33:50+08:00">2019-06-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>8.8k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>8 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  orientdb启动后可以在 <a target="_blank" rel="noopener" href="http://localhost:2480/">http://localhost:2480</a> 打开前端管理界面操作，也可以在shell里操作</p>
+<p>  orientdb的很多语句很像mysql和neo4j，学习的时候可以用来对比</p>
+<h1 id="常用语句"><a href="#常用语句" class="headerlink" title="常用语句"></a>常用语句</h1><table>
+<thead>
+<tr>
+<th align="left"></th>
+<th align="left">orientdb</th>
+<th align="left">mysql</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">连接数据库</td>
+<td align="left">CONNECT remote:127.0.0.1 root root</td>
+<td align="left">mysql -u root -p root</td>
+</tr>
+<tr>
+<td align="left">查看所有数据库</td>
+<td align="left">LIST DATABASES</td>
+<td align="left">show databases</td>
+</tr>
+<tr>
+<td align="left">创建数据库</td>
+<td align="left">CREATE DATABASE remote:127.0.0.1/db_test_wkq root root</td>
+<td align="left">create database db_test_wkq</td>
+</tr>
+<tr>
+<td align="left">使用某个数据库</td>
+<td align="left">CONNECT remote:127.0.0.1/db_test_wkq root root</td>
+<td align="left">use db_test_wkq</td>
+</tr>
+<tr>
+<td align="left">查询节点类型(表)个数</td>
+<td align="left">LIST CLASSES <br>  select expand(classes) from metadata:schema</td>
+<td align="left">show tables</td>
+</tr>
+<tr>
+<td align="left">创建某类节点</td>
+<td align="left">CREATE CLASS TestVertex extends V</td>
+<td align="left">create table table1</td>
+</tr>
+<tr>
+<td align="left">查看某个类型的结构</td>
+<td align="left">INFO CLASS OUser</td>
+<td align="left">desc table1</td>
+</tr>
+<tr>
+<td align="left">查看某个类型的数据</td>
+<td align="left">BROWSE CLASS OUser</td>
+<td align="left">select <code>*</code> from OUser limit 20</td>
+</tr>
+</tbody></table>
+<pre><code>      CREATE DATABASE &lt;database-url&gt; [&lt;user&gt;] [&lt;password&gt;] [&lt;storage-type&gt;] [&lt;db-type&gt;] [&lt;[options]&gt;]
+</code></pre>
+<p>创建数据库 CREATE DATABASE PLOCAL:/usr/local/orientdb/databases/db_test_wkq<br>         CREATE DATABASE remote:127.0.0.1/db_test_wkq root root  plocal  graph</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/06/30/orientdb-sql/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
 
     
 
@@ -466,981 +1432,8 @@
 
 
 
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/05/06/mysql-order-by/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/05/06/mysql-order-by/" class="post-title-link" itemprop="url">MySQL order by 原理</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-05-06 07:00:03" itemprop="dateCreated datePublished" datetime="2019-05-06T07:00:03+08:00">2019-05-06</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>3.4k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>3 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  转自 <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/73479">16 | “order by”是怎么工作的？</a></p>
-<h1 id="16-“order-by”是怎么工作的？"><a href="#16-“order-by”是怎么工作的？" class="headerlink" title="16 “order by”是怎么工作的？"></a>16 “order by”是怎么工作的？</h1><p>  <code>select city,name,age from t where city=&#39;杭州&#39; order by name limit 1000  ;</code> </p>
-<h2 id="全字段排序"><a href="#全字段排序" class="headerlink" title="全字段排序"></a>全字段排序</h2><p>  以我们前面举例用过的市民表为例，假设你要查询城市是“杭州”的所有人名字，并且按照姓名排序返回前 1000 个人的姓名、年龄。</p>
-<p>  Extra 这个字段中的“Using filesort”表示的就是需要排序，MySQL 会给每个线程分配一块内存用于排序，称为 sort_buffer。</p>
-<p>  通常情况下，这个语句执行流程如下所示 ：</p>
-<p>  1.初始化 sort_buffer，确定放入 name、city、age 这三个字段；</p>
-<p>  2.从索引 city 找到第一个满足 city=’杭州’条件的主键 id，也就是图中的 ID_X；</p>
-<p>  3.到主键 id 索引取出整行，取 name、city、age 三个字段的值，存入 sort_buffer 中；</p>
-<p>  4.从索引 city 取下一个记录的主键 id；</p>
-<p>  5.重复步骤 3、4 直到 city 的值不满足查询条件为止，对应的主键 id 也就是图中的 ID_Y；</p>
-<p>  6.对 sort_buffer 中的数据按照字段 name 做快速排序；</p>
-<p>  7.按照排序结果取前 1000 行返回给客户端。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/05/06/mysql-order-by/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/05/06/mysql-slow-reason/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/05/06/mysql-slow-reason/" class="post-title-link" itemprop="url">为什么我只查一行的语句，也执行这么慢</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-05-06 07:00:03" itemprop="dateCreated datePublished" datetime="2019-05-06T07:00:03+08:00">2019-05-06</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>938</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/74687">19 | 为什么我只查一行的语句，也执行这么慢？</a></p>
-<p>  需要说明的是，如果 MySQL 数据库本身就有很大的压力，导致数据库服务器 CPU 占用率很高或 ioutil（IO 利用率）很高，这种情况下所有语句的执行都有可能变慢，不属于我们今天的讨论范围。</p>
-<p> 为了便于描述，我还是构造一个表，基于这个表来说明今天的问题。这个表有两个字段 id 和 c，并且我在里面插入了 10 万行记录。</p>
-<pre class="line-numbers language-text" data-language="text"><code class="language-text">mysql> CREATE TABLE `t` (
-  `id` int(11) NOT NULL,
-  `c` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB;
-
-delimiter ;;
-create procedure idata()
-begin
-  declare i int;
-  set i=1;
-  while(i&lt;=100000)do
-    insert into t values(i,i);
-    set i=i+1;
-  end while;
-end;;
-delimiter ;
-
-call idata();
-<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/05/06/mysql-slow-reason/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/04/10/golang/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/04/10/golang/" class="post-title-link" itemprop="url">go入门笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-04-10 20:06:13" itemprop="dateCreated datePublished" datetime="2019-04-10T20:06:13+08:00">2019-04-10</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-11-26 16:16:53" itemprop="dateModified" datetime="2022-11-26T16:16:53+08:00">2022-11-26</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>13k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>12 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <h1 id="1-下载、安装、配置"><a href="#1-下载、安装、配置" class="headerlink" title="(1) 下载、安装、配置"></a>(1) 下载、安装、配置</h1><h2 id="1-1-下载-安装"><a href="#1-1-下载-安装" class="headerlink" title="(1.1) 下载 安装"></a>(1.1) 下载 安装</h2><p>  go 安装包下载地址：(下面三个都可以)<br>  <a target="_blank" rel="noopener" href="https://studygolang.com/dl">https://studygolang.com/dl</a><br>  <a target="_blank" rel="noopener" href="https://golang.google.cn/dl/">https://golang.google.cn/dl/</a><br>  <a target="_blank" rel="noopener" href="https://golang.org/dl/">https://golang.org/dl/</a></p>
-<p>   比较喜欢用压缩包，解压完配置就可以使用。<br>  linux   <a target="_blank" rel="noopener" href="https://dl.google.com/go/go1.13.4.linux-amd64.tar.gz">https://dl.google.com/go/go1.13.4.linux-amd64.tar.gz</a><br>  mac  <a target="_blank" rel="noopener" href="https://dl.google.com/go/go1.13.4.darwin-amd64.tar.gz">https://dl.google.com/go/go1.13.4.darwin-amd64.tar.gz</a><br>  mac  <a target="_blank" rel="noopener" href="https://dl.google.com/go/go1.13.4.darwin-amd64.pkg">https://dl.google.com/go/go1.13.4.darwin-amd64.pkg</a><br>  windows  <a target="_blank" rel="noopener" href="https://dl.google.com/go/go1.13.4.windows-amd64.msi">https://dl.google.com/go/go1.13.4.windows-amd64.msi</a><br>  windows  <a target="_blank" rel="noopener" href="https://dl.google.com/go/go1.13.4.windows-amd64.zip">https://dl.google.com/go/go1.13.4.windows-amd64.zip</a></p>
-<h2 id="1-2-配置环境变量"><a href="#1-2-配置环境变量" class="headerlink" title="(1.2) 配置环境变量"></a>(1.2) 配置环境变量</h2><p> go需要配置 <code>GOROOT</code>  <code>GOPATH</code>  <code>GOBIN</code><br> <code>GOROOT</code> 是go的安装目录<br> <code>GOPATH</code> 目录用来存放Go源码，Go的可运行文件，以及相应的编译之后的包文件。所以这个目录下面有三个子目录：src、bin、pkg。而且这个目录不能和 GOROOT 一样。当有多个GOPATH时，默认会将go get的内容放在第一个目录下。</p>
-<p> GOPATH 目录约定有三个子目录：</p>
-<ul>
-<li>src 存放源代码（比如：.go .c .h .s等）</li>
-<li>pkg 编译后生成的文件（比如：.a）</li>
-<li>bin 编译后生成的可执行文件（为了方便，可以把此目录加入到 $PATH 变量中，如果有多个gopath，那么使用<code>$&#123;GOPATH//://bin:&#125;/bin</code>添加所有的bin目录）</li>
-</ul>
-<h3 id="1-2-1-mac配置GOROOT-GOPATH"><a href="#1-2-1-mac配置GOROOT-GOPATH" class="headerlink" title="(1.2.1) mac配置GOROOT GOPATH"></a>(1.2.1) mac配置GOROOT GOPATH</h3><p>修改 <code>.bash_profile</code> 文件</p>
-<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token builtin class-name">export</span> <span class="token assign-left variable">GOROOT</span><span class="token operator">=</span>/usr/local/go
-<span class="token builtin class-name">export</span> <span class="token assign-left variable"><span class="token environment constant">PATH</span></span><span class="token operator">=</span><span class="token environment constant">$PATH</span><span class="token builtin class-name">:</span><span class="token variable">$GOROOT</span>/bin
-<span class="token builtin class-name">export</span> <span class="token assign-left variable">GOPATH</span><span class="token operator">=</span>/Users/weikeqin1/gopath<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
-<p>  <code>source .bash_profile</code></p>
-<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ go version
-go version go1.13.4 darwin/amd64<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ go <span class="token function">env</span>
-<span class="token assign-left variable">GO111MODULE</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOARCH</span><span class="token operator">=</span><span class="token string">"amd64"</span>
-<span class="token assign-left variable">GOBIN</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOCACHE</span><span class="token operator">=</span><span class="token string">"/Users/weikeqin1/Library/Caches/go-build"</span>
-<span class="token assign-left variable">GOENV</span><span class="token operator">=</span><span class="token string">"/Users/weikeqin1/Library/Application Support/go/env"</span>
-<span class="token assign-left variable">GOEXE</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOFLAGS</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOHOSTARCH</span><span class="token operator">=</span><span class="token string">"amd64"</span>
-<span class="token assign-left variable">GOHOSTOS</span><span class="token operator">=</span><span class="token string">"darwin"</span>
-<span class="token assign-left variable">GONOPROXY</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GONOSUMDB</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOOS</span><span class="token operator">=</span><span class="token string">"darwin"</span>
-<span class="token assign-left variable">GOPATH</span><span class="token operator">=</span><span class="token string">"/Users/weikeqin1/go"</span>
-<span class="token assign-left variable">GOPRIVATE</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOPROXY</span><span class="token operator">=</span><span class="token string">"https://proxy.golang.org,direct"</span>
-<span class="token assign-left variable">GOROOT</span><span class="token operator">=</span><span class="token string">"/usr/local/go"</span>
-<span class="token assign-left variable">GOSUMDB</span><span class="token operator">=</span><span class="token string">"sum.golang.org"</span>
-<span class="token assign-left variable">GOTMPDIR</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">GOTOOLDIR</span><span class="token operator">=</span><span class="token string">"/usr/local/go/pkg/tool/darwin_amd64"</span>
-<span class="token assign-left variable">GCCGO</span><span class="token operator">=</span><span class="token string">"gccgo"</span>
-<span class="token assign-left variable">AR</span><span class="token operator">=</span><span class="token string">"ar"</span>
-<span class="token assign-left variable">CC</span><span class="token operator">=</span><span class="token string">"clang"</span>
-<span class="token assign-left variable">CXX</span><span class="token operator">=</span><span class="token string">"clang++"</span>
-<span class="token assign-left variable">CGO_ENABLED</span><span class="token operator">=</span><span class="token string">"1"</span>
-<span class="token assign-left variable">GOMOD</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">CGO_CFLAGS</span><span class="token operator">=</span><span class="token string">"-g -O2"</span>
-<span class="token assign-left variable">CGO_CPPFLAGS</span><span class="token operator">=</span><span class="token string">""</span>
-<span class="token assign-left variable">CGO_CXXFLAGS</span><span class="token operator">=</span><span class="token string">"-g -O2"</span>
-<span class="token assign-left variable">CGO_FFLAGS</span><span class="token operator">=</span><span class="token string">"-g -O2"</span>
-<span class="token assign-left variable">CGO_LDFLAGS</span><span class="token operator">=</span><span class="token string">"-g -O2"</span>
-<span class="token assign-left variable">PKG_CONFIG</span><span class="token operator">=</span><span class="token string">"pkg-config"</span>
-<span class="token assign-left variable">GOGCCFLAGS</span><span class="token operator">=</span><span class="token string">"-fPIC -m64 -pthread -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -fdebug-prefix-map=/var/folders/03/wwlrrsnn7b9761k_s31w4yqc0glkg3/T/go-build001757962=/tmp/go-build -gno-record-gcc-switches -fno-common"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h2 id="1-2-2-windows配置GOROOT-GOPATH"><a href="#1-2-2-windows配置GOROOT-GOPATH" class="headerlink" title="(1.2.2) windows配置GOROOT GOPATH"></a>(1.2.2) windows配置GOROOT GOPATH</h2><p>  go1.12.3.windows-amd64.zip 解压完我放到 <code>D:\ProfessionalSoftWare\golang\go</code><br>  修改环境变量<br>  配置 <code>GO_ROOT</code> 为 <code>D:\ProfessionalSoftWare\golang\go</code><br>  配置 <code>PATH</code> 在 <code>PATH</code> 后添加 <code>%GO_ROOT%\bin</code><br>  配置 <code>GO_PATH</code> 为 <code>D:\ProfessionalSoftWare\golang\gopath</code><br>  新打开一个cmd，输入 <code>go env</code> 结果如下：</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/04/10/golang/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/29/mybaits-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/03/29/mybaits-notes/" class="post-title-link" itemprop="url">mybaits笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-03-29 06:45:41" itemprop="dateCreated datePublished" datetime="2019-03-29T06:45:41+08:00">2019-03-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>9.9k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>9 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <pre class="line-numbers language-log" data-language="log"><code class="language-log">driverClassName<span class="token operator">=</span>com<span class="token punctuation">.</span>mysql<span class="token punctuation">.</span>jdbc<span class="token punctuation">.</span>Driver
-url<span class="token operator">=</span>jdbc<span class="token operator">:</span>mysql<span class="token operator">:</span><span class="token operator">/</span><span class="token operator">/</span>localhost<span class="token operator">:</span><span class="token number">3306</span><span class="token operator">/</span>dataserver<span class="token operator">?</span>useUnicode<span class="token operator">=</span><span class="token boolean">true</span><span class="token operator">&amp;</span>characterEncoding<span class="token operator">=</span>UTF<span class="token operator">-</span><span class="token number">8</span><span class="token operator">&amp;</span>autoReconnect<span class="token operator">=</span><span class="token boolean">true</span><span class="token operator">&amp;</span>useSSL<span class="token operator">=</span><span class="token boolean">false</span><span class="token operator">&amp;</span>allowMultiQueries<span class="token operator">=</span><span class="token boolean">true</span>
-username<span class="token operator">=</span>admin
-password<span class="token operator">=</span>admin<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/03/29/mybaits-notes/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/26/kafka-install-use/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/03/26/kafka-install-use/" class="post-title-link" itemprop="url">kafka 安装 使用</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-03-26 23:25:30" itemprop="dateCreated datePublished" datetime="2019-03-26T23:25:30+08:00">2019-03-26</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>7.6k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>7 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  <a target="_blank" rel="noopener" href="http://kafka.apache.org/downloads">http://kafka.apache.org/downloads</a></p>
-<h1 id="1-安装"><a href="#1-安装" class="headerlink" title="(1) 安装"></a>(1) 安装</h1><p>　使用kafka时需要zookeeper，所以需要安装 kafka 和 zookeeper </p>
-<h2 id="1-1-zookeeper安装"><a href="#1-1-zookeeper安装" class="headerlink" title="(1.1) zookeeper安装"></a>(1.1) zookeeper安装</h2><p>　下载　<a target="_blank" rel="noopener" href="http://mirrors.cnnic.cn/apache/zookeeper/zookeeper-3.5.5/zookeeper-3.5.5.tar.gz"> apache-zookeeper-3.5.5-bin.tar.gz </a></p>
-<p>　解压　<code>tar -zxvf apache-zookeeper-3.5.5-bin.tar.gz</code></p>
-<p>　配置　<code>cp -rf conf/zoo_sample.cfg conf/zoo.cfg</code></p>
-<p>　启动　<code>./bin/zkServer.sh start</code></p>
-<pre class="line-numbers language-text" data-language="text"><code class="language-text">ZBMAC-C02PGMT0F:apache-zookeeper-3.5.5-bin weikeqin1$ ./bin/zkServer.sh start
-/usr/bin/java
-ZooKeeper JMX enabled by default
-Using config: /Users/weikeqin1/SoftWare/apache-zookeeper-3.5.5-bin/bin/../conf/zoo.cfg
-Starting zookeeper ... STARTED<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/03/26/kafka-install-use/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/23/mysql-update-statement-execution-flow/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/03/23/mysql-update-statement-execution-flow/" class="post-title-link" itemprop="url">MySQL更新语句执行流程</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-03-23 23:30:40" itemprop="dateCreated datePublished" datetime="2019-03-23T23:30:40+08:00">2019-03-23</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-11-27 15:14:02" itemprop="dateModified" datetime="2022-11-27T15:14:02+08:00">2022-11-27</time>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>290</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p> 转自 <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲</a></p>
-<p>  问大家一个问题。 <code> UPDATE t set c = 2 where id = 1 ;</code> 这个更新语句是怎么执行的。</p>
-<p>假设表结构是</p>
-<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> <span class="token identifier"><span class="token punctuation">`</span>t<span class="token punctuation">`</span></span> <span class="token punctuation">(</span>
-  <span class="token identifier"><span class="token punctuation">`</span>id<span class="token punctuation">`</span></span> <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span> <span class="token operator">NOT</span> <span class="token boolean">NULL</span><span class="token punctuation">,</span>
-  <span class="token identifier"><span class="token punctuation">`</span>c<span class="token punctuation">`</span></span> <span class="token keyword">int</span><span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span> <span class="token keyword">DEFAULT</span> <span class="token boolean">NULL</span><span class="token punctuation">,</span>
-  <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span><span class="token identifier"><span class="token punctuation">`</span>id<span class="token punctuation">`</span></span><span class="token punctuation">)</span>
-<span class="token punctuation">)</span> <span class="token keyword">ENGINE</span><span class="token operator">=</span><span class="token keyword">InnoDB</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h1 id="7-更新一条语句的流程"><a href="#7-更新一条语句的流程" class="headerlink" title="(7) 更新一条语句的流程"></a>(7) 更新一条语句的流程</h1><ol>
-<li>连接器 连接数据库。</li>
-<li>清空对应表缓存</li>
-<li>分析器 词法解析 语法解析</li>
-<li>优化器</li>
-<li>执行器</li>
-<li>更新  redo log（重做日志）和 binlog（归档日志）。</li>
-</ol>
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68633">02 | 日志系统：一条SQL更新语句是如何执行的？ - MySQL实战45讲</a></p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/23/mysql-query-statement-execution-flow/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/03/23/mysql-query-statement-execution-flow/" class="post-title-link" itemprop="url">MySQL查询语句执行流程</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-03-23 23:28:46" itemprop="dateCreated datePublished" datetime="2019-03-23T23:28:46+08:00">2019-03-23</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-11-27 13:18:39" itemprop="dateModified" datetime="2022-11-27T13:18:39+08:00">2022-11-27</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>164</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>  转自 <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68319">01 | 基础架构：一条SQL查询语句是如何执行的？ - MySQL实战45讲</a></p>
-<p>  问大家一个问题。<code>SELECT * FROM t WHERE id = 1 ;</code>  这条查询语句是怎么执行的。</p>
-<h1 id="6-执行一条查询语句的流程"><a href="#6-执行一条查询语句的流程" class="headerlink" title="(6) 执行一条查询语句的流程"></a>(6) 执行一条查询语句的流程</h1><ol>
-<li>连接器 连接数据库。</li>
-<li>查询缓存</li>
-<li>分析器 词法解析 语法解析</li>
-<li>优化器</li>
-<li>执行器</li>
-</ol>
-<h1 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/68319">01 | 基础架构：一条SQL查询语句是如何执行的？ - MySQL实战45讲</a></p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2019/03/23/mysql-redo-log/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2019/03/23/mysql-redo-log/" class="post-title-link" itemprop="url">MySQL 重做日志 (redo log)</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2019-03-23 15:13:35" itemprop="dateCreated datePublished" datetime="2019-03-23T15:13:35+08:00">2019-03-23</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-12-11 00:11:52" itemprop="dateModified" datetime="2022-12-11T00:11:52+08:00">2022-12-11</time>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>1.8k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>2 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <h1 id="什么是重做日志-redo-log"><a href="#什么是重做日志-redo-log" class="headerlink" title="什么是重做日志(redo log)"></a>什么是重做日志(redo log)</h1><p>  而粉板和账本配合的整个过程，其实就是 MySQL 里经常说到的 WAL 技术，WAL 的全称是 Write-Ahead Logging，它的关键点就是先写日志，再写做磁盘，也就是先写粉板，等不忙的时候再写账本。</p>
-<p>  具体来说，当有一条记录需要更新的时候，InnoDB 引擎就会先把记录写到 redo log（粉板）里面，并更新内存，这个时候更新就算完成了。同时，InnoDB 引擎会在适当的时候，将这个操作记录更新到磁盘里面，而这个更新往往是在系统比较空闲的时候做，这就像打烊以后掌柜做的事。</p>
-<p>  InnoDB 的 redo log 是固定大小的，比如可以配置为一组 4 个文件，每个文件的大小是 1GB，那么这块“粉板”总共就可以记录 4GB 的操作。从头开始写，写到末尾就又回到开头循环写</p>
-<h1 id="重做日志-redo-log-作用"><a href="#重做日志-redo-log-作用" class="headerlink" title="重做日志(redo log)作用"></a>重做日志(redo log)作用</h1><p>  1、<br>  2、crash-safe 保证数据一致性</p>
-<p>  有了 redo log，InnoDB 就可以保证即使数据库发生异常重启，之前提交的记录都不会丢失，这个能力称为 crash-safe。</p>
-<h2 id="crash-safe"><a href="#crash-safe" class="headerlink" title="crash-safe"></a>crash-safe</h2><p>  要理解 crash-safe 这个概念，可以想想我们前面赊账记录的例子。只要赊账记录记在了粉板上或写在了账本上，之后即使掌柜忘记了，比如突然停业几天，恢复生意后依然可以通过账本和粉板上的数据明确赊账账目。</p>
-<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql">mysql<span class="token operator">></span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'innodb_log%'</span> <span class="token punctuation">;</span>
-<span class="token operator">+</span><span class="token comment">------------------------------------+----------+</span>
-<span class="token operator">|</span> Variable_name                      <span class="token operator">|</span> <span class="token keyword">Value</span>    <span class="token operator">|</span>
-<span class="token operator">+</span><span class="token comment">------------------------------------+----------+</span>
-<span class="token operator">|</span> innodb_log_buffer_size             <span class="token operator">|</span> <span class="token number">16777216</span> <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_checksums               <span class="token operator">|</span> <span class="token keyword">ON</span>       <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_compressed_pages        <span class="token operator">|</span> <span class="token keyword">ON</span>       <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_file_size               <span class="token operator">|</span> <span class="token number">50331648</span> <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_files_in_group          <span class="token operator">|</span> <span class="token number">2</span>        <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_group_home_dir          <span class="token operator">|</span> <span class="token punctuation">.</span><span class="token operator">/</span>       <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_spin_cpu_abs_lwm        <span class="token operator">|</span> <span class="token number">80</span>       <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_spin_cpu_pct_hwm        <span class="token operator">|</span> <span class="token number">50</span>       <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_wait_for_flush_spin_hwm <span class="token operator">|</span> <span class="token number">400</span>      <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_write_ahead_size        <span class="token operator">|</span> <span class="token number">8192</span>     <span class="token operator">|</span>
-<span class="token operator">|</span> innodb_log_writer_threads          <span class="token operator">|</span> <span class="token keyword">ON</span>       <span class="token operator">|</span>
-<span class="token operator">+</span><span class="token comment">------------------------------------+----------+</span>
-<span class="token number">11</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
-
-mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h1 id="日志不同"><a href="#日志不同" class="headerlink" title="日志不同"></a>日志不同</h1><p>redo log 是 InnoDB 引擎特有的；binlog 是 MySQL 的 Server 层实现的，所有引擎都可以使用。<br>redo log 是物理日志，记录的是“在某个数据页上做了什么修改”；binlog 是逻辑日志，记录的是这个语句的原始逻辑，比如“给 ID=2 这一行的 c 字段加 1 ”。<br>redo log 是循环写的，空间固定会用完；binlog 是可以追加写入的。“追加写”是指 binlog 文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。</p>
-<h1 id="思考题"><a href="#思考题" class="headerlink" title="思考题"></a>思考题</h1><h2 id="redo-log-一般设置多大"><a href="#redo-log-一般设置多大" class="headerlink" title="redo log 一般设置多大"></a>redo log 一般设置多大</h2><p>回答：redo log 太小的话，会导致很快就被写满，然后不得不强行刷 redo log，这样 WAL 机制的能力就发挥不出来了。<br>所以，如果是现在常见的几个 TB 的磁盘的话，就不要太小气了，直接将 redo log 设置为 4 个文件、每个文件 1GB 吧。</p>
-<h2 id="正常运行中的实例，数据写入后的最终落盘，是从-redo-log-更新过来的还是从-buffer-pool-更新过来的呢"><a href="#正常运行中的实例，数据写入后的最终落盘，是从-redo-log-更新过来的还是从-buffer-pool-更新过来的呢" class="headerlink" title="正常运行中的实例，数据写入后的最终落盘，是从 redo log 更新过来的还是从 buffer pool 更新过来的呢"></a>正常运行中的实例，数据写入后的最终落盘，是从 redo log 更新过来的还是从 buffer pool 更新过来的呢</h2><p>回答：这个问题其实问得非常好。<br>这里涉及到了，“redo log 里面到底是什么”的问题。</p>
-<p>实际上，redo log 并没有记录数据页的完整数据，所以它并没有能力自己去更新磁盘数据页，也就不存在“数据最终落盘，是由 redo log 更新过去”的情况。<br>如果是正常运行的实例的话，数据页被修改以后，跟磁盘的数据页不一致，称为脏页。最终数据落盘，就是把内存中的数据页写盘。这个过程，甚至与 redo log 毫无关系。在崩溃恢复场景中，InnoDB 如果判断到一个数据页可能在崩溃恢复的时候丢失了更新，就会将它读到内存，然后让 redo log 更新内存内容。更新完成后，内存页变成脏页，就回到了第一种情况的状态。</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/14/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><span class="page-number current">15</span><a class="page-number" href="/page/16/">16</a><span class="space">&hellip;</span><a class="page-number" href="/page/28/">28</a><a class="extend next" rel="next" href="/page/16/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/14/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><span class="page-number current">15</span><a class="page-number" href="/page/16/">16</a><span class="space">&hellip;</span><a class="page-number" href="/page/29/">29</a><a class="extend next" rel="next" href="/page/16/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 </div>

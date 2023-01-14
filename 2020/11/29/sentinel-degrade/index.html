@@ -19,17 +19,18 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
 
-    <meta name="description" content="原理  todo  源码解读">
+    <meta name="description" content="(1) 什么是熔断  在生活中，我们经常看到家里的闸里会有保险丝，保险丝会在电流过大时熔断。 (2) 为什么需要熔断  像保险丝在电流过大时熔断保护电路一样  计算机软件系统里的熔断是为了保护系统不被过大的资源消耗拖垮 (3) 熔断的原理  断路器 (3.1) 状态机  熔断状态机">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Sentinel熔断源码解读">
 <meta property="og:url" content="http://weikeqin.com/2020/11/29/sentinel-degrade/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="原理  todo  源码解读">
+<meta property="og:description" content="(1) 什么是熔断  在生活中，我们经常看到家里的闸里会有保险丝，保险丝会在电流过大时熔断。 (2) 为什么需要熔断  像保险丝在电流过大时熔断保护电路一样  计算机软件系统里的熔断是为了保护系统不被过大的资源消耗拖垮 (3) 熔断的原理  断路器 (3.1) 状态机  熔断状态机">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2020-11-29T01:11:58.000Z">
-<meta property="article:modified_time" content="2023-01-08T14:57:02.356Z">
+<meta property="article:modified_time" content="2023-01-14T15:23:28.094Z">
 <meta property="article:author" content="WKQ">
-<meta property="article:tag" content="tech,Java,MySQL,Redis,ElasticSearch,DDD">
+<meta property="article:tag" content="stability">
+<meta property="article:tag" content="sentinel">
 <meta name="twitter:card" content="summary">
 
 
@@ -149,7 +150,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8E%9F%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">2.</span> <span class="nav-text">源码解读</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%BB%80%E4%B9%88%E6%98%AF%E7%86%94%E6%96%AD"><span class="nav-number">1.</span> <span class="nav-text">(1) 什么是熔断</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E7%86%94%E6%96%AD"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么需要熔断</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E7%86%94%E6%96%AD%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) 熔断的原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E7%8A%B6%E6%80%81%E6%9C%BA"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 状态机</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-Sentinel%E7%86%94%E6%96%AD%E9%85%8D%E7%BD%AE"><span class="nav-number">4.</span> <span class="nav-text">(4) Sentinel熔断配置</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E7%B3%BB%E7%BB%9F%E9%87%8C%E4%BD%BF%E7%94%A8%E7%86%94%E6%96%AD"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 系统里使用熔断</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E7%86%94%E6%96%AD%E9%85%8D%E7%BD%AE"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 熔断配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-1-sentinel-1-7%E7%89%88%E6%9C%AC"><span class="nav-number">4.2.1.</span> <span class="nav-text">(4.2.1) sentinel 1.7版本</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-2-sentinel-1-8%E7%89%88%E6%9C%AC"><span class="nav-number">4.2.2.</span> <span class="nav-text">(4.2.2) sentinel 1.8版本</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">5.</span> <span class="nav-text">(5) 源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%86%94%E6%96%AD%E9%99%8D%E7%BA%A7%E6%8F%92%E6%A7%BD-DegradeSlot"><span class="nav-number">5.1.</span> <span class="nav-text">熔断降级插槽-DegradeSlot</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%86%94%E6%96%AD%E8%A7%84%E5%88%99%E7%9A%84%E8%A7%84%E5%88%99%E7%AE%A1%E7%90%86%E5%99%A8-DegradeRuleManager"><span class="nav-number">5.2.</span> <span class="nav-text">熔断规则的规则管理器-DegradeRuleManager</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E7%86%94%E6%96%AD%E8%A7%84%E5%88%99"><span class="nav-number">5.2.1.</span> <span class="nav-text">查询熔断规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9B%B4%E6%96%B0%E7%86%94%E6%96%AD%E8%A7%84%E5%88%99"><span class="nav-number">5.2.2.</span> <span class="nav-text">更新熔断规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ResponseTimeCircuitBreaker"><span class="nav-number">5.2.3.</span> <span class="nav-text">ResponseTimeCircuitBreaker</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CircuitBreaker-tryPass"><span class="nav-number">5.3.</span> <span class="nav-text">CircuitBreaker::tryPass</span></a></li></ol></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -162,18 +163,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">277</span>
+          <span class="site-state-item-count">285</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">15</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">52</span>
+        <span class="site-state-item-count">54</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -268,7 +269,16 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2023-01-08 22:57:02" itemprop="dateModified" datetime="2023-01-08T22:57:02+08:00">2023-01-08</time>
+      <time title="修改时间：2023-01-14 23:23:28" itemprop="dateModified" datetime="2023-01-14T23:23:28+08:00">2023-01-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/stability/" itemprop="url" rel="index"><span itemprop="name">stability</span></a>
+        </span>
     </span>
 
   
@@ -285,14 +295,14 @@
         <i class="far fa-file-word"></i>
       </span>
       <span class="post-meta-item-text">本文字数：</span>
-      <span>10</span>
+      <span>17k</span>
     </span>
     <span class="post-meta-item" title="阅读时长">
       <span class="post-meta-item-icon">
         <i class="far fa-clock"></i>
       </span>
       <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
+      <span>15 分钟</span>
     </span>
 </div>
 
@@ -303,8 +313,741 @@
     
     
     <div class="post-body" itemprop="articleBody">
-        <h1 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h1><p>  todo </p>
-<h1 id="源码解读"><a href="#源码解读" class="headerlink" title="源码解读"></a>源码解读</h1>
+        <h1 id="1-什么是熔断"><a href="#1-什么是熔断" class="headerlink" title="(1) 什么是熔断"></a>(1) 什么是熔断</h1><p>  在生活中，我们经常看到家里的闸里会有保险丝，保险丝会在电流过大时熔断。</p>
+<h1 id="2-为什么需要熔断"><a href="#2-为什么需要熔断" class="headerlink" title="(2) 为什么需要熔断"></a>(2) 为什么需要熔断</h1><p>  像保险丝在电流过大时熔断保护电路一样<br>  计算机软件系统里的熔断是为了保护系统不被过大的资源消耗拖垮</p>
+<h1 id="3-熔断的原理"><a href="#3-熔断的原理" class="headerlink" title="(3) 熔断的原理"></a>(3) 熔断的原理</h1><p>  断路器</p>
+<h2 id="3-1-状态机"><a href="#3-1-状态机" class="headerlink" title="(3.1) 状态机"></a>(3.1) 状态机</h2><p>  熔断状态机</p>
+<span id="more"></span>
+
+<h1 id="4-Sentinel熔断配置"><a href="#4-Sentinel熔断配置" class="headerlink" title="(4) Sentinel熔断配置"></a>(4) Sentinel熔断配置</h1><h2 id="4-1-系统里使用熔断"><a href="#4-1-系统里使用熔断" class="headerlink" title="(4.1) 系统里使用熔断"></a>(4.1) 系统里使用熔断</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// </span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h2 id="4-2-熔断配置"><a href="#4-2-熔断配置" class="headerlink" title="(4.2) 熔断配置"></a>(4.2) 熔断配置</h2><p>  交易每天都有大量的熔断报警，但是实际熔断时的服务状况又不是我们预期配置的熔断触发场景，和我们在预案平台配置的熔断条件有出入，因此排查了一波。</p>
+<h3 id="4-2-1-sentinel-1-7版本"><a href="#4-2-1-sentinel-1-7版本" class="headerlink" title="(4.2.1) sentinel 1.7版本"></a>(4.2.1) sentinel 1.7版本</h3><table>
+<thead>
+<tr>
+<th>熔断策略</th>
+<th>实际触发熔断规则</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RT</td>
+<td>1s内所有成功的请求平均RT连续5次大于配置的阈值时触发熔断</td>
+</tr>
+<tr>
+<td>错误数</td>
+<td>1min内所有异常的请求次数大于配置的阈值时触发熔断</td>
+</tr>
+<tr>
+<td>错误率</td>
+<td>1s内请求数大于配置的最小请求数，并且异常数/成功数大于配置的阈值</td>
+</tr>
+</tbody></table>
+<h3 id="4-2-2-sentinel-1-8版本"><a href="#4-2-2-sentinel-1-8版本" class="headerlink" title="(4.2.2) sentinel 1.8版本"></a>(4.2.2) sentinel 1.8版本</h3><table>
+<thead>
+<tr>
+<th>熔断策略</th>
+<th>实际触发熔断规则</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RT</td>
+<td>在一个统计时长内总请求数大于等于最小请求数，并且慢调用(RT大于阈值)次数/总调用次数大于比例阈值时触发熔断</td>
+</tr>
+<tr>
+<td>错误数</td>
+<td>1min内所有异常的请求次数大于配置的阈值时触发熔断</td>
+</tr>
+<tr>
+<td>错误率</td>
+<td>1s内请求数大于配置的最小请求数，并且异常数/成功数大于配置的阈值</td>
+</tr>
+</tbody></table>
+<h1 id="5-源码解读"><a href="#5-源码解读" class="headerlink" title="(5) 源码解读"></a>(5) 源码解读</h1><p>// todo<br>// 流程<br>// 根据流程重新梳理 表达</p>
+<h2 id="熔断降级插槽-DegradeSlot"><a href="#熔断降级插槽-DegradeSlot" class="headerlink" title="熔断降级插槽-DegradeSlot"></a>熔断降级插槽-DegradeSlot</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>block<span class="token punctuation">.</span>degrade</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 专门用于熔断/电路断路 的处理插槽
+ */</span>
+<span class="token annotation punctuation">@Spi</span><span class="token punctuation">(</span>order <span class="token operator">=</span> <span class="token class-name">Constants</span><span class="token punctuation">.</span>ORDER_DEGRADE_SLOT<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">DegradeSlot</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractLinkedProcessorSlot</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">entry</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">,</span> <span class="token class-name">ResourceWrapper</span> resourceWrapper<span class="token punctuation">,</span> <span class="token class-name">DefaultNode</span> node<span class="token punctuation">,</span> <span class="token keyword">int</span> count<span class="token punctuation">,</span>
+                      <span class="token keyword">boolean</span> prioritized<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Throwable</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 执行检查       </span>
+        <span class="token function">performChecking</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token function">fireEntry</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> node<span class="token punctuation">,</span> count<span class="token punctuation">,</span> prioritized<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span>    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/** 执行检查 */</span>
+<span class="token keyword">void</span> <span class="token function">performChecking</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">,</span> <span class="token class-name">ResourceWrapper</span> r<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">BlockException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 根据资源名获取对应的熔断器/熔断器</span>
+    <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span></span> circuitBreakers <span class="token operator">=</span> <span class="token class-name">DegradeRuleManager</span><span class="token punctuation">.</span><span class="token function">getCircuitBreakers</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>circuitBreakers <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span> circuitBreakers<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">CircuitBreaker</span> cb <span class="token operator">:</span> circuitBreakers<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 判断是否可以通过</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>cb<span class="token punctuation">.</span><span class="token function">tryPass</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 抛出熔断异常 DegradeException </span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">DegradeException</span><span class="token punctuation">(</span>cb<span class="token punctuation">.</span><span class="token function">getRule</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getLimitApp</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> cb<span class="token punctuation">.</span><span class="token function">getRule</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="熔断规则的规则管理器-DegradeRuleManager"><a href="#熔断规则的规则管理器-DegradeRuleManager" class="headerlink" title="熔断规则的规则管理器-DegradeRuleManager"></a>熔断规则的规则管理器-DegradeRuleManager</h2><p>  <code>DegradeRuleManager</code>是观察者模式里的观察者，被观察着是<code>DynamicSentinelProperty</code>，观察到配置变更以后，会更新配置。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>block<span class="token punctuation">.</span>degrade</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 熔断规则的规则管理器  
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">DegradeRuleManager</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 资源对应的熔断器</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">volatile</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span><span class="token punctuation">></span></span> circuitBreakers <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 资源对应的熔断配置</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">volatile</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Set</span><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span><span class="token punctuation">></span></span> ruleMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 观察者</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">RulePropertyListener</span> LISTENER <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RulePropertyListener</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 当前配置</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">SentinelProperty</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span><span class="token punctuation">></span></span> currentProperty
+        <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DynamicSentinelProperty</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">static</span> <span class="token punctuation">&#123;</span>
+        currentProperty<span class="token punctuation">.</span><span class="token function">addListener</span><span class="token punctuation">(</span>LISTENER<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="查询熔断规则"><a href="#查询熔断规则" class="headerlink" title="查询熔断规则"></a>查询熔断规则</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">static</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span></span> <span class="token function">getCircuitBreakers</span><span class="token punctuation">(</span><span class="token class-name">String</span> resourceName<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> circuitBreakers<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>resourceName<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="更新熔断规则"><a href="#更新熔断规则" class="headerlink" title="更新熔断规则"></a>更新熔断规则</h3><p>  观察着实现类</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">RulePropertyListener</span> <span class="token keyword">implements</span> <span class="token class-name">PropertyListener</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/** 重新加载熔断配置 */</span>
+    <span class="token keyword">private</span> <span class="token keyword">synchronized</span> <span class="token keyword">void</span> <span class="token function">reloadFrom</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span></span> list<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 构建 资源和熔断器map</span>
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span><span class="token punctuation">></span></span> cbs <span class="token operator">=</span> <span class="token function">buildCircuitBreakers</span><span class="token punctuation">(</span>list<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 构建 资源和熔断配置map</span>
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Set</span><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span><span class="token punctuation">></span></span> rm <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>cbs<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Map<span class="token punctuation">.</span>Entry</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span><span class="token punctuation">></span></span> e <span class="token operator">:</span> cbs<span class="token punctuation">.</span><span class="token function">entrySet</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 熔断器集合不能为空</span>
+            <span class="token keyword">assert</span> e<span class="token punctuation">.</span><span class="token function">getValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>e<span class="token punctuation">.</span><span class="token function">getValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 处理熔断规则</span>
+            <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span></span> rules <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashSet</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>e<span class="token punctuation">.</span><span class="token function">getValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">CircuitBreaker</span> cb <span class="token operator">:</span> e<span class="token punctuation">.</span><span class="token function">getValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                rules<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>cb<span class="token punctuation">.</span><span class="token function">getRule</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            rm<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span><span class="token function">getKey</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> rules<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// 设置 资源和熔断器map</span>
+        <span class="token class-name">DegradeRuleManager</span><span class="token punctuation">.</span>circuitBreakers <span class="token operator">=</span> cbs<span class="token punctuation">;</span>
+        <span class="token comment">// 设置 资源和熔断配置map</span>
+        <span class="token class-name">DegradeRuleManager</span><span class="token punctuation">.</span>ruleMap <span class="token operator">=</span> rm<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/** 更新配置 */</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">configUpdate</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span></span> conf<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">reloadFrom</span><span class="token punctuation">(</span>conf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">RecordLog</span><span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"[DegradeRuleManager] Degrade rules has been updated to: &#123;&#125;"</span><span class="token punctuation">,</span> ruleMap<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/** 加载配置 */</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">configLoad</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span></span> conf<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">reloadFrom</span><span class="token punctuation">(</span>conf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">RecordLog</span><span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"[DegradeRuleManager] Degrade rules loaded: &#123;&#125;"</span><span class="token punctuation">,</span> ruleMap<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/** 构建 资源和熔断器map */</span>
+    <span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token function">buildCircuitBreakers</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DegradeRule</span><span class="token punctuation">></span></span> list<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span><span class="token punctuation">></span></span> cbMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>list <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span> list<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> cbMap<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">DegradeRule</span> rule <span class="token operator">:</span> list<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 判断熔断规则是否可用</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">isValidRule</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">RecordLog</span><span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"[DegradeRuleManager] Ignoring invalid rule when loading new rules: &#123;&#125;"</span><span class="token punctuation">,</span> rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">continue</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">StringUtil</span><span class="token punctuation">.</span><span class="token function">isBlank</span><span class="token punctuation">(</span>rule<span class="token punctuation">.</span><span class="token function">getLimitApp</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 熔断规则limitApp为空 设置默认值 default</span>
+                rule<span class="token punctuation">.</span><span class="token function">setLimitApp</span><span class="token punctuation">(</span><span class="token class-name">RuleConstant</span><span class="token punctuation">.</span>LIMIT_APP_DEFAULT<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// </span>
+            <span class="token class-name">CircuitBreaker</span> cb <span class="token operator">=</span> <span class="token function">getExistingSameCbOrNew</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>cb <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">RecordLog</span><span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"[DegradeRuleManager] Unknown circuit breaking strategy, ignoring: &#123;&#125;"</span><span class="token punctuation">,</span> rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">continue</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token class-name">String</span> resourceName <span class="token operator">=</span> rule<span class="token punctuation">.</span><span class="token function">getResource</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span></span> cbList <span class="token operator">=</span> cbMap<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>resourceName<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>cbList <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                cbList <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                cbMap<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>resourceName<span class="token punctuation">,</span> cbList<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            cbList<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>cb<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span> cbMap<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<p>  DegradeRuleManager::getExistingSameCbOrNew</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">CircuitBreaker</span> <span class="token function">getExistingSameCbOrNew</span><span class="token punctuation">(</span><span class="token comment">/*@Valid*/</span> <span class="token class-name">DegradeRule</span> rule<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">CircuitBreaker</span><span class="token punctuation">></span></span> cbs <span class="token operator">=</span> <span class="token function">getCircuitBreakers</span><span class="token punctuation">(</span>rule<span class="token punctuation">.</span><span class="token function">getResource</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cbs <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span> cbs<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token function">newCircuitBreakerFrom</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">CircuitBreaker</span> cb <span class="token operator">:</span> cbs<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>rule<span class="token punctuation">.</span><span class="token function">equals</span><span class="token punctuation">(</span>cb<span class="token punctuation">.</span><span class="token function">getRule</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Reuse the circuit breaker if the rule remains unchanged.</span>
+            <span class="token keyword">return</span> cb<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token function">newCircuitBreakerFrom</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  DegradeRuleManager::newCircuitBreakerFrom</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 根据提供的熔断规则创建熔断器实例。 
+ *
+ * @param rule 熔断规则
+ * @return 基于提供规则的新熔断器；如果规则无效或类型不受支持，则为 null
+ */</span>
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">CircuitBreaker</span> <span class="token function">newCircuitBreakerFrom</span><span class="token punctuation">(</span><span class="token comment">/*@Valid*/</span> <span class="token class-name">DegradeRule</span> rule<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>rule<span class="token punctuation">.</span><span class="token function">getGrade</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 按照rt熔断</span>
+        <span class="token keyword">case</span> <span class="token class-name">RuleConstant</span><span class="token punctuation">.</span>DEGRADE_GRADE_RT<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">ResponseTimeCircuitBreaker</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 按照错误率熔断    </span>
+        <span class="token keyword">case</span> <span class="token class-name">RuleConstant</span><span class="token punctuation">.</span>DEGRADE_GRADE_EXCEPTION_RATIO<span class="token operator">:</span>
+        <span class="token comment">// 按照错误数熔断</span>
+        <span class="token keyword">case</span> <span class="token class-name">RuleConstant</span><span class="token punctuation">.</span>DEGRADE_GRADE_EXCEPTION_COUNT<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">ExceptionCircuitBreaker</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="ResponseTimeCircuitBreaker"><a href="#ResponseTimeCircuitBreaker" class="headerlink" title="ResponseTimeCircuitBreaker"></a>ResponseTimeCircuitBreaker</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>block<span class="token punctuation">.</span>degrade<span class="token punctuation">.</span>circuitbreaker</span><span class="token punctuation">;</span>
+ 
+<span class="token comment">/**
+ * @since 1.8.0
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ResponseTimeCircuitBreaker</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractCircuitBreaker</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 慢请求比例最大值</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">double</span> SLOW_REQUEST_RATIO_MAX_VALUE <span class="token operator">=</span> <span class="token number">1.0d</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 最大允许rt</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> maxAllowedRt<span class="token punctuation">;</span>
+
+    <span class="token comment">// 最大慢请求比例</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">double</span> maxSlowRequestRatio<span class="token punctuation">;</span>
+
+    <span class="token comment">// 最小请求数</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> minRequestAmount<span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">SlowRequestCounter</span><span class="token punctuation">></span></span> slidingCounter<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     */</span>
+    <span class="token keyword">public</span> <span class="token class-name">ResponseTimeCircuitBreaker</span><span class="token punctuation">(</span><span class="token class-name">DegradeRule</span> rule<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">(</span>rule<span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">SlowRequestLeapArray</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> rule<span class="token punctuation">.</span><span class="token function">getStatIntervalMs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     */</span>
+    <span class="token class-name">ResponseTimeCircuitBreaker</span><span class="token punctuation">(</span><span class="token class-name">DegradeRule</span> rule<span class="token punctuation">,</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">SlowRequestCounter</span><span class="token punctuation">></span></span> stat<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">super</span><span class="token punctuation">(</span>rule<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">AssertUtil</span><span class="token punctuation">.</span><span class="token function">isTrue</span><span class="token punctuation">(</span>rule<span class="token punctuation">.</span><span class="token function">getGrade</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">RuleConstant</span><span class="token punctuation">.</span>DEGRADE_GRADE_RT<span class="token punctuation">,</span> <span class="token string">"rule metric type should be RT"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">AssertUtil</span><span class="token punctuation">.</span><span class="token function">notNull</span><span class="token punctuation">(</span>stat<span class="token punctuation">,</span> <span class="token string">"stat cannot be null"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>maxAllowedRt <span class="token operator">=</span> <span class="token class-name">Math</span><span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>rule<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>maxSlowRequestRatio <span class="token operator">=</span> rule<span class="token punctuation">.</span><span class="token function">getSlowRatioThreshold</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>minRequestAmount <span class="token operator">=</span> rule<span class="token punctuation">.</span><span class="token function">getMinRequestAmount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>slidingCounter <span class="token operator">=</span> stat<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="CircuitBreaker-tryPass"><a href="#CircuitBreaker-tryPass" class="headerlink" title="CircuitBreaker::tryPass"></a>CircuitBreaker::tryPass</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>block<span class="token punctuation">.</span>degrade<span class="token punctuation">.</span>circuitbreaker</span><span class="token punctuation">;</span>
+
+<span class="token keyword">import</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>context<span class="token punctuation">.</span></span><span class="token class-name">Context</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slotchain<span class="token punctuation">.</span></span><span class="token class-name">ResourceWrapper</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>block<span class="token punctuation">.</span>degrade<span class="token punctuation">.</span></span><span class="token class-name">DegradeRule</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 熔断器/断路器接口
+ *   
+ * https://martinfowler.com/bliki/CircuitBreaker.html 
+ *
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">CircuitBreaker</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 获取关联的熔断规则。
+     *
+     * @return 关联的熔断规则
+     */</span>
+    <span class="token class-name">DegradeRule</span> <span class="token function">getRule</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * Acquires permission of an invocation only if it is available at the time of invoking.
+     *
+     * @param context context of current invocation
+     * @return &#123;@code true&#125; if permission was acquired and &#123;@code false&#125; otherwise
+     */</span>
+    <span class="token keyword">boolean</span> <span class="token function">tryPass</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 获取熔断器的当前状态
+     *
+     * @return 当前熔断器状态
+     */</span>
+    <span class="token class-name">State</span> <span class="token function">currentState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * &lt;p>Record a completed request with the context and handle state transformation of the circuit breaker.&lt;/p>
+     * &lt;p>Called when a &lt;strong>passed&lt;/strong> invocation finished.&lt;/p>
+     *
+     * @param context 当前调用的上下文
+     */</span>
+    <span class="token keyword">void</span> <span class="token function">onRequestComplete</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 熔断器状态机
+     */</span>
+    <span class="token keyword">enum</span> <span class="token class-name">State</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/**
+         * 在OPEN状态下，所有的请求都会被拒绝，直到下一个恢复时间点。
+         */</span>
+        OPEN<span class="token punctuation">,</span>
+        <span class="token comment">/**
+         * 在 HALF_OPEN 状态下，熔断器将允许“探测”调用。
+         * 如果根据策略调用异常(如慢调用)，熔断器会重新转变为OPEN状态，等待下一个恢复时间点；
+         * 否则资源将被视为“已恢复”，熔断器将停止切断请求并转换为 CLOSED 状态。 
+         */</span>
+        HALF_OPEN<span class="token punctuation">,</span>
+        <span class="token comment">/**
+         * 在 CLOSED 状态下，所有请求都被允许。当指标值超过阈值时，熔断器将转换为 OPEN
+         */</span>
+        CLOSED
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>block<span class="token punctuation">.</span>degrade<span class="token punctuation">.</span>circuitbreaker</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * @since 1.8.0
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">AbstractCircuitBreaker</span> <span class="token keyword">implements</span> <span class="token class-name">CircuitBreaker</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">//</span>
+    <span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token class-name">DegradeRule</span> rule<span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">int</span> recoveryTimeoutMs<span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">EventObserverRegistry</span> observerRegistry<span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token class-name">AtomicReference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">State</span><span class="token punctuation">></span></span> currentState <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">AtomicReference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token class-name">State</span><span class="token punctuation">.</span>CLOSED<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">protected</span> <span class="token keyword">volatile</span> <span class="token keyword">long</span> nextRetryTimestamp<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">AbstractCircuitBreaker</span><span class="token punctuation">(</span><span class="token class-name">DegradeRule</span> rule<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">(</span>rule<span class="token punctuation">,</span> <span class="token class-name">EventObserverRegistry</span><span class="token punctuation">.</span><span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">tryPass</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 模版实现 </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>currentState<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">State</span><span class="token punctuation">.</span>CLOSED<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 熔断器 开启 </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>currentState<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">State</span><span class="token punctuation">.</span>OPEN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 对于半开状态，允许探测请求。</span>
+        <span class="token keyword">return</span> <span class="token function">retryTimeoutArrived</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> <span class="token function">fromOpenToHalfOpen</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**  */</span>
+<span class="token keyword">protected</span> <span class="token keyword">boolean</span> <span class="token function">retryTimeoutArrived</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+     <span class="token comment">// 当前时间戳 >= 下个周期</span>
+    <span class="token keyword">return</span> <span class="token class-name">TimeUtil</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">>=</span> nextRetryTimestamp<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">boolean</span> <span class="token function">fromOpenToHalfOpen</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 熔断器只有在OPEN状态下才能设置成HALF_OPEN</span>
+    <span class="token comment">// 并发场景只有一个线程能设置成功</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>currentState<span class="token punctuation">.</span><span class="token function">compareAndSet</span><span class="token punctuation">(</span><span class="token class-name">State</span><span class="token punctuation">.</span>OPEN<span class="token punctuation">,</span> <span class="token class-name">State</span><span class="token punctuation">.</span>HALF_OPEN<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 事件通知监听者</span>
+        <span class="token function">notifyObservers</span><span class="token punctuation">(</span><span class="token class-name">State</span><span class="token punctuation">.</span>OPEN<span class="token punctuation">,</span> <span class="token class-name">State</span><span class="token punctuation">.</span>HALF_OPEN<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 获取当前上下文的entry</span>
+        <span class="token class-name">Entry</span> entry <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 退出回调处理handler</span>
+        entry<span class="token punctuation">.</span><span class="token function">whenTerminate</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">BiConsumer</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Context</span><span class="token punctuation">,</span> <span class="token class-name">Entry</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token annotation punctuation">@Override</span>
+            <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">accept</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">,</span> <span class="token class-name">Entry</span> entry<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Note: This works as a temporary workaround for https://github.com/alibaba/Sentinel/issues/1638</span>
+                <span class="token comment">// Without the hook, the circuit breaker won't recover from half-open state in some circumstances</span>
+                <span class="token comment">// when the request is actually blocked by upcoming rules (not only degrade rules).</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>entry<span class="token punctuation">.</span><span class="token function">getBlockError</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 熔断器打开 </span>
+                    <span class="token comment">// Fallback to OPEN due to detecting request is blocked</span>
+                    currentState<span class="token punctuation">.</span><span class="token function">compareAndSet</span><span class="token punctuation">(</span><span class="token class-name">State</span><span class="token punctuation">.</span>HALF_OPEN<span class="token punctuation">,</span> <span class="token class-name">State</span><span class="token punctuation">.</span>OPEN<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token comment">// </span>
+                    <span class="token function">notifyObservers</span><span class="token punctuation">(</span><span class="token class-name">State</span><span class="token punctuation">.</span>HALF_OPEN<span class="token punctuation">,</span> <span class="token class-name">State</span><span class="token punctuation">.</span>OPEN<span class="token punctuation">,</span> <span class="token number">1.0d</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// </span>
+        <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 关闭状态 或者 半开状态 返回false</span>
+    <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  熔断只是对时间和状态进行判断，时间和状态来自哪里？<br>  时间在执行完毕后的exits里<br>  看 com.alibaba.csp.sentinel.slots.statistic.StatisticSlot::exit 方法</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic</span><span class="token punctuation">;</span>
+
+
+<span class="token comment">/**
+ * 专用于实时统计的处理器插槽。
+ */</span>
+<span class="token annotation punctuation">@Spi</span><span class="token punctuation">(</span>order <span class="token operator">=</span> <span class="token class-name">Constants</span><span class="token punctuation">.</span>ORDER_STATISTIC_SLOT<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">StatisticSlot</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractLinkedProcessorSlot</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/** 退出时调用exit方法 */</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">exit</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">,</span> <span class="token class-name">ResourceWrapper</span> resourceWrapper<span class="token punctuation">,</span> <span class="token keyword">int</span> count<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 获取当前上下文的node</span>
+        <span class="token class-name">Node</span> node <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">getCurNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 当前上下文的entry没有被流控</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getBlockError</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 计算响应时间  (使用 completeStatTime 作为完成时间)</span>
+            <span class="token keyword">long</span> completeStatTime <span class="token operator">=</span> <span class="token class-name">TimeUtil</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setCompleteTimestamp</span><span class="token punctuation">(</span>completeStatTime<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 当前时间戳 - 开始时间戳</span>
+            <span class="token keyword">long</span> rt <span class="token operator">=</span> completeStatTime <span class="token operator">-</span> context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getCreateTimestamp</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token class-name">Throwable</span> error <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getError</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 记录响应时间和成功请求个数</span>
+            <span class="token function">recordCompleteFor</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> count<span class="token punctuation">,</span> rt<span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">recordCompleteFor</span><span class="token punctuation">(</span>context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> count<span class="token punctuation">,</span> rt<span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>resourceWrapper<span class="token punctuation">.</span><span class="token function">getEntryType</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">EntryType</span><span class="token punctuation">.</span>IN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">recordCompleteFor</span><span class="token punctuation">(</span><span class="token class-name">Constants</span><span class="token punctuation">.</span>ENTRY_NODE<span class="token punctuation">,</span> count<span class="token punctuation">,</span> rt<span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// 使用注册的退出回调处理程序处理退出事件。</span>
+        <span class="token class-name">Collection</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ProcessorSlotExitCallback</span><span class="token punctuation">></span></span> exitCallbacks <span class="token operator">=</span> <span class="token class-name">StatisticSlotCallbackRegistry</span><span class="token punctuation">.</span><span class="token function">getExitCallbacks</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">ProcessorSlotExitCallback</span> handler <span class="token operator">:</span> exitCallbacks<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            handler<span class="token punctuation">.</span><span class="token function">onExit</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> count<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// fix bug https://github.com/alibaba/Sentinel/issues/2374</span>
+        <span class="token function">fireExit</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> count<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**  */</span>
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">recordCompleteFor</span><span class="token punctuation">(</span><span class="token class-name">Node</span> node<span class="token punctuation">,</span> <span class="token keyword">int</span> batchCount<span class="token punctuation">,</span> <span class="token keyword">long</span> rt<span class="token punctuation">,</span> <span class="token class-name">Throwable</span> error<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// </span>
+    node<span class="token punctuation">.</span><span class="token function">addRtAndSuccess</span><span class="token punctuation">(</span>rt<span class="token punctuation">,</span> batchCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    node<span class="token punctuation">.</span><span class="token function">decreaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>error <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token punctuation">(</span>error <span class="token keyword">instanceof</span> <span class="token class-name">BlockException</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        node<span class="token punctuation">.</span><span class="token function">increaseExceptionQps</span><span class="token punctuation">(</span>batchCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<p>  StatisticSlot</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic</span><span class="token punctuation">;</span>
+
+
+<span class="token comment">/**
+ * 专用于实时统计的处理器插槽。
+ */</span>
+<span class="token annotation punctuation">@Spi</span><span class="token punctuation">(</span>order <span class="token operator">=</span> <span class="token class-name">Constants</span><span class="token punctuation">.</span>ORDER_STATISTIC_SLOT<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">StatisticSlot</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractLinkedProcessorSlot</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * Holds statistics of the recent &#123;@code INTERVAL&#125; milliseconds. The &#123;@code INTERVAL&#125; is divided into time spans
+     * by given &#123;@code sampleCount&#125;.
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token keyword">volatile</span> <span class="token class-name">Metric</span> rollingCounterInSecond <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayMetric</span><span class="token punctuation">(</span><span class="token class-name">SampleCountProperty</span><span class="token punctuation">.</span>SAMPLE_COUNT<span class="token punctuation">,</span>
+        <span class="token class-name">IntervalProperty</span><span class="token punctuation">.</span>INTERVAL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * Holds statistics of the recent 60 seconds. The windowLengthInMs is deliberately set to 1000 milliseconds,
+     * meaning each bucket per second, in this way we can get accurate statistics of each second.
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token class-name">Metric</span> rollingCounterInMinute <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayMetric</span><span class="token punctuation">(</span><span class="token number">60</span><span class="token punctuation">,</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * The counter for thread count.
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">LongAdder</span> curThreadNum <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LongAdder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * The last timestamp when metrics were fetched.
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> lastFetchTime <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addPassRequest</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        rollingCounterInSecond<span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        rollingCounterInMinute<span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>metric</span><span class="token punctuation">;</span>
+ 
+<span class="token comment">/**
+ * The basic metric class in Sentinel using a &#123;@link BucketLeapArray&#125; internal.
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ArrayMetric</span> <span class="token keyword">implements</span> <span class="token class-name">Metric</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> data<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">ArrayMetric</span><span class="token punctuation">(</span><span class="token keyword">int</span> sampleCount<span class="token punctuation">,</span> <span class="token keyword">int</span> intervalInMs<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>data <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OccupiableBucketLeapArray</span><span class="token punctuation">(</span>sampleCount<span class="token punctuation">,</span> intervalInMs<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addPass</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> wrap <span class="token operator">=</span> data<span class="token punctuation">.</span><span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        wrap<span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  LeapArray</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>base</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * &lt;p>
+ * Basic data structure for statistic metrics in Sentinel.
+ * &lt;/p>
+ * &lt;p>
+ * Leap array use sliding window algorithm to count data. Each bucket cover &#123;@code windowLengthInMs&#125; time span,
+ * and the total time span is &#123;@link #intervalInMs&#125;, so the total bucket amount is:
+ * &#123;@code sampleCount = intervalInMs / windowLengthInMs&#125;.
+ * &lt;/p>
+ *
+ * @param &lt;T> type of statistic data
+ * @author jialiang.linjl
+ * @author Eric Zhao
+ * @author Carpenter Lee
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">protected</span> <span class="token keyword">int</span> windowLengthInMs<span class="token punctuation">;</span>
+    <span class="token keyword">protected</span> <span class="token keyword">int</span> sampleCount<span class="token punctuation">;</span>
+    <span class="token keyword">protected</span> <span class="token keyword">int</span> intervalInMs<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">double</span> intervalInSecond<span class="token punctuation">;</span>
+
+    <span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token class-name">AtomicReferenceArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">WindowWrap</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span><span class="token punctuation">></span></span> array<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * The conditional (predicate) update lock is used only when current bucket is deprecated.
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> updateLock <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ReentrantLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * Get the bucket at current timestamp.
+     *
+     * @return the bucket at current timestamp
+     */</span>
+    <span class="token keyword">public</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token class-name">TimeUtil</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * Get bucket item at provided timestamp.
+ *
+ * @param timeMillis a valid timestamp in milliseconds
+ * @return current bucket item at provided timestamp if the time is valid; null if time is invalid
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token keyword">long</span> timeMillis<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>timeMillis <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 计算下标</span>
+    <span class="token keyword">int</span> idx <span class="token operator">=</span> <span class="token function">calculateTimeIdx</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 计算当前桶开始时间。</span>
+    <span class="token keyword">long</span> windowStart <span class="token operator">=</span> <span class="token function">calculateWindowStart</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/*
+     * Get bucket item at given time from the array.
+     *
+     * (1) Bucket is absent, then just create a new bucket and CAS update to circular array.
+     * (2) Bucket is up-to-date, then just return the bucket.
+     * (3) Bucket is deprecated, then reset current bucket.
+     */</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> old <span class="token operator">=</span> array<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>old <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/*
+             *     B0       B1      B2    NULL      B4
+             * ||_______|_______|_______|_______|_______||___
+             * 200     400     600     800     1000    1200  timestamp
+             *                             ^
+             *                          time=888
+             *            bucket is empty, so create new and update
+             *
+             * If the old bucket is absent, then we create a new bucket at &#123;@code windowStart&#125;,
+             * then try to update circular array via a CAS operation. Only one thread can
+             * succeed to update, while other threads yield its time slice.
+             */</span>
+            <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> window <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>windowLengthInMs<span class="token punctuation">,</span> windowStart<span class="token punctuation">,</span> <span class="token function">newEmptyBucket</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>array<span class="token punctuation">.</span><span class="token function">compareAndSet</span><span class="token punctuation">(</span>idx<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> window<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Successfully updated, return the created bucket.</span>
+                <span class="token keyword">return</span> window<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Contention failed, the thread will yield its time slice to wait for bucket available.</span>
+                <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token keyword">yield</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>windowStart <span class="token operator">==</span> old<span class="token punctuation">.</span><span class="token function">windowStart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/*
+             *     B0       B1      B2     B3      B4
+             * ||_______|_______|_______|_______|_______||___
+             * 200     400     600     800     1000    1200  timestamp
+             *                             ^
+             *                          time=888
+             *            startTime of Bucket 3: 800, so it's up-to-date
+             *
+             * If current &#123;@code windowStart&#125; is equal to the start timestamp of old bucket,
+             * that means the time is within the bucket, so directly return the bucket.
+             */</span>
+            <span class="token keyword">return</span> old<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>windowStart <span class="token operator">></span> old<span class="token punctuation">.</span><span class="token function">windowStart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/*
+             *   (old)
+             *             B0       B1      B2    NULL      B4
+             * |_______||_______|_______|_______|_______|_______||___
+             * ...    1200     1400    1600    1800    2000    2200  timestamp
+             *                              ^
+             *                           time=1676
+             *          startTime of Bucket 2: 400, deprecated, should be reset
+             *
+             * If the start timestamp of old bucket is behind provided time, that means
+             * the bucket is deprecated. We have to reset the bucket to current &#123;@code windowStart&#125;.
+             * Note that the reset and clean-up operations are hard to be atomic,
+             * so we need a update lock to guarantee the correctness of bucket update.
+             *
+             * The update lock is conditional (tiny scope) and will take effect only when
+             * bucket is deprecated, so in most cases it won't lead to performance loss.
+             */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>updateLock<span class="token punctuation">.</span><span class="token function">tryLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// Successfully get the update lock, now we reset the bucket.</span>
+                    <span class="token keyword">return</span> <span class="token function">resetWindowTo</span><span class="token punctuation">(</span>old<span class="token punctuation">,</span> windowStart<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+                    updateLock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Contention failed, the thread will yield its time slice to wait for bucket available.</span>
+                <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token keyword">yield</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>windowStart <span class="token operator">&lt;</span> old<span class="token punctuation">.</span><span class="token function">windowStart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Should not go through here, as the provided time is already behind.</span>
+            <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>windowLengthInMs<span class="token punctuation">,</span> windowStart<span class="token punctuation">,</span> <span class="token function">newEmptyBucket</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">int</span> <span class="token function">calculateTimeIdx</span><span class="token punctuation">(</span><span class="token comment">/*@Valid*/</span> <span class="token keyword">long</span> timeMillis<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">long</span> timeId <span class="token operator">=</span> timeMillis <span class="token operator">/</span> windowLengthInMs<span class="token punctuation">;</span>
+    <span class="token comment">// Calculate current index so we can map the timestamp to the leap array.</span>
+    <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span><span class="token punctuation">(</span>timeId <span class="token operator">%</span> array<span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>metric<span class="token punctuation">.</span>occupy</span><span class="token punctuation">;</span>
+ 
+<span class="token comment">/**
+ * @since 1.5.0
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OccupiableBucketLeapArray</span> <span class="token keyword">extends</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">protected</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> <span class="token function">resetWindowTo</span><span class="token punctuation">(</span><span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> w<span class="token punctuation">,</span> <span class="token keyword">long</span> time<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Update the start time and reset value.</span>
+        w<span class="token punctuation">.</span><span class="token function">resetTo</span><span class="token punctuation">(</span>time<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">MetricBucket</span> borrowBucket <span class="token operator">=</span> borrowArray<span class="token punctuation">.</span><span class="token function">getWindowValue</span><span class="token punctuation">(</span>time<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>borrowBucket <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            w<span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">reset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            w<span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span>borrowBucket<span class="token punctuation">.</span><span class="token function">pass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            w<span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">reset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">return</span> w<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<!--
+  sentinel踩坑 熔断系列 http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=652250703
+-->
+
+
     </div>
 
     
@@ -330,13 +1073,17 @@
   </div>
 </div>
 
+          <div class="post-tags">
+              <a href="/tags/stability/" rel="tag"># stability</a>
+              <a href="/tags/sentinel/" rel="tag"># sentinel</a>
+          </div>
 
         
 
           <div class="post-nav">
             <div class="post-nav-item">
-                <a href="/2020/11/22/sentinel-flow/" rel="prev" title="Sentinel限流源码解读">
-                  <i class="fa fa-chevron-left"></i> Sentinel限流源码解读
+                <a href="/2020/11/22/current-limiting-algorithm/" rel="prev" title="限流算法">
+                  <i class="fa fa-chevron-left"></i> 限流算法
                 </a>
             </div>
             <div class="post-nav-item">

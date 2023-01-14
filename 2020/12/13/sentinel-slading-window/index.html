@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Sentinel从架构上主要包含5部分：规则(rules)、 处理插槽(slot)、 调用链路(invocation tree)、 集群节点(cluster node)、 滑动窗口(slading winodw)       下面我们来看滑动窗口在Sentinel里是怎么实现的？ (1) 滑动窗口是什么  滑动窗口是计数器算法的优化版，解决了计数器限流算法 的问题。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Sentinel滑动窗口原理及源码解析">
+<meta property="og:url" content="http://weikeqin.com/2020/12/13/sentinel-slading-window/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Sentinel从架构上主要包含5部分：规则(rules)、 处理插槽(slot)、 调用链路(invocation tree)、 集群节点(cluster node)、 滑动窗口(slading winodw)       下面我们来看滑动窗口在Sentinel里是怎么实现的？ (1) 滑动窗口是什么  滑动窗口是计数器算法的优化版，解决了计数器限流算法 的问题。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/sentinel-slot-chain-architecture.png">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/slading-window/slading-window.png">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/slading-window/slading-window-v1.png">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/slading-window/slading-window-ring.png">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/slot/process-slot/statistic-slot/sentinel-salding-window.png">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/slading-window/sentinel-salding-window-data-structe.png">
+<meta property="og:image" content="http://weikeqin.com/img/distributed/sentinel/slading-window/slading-window-v3.png">
+<meta property="article:published_time" content="2020-12-13T06:16:20.000Z">
+<meta property="article:modified_time" content="2023-01-14T15:29:33.437Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="stability">
+<meta property="article:tag" content="sentinel">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/distributed/sentinel/sentinel-slot-chain-architecture.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2020/12/13/sentinel-slading-window/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/12/13/sentinel-slading-window/","path":"2020/12/13/sentinel-slading-window/","title":"Sentinel滑动窗口原理及源码解析"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Sentinel滑动窗口原理及源码解析 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) 滑动窗口是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用滑动窗口</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) 滑动窗口的原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%B7%A5%E7%A8%8B%E4%BC%98%E5%8C%96"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 工程优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E7%8E%AF%E5%BD%A2%E6%95%B0%E7%BB%84%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 环形数组的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-%E6%A0%B9%E6%8D%AE%E6%97%B6%E9%97%B4%E5%AE%9A%E4%BD%8D%E5%88%B0%E6%A1%B6-%E6%97%B6%E9%97%B4%E7%AA%97%E5%8F%A3-%E7%9A%84%E4%B8%8B%E6%A0%87"><span class="nav-number">3.2.1.</span> <span class="nav-text">(3.2.1) 根据时间定位到桶(时间窗口)的下标</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-%E6%95%B0%E6%8D%AE%E6%98%AF%E6%96%B0%E7%9A%84%E8%BF%98%E6%98%AF%E6%97%A7%E7%9A%84"><span class="nav-number">3.2.2.</span> <span class="nav-text">(3.2.2) 数据是新的还是旧的</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%BA%90%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">(4) 源码</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E5%AE%9E%E6%97%B6%E7%BB%9F%E8%AE%A1%E6%8F%92%E6%A7%BD-StatisticSlot"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 实时统计插槽-StatisticSlot</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-N%E5%8F%89%E6%A0%91%E8%8A%82%E7%82%B9-DefaultNode"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) N叉树节点-DefaultNode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E7%BB%9F%E8%AE%A1%E8%8A%82%E7%82%B9-StatisticNode"><span class="nav-number">4.3.</span> <span class="nav-text">(4.3) 统计节点-StatisticNode</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E5%BA%A6%E9%87%8F%E6%95%B0%E7%BB%84%E5%8C%85%E8%A3%85%E7%B1%BB-ArrayMetric"><span class="nav-number">4.4.</span> <span class="nav-text">(4.4) 度量数组包装类-ArrayMetric</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-5-%E6%BB%91%E5%8A%A8%E7%AA%97%E5%8F%A3-LeapArray"><span class="nav-number">4.5.</span> <span class="nav-text">(4.5) 滑动窗口-LeapArray</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-1-currentWindow"><span class="nav-number">4.5.1.</span> <span class="nav-text">(4.5.1) currentWindow()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-2-%E6%A0%B9%E6%8D%AE%E6%97%B6%E9%97%B4%E5%AE%9A%E4%BD%8D%E5%88%B0%E5%AF%B9%E5%BA%94%E7%9A%84%E4%B8%8B%E6%A0%87-calculateTimeIdx"><span class="nav-number">4.5.2.</span> <span class="nav-text">(4.5.2) 根据时间定位到对应的下标-calculateTimeIdx()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-3-%E6%97%B6%E9%97%B4%E7%AA%97%E5%8F%A3%E7%9A%84%E5%BC%80%E5%A7%8B%E6%97%B6%E9%97%B4%E6%88%B3"><span class="nav-number">4.5.3.</span> <span class="nav-text">(4.5.3) 时间窗口的开始时间戳</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-4-TimeUtil-currentTimeMillis"><span class="nav-number">4.5.4.</span> <span class="nav-text">(4.5.4) TimeUtil.currentTimeMillis()</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-6-%E6%97%B6%E9%97%B4%E7%AA%97%E5%8F%A3%E5%8C%85%E8%A3%85%E7%B1%BB-WindowWrap"><span class="nav-number">4.6.</span> <span class="nav-text">(4.6) 时间窗口包装类-WindowWrap</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-7-%E5%BA%A6%E9%87%8F%E6%A1%B6-MetricBucket"><span class="nav-number">4.7.</span> <span class="nav-text">(4.7) 度量桶-MetricBucket</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BA%A6%E9%87%8F%E4%BA%8B%E4%BB%B6%E7%B1%BB%E5%9E%8B-MetricEvent"><span class="nav-number">4.7.1.</span> <span class="nav-text">度量事件类型-MetricEvent</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#LongAdder"><span class="nav-number">4.7.2.</span> <span class="nav-text">LongAdder</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">285</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">54</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/12/13/sentinel-slading-window/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Sentinel滑动窗口原理及源码解析 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Sentinel滑动窗口原理及源码解析
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2020-12-13 14:16:20" itemprop="dateCreated datePublished" datetime="2020-12-13T14:16:20+08:00">2020-12-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-14 23:29:33" itemprop="dateModified" datetime="2023-01-14T23:29:33+08:00">2023-01-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/stability/" itemprop="url" rel="index"><span itemprop="name">stability</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>17k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>15 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Sentinel从架构上主要包含5部分：规则(rules)、 处理插槽(slot)、 调用链路(invocation tree)、 集群节点(cluster node)、 滑动窗口(slading winodw)</p>
+<p>  <img src="/img/distributed/sentinel/sentinel-slot-chain-architecture.png" alt="Sentinel架构"> </p>
+<p>  下面我们来看滑动窗口在Sentinel里是怎么实现的？</p>
+<h1 id="1-滑动窗口是什么"><a href="#1-滑动窗口是什么" class="headerlink" title="(1) 滑动窗口是什么"></a>(1) 滑动窗口是什么</h1><p>  滑动窗口是计数器算法的优化版，解决了计数器限流算法 的问题。</p>
+<p>  <img src="/img/distributed/sentinel/slading-window/slading-window.png" alt="滑动窗口"></p>
+<span id="more"></span>
+
+<br>
+
+<h1 id="2-为什么要用滑动窗口"><a href="#2-为什么要用滑动窗口" class="headerlink" title="(2) 为什么要用滑动窗口"></a>(2) 为什么要用滑动窗口</h1><p>  滑动窗口是计数器算法的优化版，解决了计数器限流算法 的问题。</p>
+<br>
+
+<h1 id="3-滑动窗口的原理"><a href="#3-滑动窗口的原理" class="headerlink" title="(3) 滑动窗口的原理"></a>(3) 滑动窗口的原理</h1><p>  <code>滑动窗口</code> 是 <code>固定时间窗口计数器算法</code>的改进版，把一个时间间隔分为多个更小的时间间隔，使得流量更为平滑，限流更为准确。</p>
+<p>  <img src="/img/distributed/sentinel/slading-window/slading-window-v1.png" alt="滑动窗口示例"></p>
+<h2 id="3-1-工程优化"><a href="#3-1-工程优化" class="headerlink" title="(3.1) 工程优化"></a>(3.1) 工程优化</h2><p>  如果在程序里直接使用数组，随着时间的推移，每次滑动一个窗口需要在尾部增加一个元素并且需要在头部删除一个元素，所以为了节省删除元素对整个数字带来的移动开销，使用环形数组来避免数组频繁增加移动的问题。</p>
+<p>  在实现时可以通过移动指针来达到环形数组的情况，比如<code>ArrayBlockingQueue</code>就用的这个办法。<br>  Sentinel也使用了类似的思想，只不过指针需要计算一下。</p>
+<p>  <img src="/img/distributed/sentinel/slading-window/slading-window-ring.png" alt="滑动窗口-环形数组"></p>
+<p>  可以看到，使用环形数组后数组里的元素个数是固定的，不会随时间变化而变化，唯一变化的是时间。</p>
+<h2 id="3-2-环形数组的问题"><a href="#3-2-环形数组的问题" class="headerlink" title="(3.2) 环形数组的问题"></a>(3.2) 环形数组的问题</h2><p>  但是使用了环形数组后，带来2个问题：<br>1.怎么根据时间定位到对应的下标？<br>2.数组里的数据是新的还是旧的？</p>
+<h3 id="3-2-1-根据时间定位到桶-时间窗口-的下标"><a href="#3-2-1-根据时间定位到桶-时间窗口-的下标" class="headerlink" title="(3.2.1) 根据时间定位到桶(时间窗口)的下标"></a>(3.2.1) 根据时间定位到桶(时间窗口)的下标</h3><p>  对 时间跨度(1000ms) 取余即可得到对应的时间，再除以时间窗口长度(200ms)得到的余数就是下标。 <code>下标 = (当前时间 % 时间跨度) / 一个时间窗口的时间</code><br>  比如 时间跨度是1000ms，时间窗口是200ms，桶有5个<br>  那么t1=2100，对应的下标就是 (2100%1000) / 200 = 0</p>
+<h3 id="3-2-2-数据是新的还是旧的"><a href="#3-2-2-数据是新的还是旧的" class="headerlink" title="(3.2.2) 数据是新的还是旧的"></a>(3.2.2) 数据是新的还是旧的</h3><p>  在一个桶/时间窗口内保存开始时间，在使用时对比 开始时间是否一致，如果一致则是新的，否则就是旧的。公式: <code>当前时间跨度开始时间 = 当前时间 - (当前时间 % 时间跨度)</code><br>  2100 - (2100 % 1000) = 2000，可以获取到当前时间对应的时间跨度开始时间是 2000 </p>
+<br>
+
+
+<h1 id="4-源码"><a href="#4-源码" class="headerlink" title="(4) 源码"></a>(4) 源码</h1><p>  Sentinel整体统计计数流程如下<br>  <img src="/img/distributed/sentinel/slot/process-slot/statistic-slot/sentinel-salding-window.png" alt="Sentinel统计计数时序图"></p>
+<br>
+
+<table>
+<thead>
+<tr>
+<th align="left">类</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">StatisticSlot</td>
+<td align="left">实时统计处理插槽。</td>
+</tr>
+<tr>
+<td align="left">DefaultNode</td>
+<td align="left">N叉树的节点，节点里保存了孩子节点、统计指标。</td>
+</tr>
+<tr>
+<td align="left">StatisticNode</td>
+<td align="left">存储实时统计指标；包含秒级指标、分钟级指标、线程数。</td>
+</tr>
+<tr>
+<td align="left">ArrayMetric</td>
+<td align="left">滑动窗口的包装类，对外提供计数功能类，底层通过持有LeapArray的对象实现计数。</td>
+</tr>
+<tr>
+<td align="left">LeapArray</td>
+<td align="left">滑动窗口真正的数据结构，环形数组、滑动窗口的实现。</td>
+</tr>
+<tr>
+<td align="left">WindowWrap</td>
+<td align="left">时间窗口/桶包装类，通过桶的开始时间戳 解决环形数组定位下标和判断新老数据问题。</td>
+</tr>
+<tr>
+<td align="left">MetricBucket</td>
+<td align="left">计数桶/时间窗口，存储各种事件计数，比如请求通过总数、限流总数、异常总数等。</td>
+</tr>
+</tbody></table>
+<br>
+<br>
+
+<p>  和滑动窗口相关的数据结构如下<br>  <img src="/img/distributed/sentinel/slading-window/sentinel-salding-window-data-structe.png" alt="滑动窗口数据结构"></p>
+<p>  可以看到滑动窗口是基于Node的，这个Node是在<code>ClusterBuilderSlot</code>获取的。<br>  滑动窗口里比较重要的是<code>LeapArray</code></p>
+<br>
+
+<p>  Sentinel实现的滑动窗口如下<br>  <img src="/img/distributed/sentinel/slading-window/slading-window-v3.png" alt="Sentinel实现的滑动窗口"></p>
+<p>  滑动窗口的调用入口从<code>StatisticSlot</code>类 <code>entry()</code>方法 <code>node.increaseThreadNum();</code> 和 <code>node.addPassRequest(count);</code> 2行代码</p>
+<p>  注意滑动窗口都是 基于当前节点 当前时间窗口的。</p>
+<br>
+
+<h2 id="4-1-实时统计插槽-StatisticSlot"><a href="#4-1-实时统计插槽-StatisticSlot" class="headerlink" title="(4.1) 实时统计插槽-StatisticSlot"></a>(4.1) 实时统计插槽-StatisticSlot</h2><p>  源码 <a target="_blank" rel="noopener" href="https://github.com/alibaba/Sentinel/blob/1.8.6/sentinel-core/src/main/java/com/alibaba/csp/sentinel/slots/statistic/StatisticSlot.java#L55">https://github.com/alibaba/Sentinel/blob/1.8.6/sentinel-core/src/main/java/com/alibaba/csp/sentinel/slots/statistic/StatisticSlot.java#L55</a></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 专用于实时统计的处理器插槽。
+ * 在进入这个槽的时候，我们需要单独统计以下信息：
+ *   ClusterNode：资源ID的集群节点的总统计。
+ *   源节点：来自不同调用者/源的集群节点的统计信息。 
+ *   DefaultNode：特定上下文中特定资源名称的统计信息。
+ *   最后是所有入口的总和统计。
+ */</span>
+<span class="token annotation punctuation">@Spi</span><span class="token punctuation">(</span>order <span class="token operator">=</span> <span class="token class-name">Constants</span><span class="token punctuation">.</span>ORDER_STATISTIC_SLOT<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">StatisticSlot</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractLinkedProcessorSlot</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">entry</span><span class="token punctuation">(</span><span class="token class-name">Context</span> context<span class="token punctuation">,</span> <span class="token class-name">ResourceWrapper</span> resourceWrapper<span class="token punctuation">,</span> <span class="token class-name">DefaultNode</span> node<span class="token punctuation">,</span> <span class="token keyword">int</span> count<span class="token punctuation">,</span>
+                      <span class="token keyword">boolean</span> prioritized<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Throwable</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Do some checking.</span>
+            <span class="token function">fireEntry</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> node<span class="token punctuation">,</span> count<span class="token punctuation">,</span> prioritized<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 资源线程计数  </span>
+            node<span class="token punctuation">.</span><span class="token function">increaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 资源请求量计数  计数的部分用到了滑动窗口</span>
+            node<span class="token punctuation">.</span><span class="token function">addPassRequest</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 来源计数</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Add count for origin node.</span>
+                context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">increaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">addPassRequest</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// 入口流量计数</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>resourceWrapper<span class="token punctuation">.</span><span class="token function">getEntryType</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">EntryType</span><span class="token punctuation">.</span>IN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Add count for global inbound entry node for global statistics.</span>
+                <span class="token class-name">Constants</span><span class="token punctuation">.</span>ENTRY_NODE<span class="token punctuation">.</span><span class="token function">increaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">Constants</span><span class="token punctuation">.</span>ENTRY_NODE<span class="token punctuation">.</span><span class="token function">addPassRequest</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// 使用已注册的条目回调处理程序处理传递事件。</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">ProcessorSlotEntryCallback</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> handler <span class="token operator">:</span> <span class="token class-name">StatisticSlotCallbackRegistry</span><span class="token punctuation">.</span><span class="token function">getEntryCallbacks</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                handler<span class="token punctuation">.</span><span class="token function">onPass</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> node<span class="token punctuation">,</span> count<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">PriorityWaitException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            node<span class="token punctuation">.</span><span class="token function">increaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">//  origin node 添加计数</span>
+                context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">increaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>resourceWrapper<span class="token punctuation">.</span><span class="token function">getEntryType</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">EntryType</span><span class="token punctuation">.</span>IN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Add count for global inbound entry node for global statistics.</span>
+                <span class="token class-name">Constants</span><span class="token punctuation">.</span>ENTRY_NODE<span class="token punctuation">.</span><span class="token function">increaseThreadNum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token comment">// Handle pass event with registered entry callback handlers.</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">ProcessorSlotEntryCallback</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> handler <span class="token operator">:</span> <span class="token class-name">StatisticSlotCallbackRegistry</span><span class="token punctuation">.</span><span class="token function">getEntryCallbacks</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                handler<span class="token punctuation">.</span><span class="token function">onPass</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> node<span class="token punctuation">,</span> count<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">BlockException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Blocked, set block exception to current entry.</span>
+            context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setBlockError</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// Add block count.</span>
+            node<span class="token punctuation">.</span><span class="token function">increaseBlockQps</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOriginNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">increaseBlockQps</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>resourceWrapper<span class="token punctuation">.</span><span class="token function">getEntryType</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">EntryType</span><span class="token punctuation">.</span>IN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Add count for global inbound entry node for global statistics.</span>
+                <span class="token class-name">Constants</span><span class="token punctuation">.</span>ENTRY_NODE<span class="token punctuation">.</span><span class="token function">increaseBlockQps</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// Handle block event with registered entry callback handlers.</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">ProcessorSlotEntryCallback</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">DefaultNode</span><span class="token punctuation">></span></span> handler <span class="token operator">:</span> <span class="token class-name">StatisticSlotCallbackRegistry</span><span class="token punctuation">.</span><span class="token function">getEntryCallbacks</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                handler<span class="token punctuation">.</span><span class="token function">onBlocked</span><span class="token punctuation">(</span>e<span class="token punctuation">,</span> context<span class="token punctuation">,</span> resourceWrapper<span class="token punctuation">,</span> node<span class="token punctuation">,</span> count<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token keyword">throw</span> e<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Unexpected internal error, set error to current entry.</span>
+            context<span class="token punctuation">.</span><span class="token function">getCurEntry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setError</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">throw</span> e<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+<h2 id="4-2-N叉树节点-DefaultNode"><a href="#4-2-N叉树节点-DefaultNode" class="headerlink" title="(4.2) N叉树节点-DefaultNode"></a>(4.2) N叉树节点-DefaultNode</h2><p>  DefaultNode可以看做N叉树节点。继承了<code>StatisticNode</code>节点。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>node</span><span class="token punctuation">;</span>
+
+
+<span class="token comment">/**  
+ * 用于保存特定上下文中特定资源名称的统计信息的Node。
+ * 不同上下文中的不同资源将对应不同的DefaultNode。
+ *
+ * 此类可能有子节点列表。在同一上下文中多次调用 SphU#entry() 或 SphO#entry() 时，将创建子节点。
+ *
+ * @see NodeSelectorSlot
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">DefaultNode</span> <span class="token keyword">extends</span> <span class="token class-name">StatisticNode</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 与当前节点关联的资源。
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">ResourceWrapper</span> id<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 当前节点的孩子节点
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">volatile</span> <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Node</span><span class="token punctuation">></span></span> childList <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashSet</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 关联的群集节点
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">ClusterNode</span> clusterNode<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">DefaultNode</span><span class="token punctuation">(</span><span class="token class-name">ResourceWrapper</span> id<span class="token punctuation">,</span> <span class="token class-name">ClusterNode</span> clusterNode<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>id <span class="token operator">=</span> id<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>clusterNode <span class="token operator">=</span> clusterNode<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span>    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/** 添加请求次数 */</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addPassRequest</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">super</span><span class="token punctuation">.</span><span class="token function">addPassRequest</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>clusterNode<span class="token punctuation">.</span><span class="token function">addPassRequest</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-3-统计节点-StatisticNode"><a href="#4-3-统计节点-StatisticNode" class="headerlink" title="(4.3) 统计节点-StatisticNode"></a>(4.3) 统计节点-StatisticNode</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>node</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 统计节点保留三种实时统计指标：
+ *   秒级指标 rollingCounterInSecond 
+ *   分钟级别指标  rollingCounterInMinute 
+ *   线程数
+ *
+ * Sentinel 使用滑动窗口实时记录和统计资源统计数据。
+ * ArrayMetric 背后的滑动窗口基础架构是 LeapArray
+ * 
+ *
+ * case 1：当第一个请求进来时，Sentinel会新建一个指定时间跨度的window bucket来存储运行统计信息，
+ *　       比如总响应时间(rt)、传入请求(QPS)、阻塞请求(bq)等. 时间跨度由样本计数定义。
+ *
+ * 	0      100ms
+ *  +-------+--→ 滑动窗口
+ * 	    ^
+ * 	    |
+ * 	  request
+ * 
+ * Sentinel使用有效桶的静态信息来决定是否可以通过该请求。
+ * 例如，如果一条规则定义了只能通过100个请求，它会将有效桶中的所有qps相加，并将其与规则中定义的阈值进行比较。
+ * 
+ *
+ * case 2: 连续请求
+ * 
+ *  0    100ms    200ms    300ms
+ *  +-------+-------+-------+-----→ 滑动窗口
+ *                      ^
+ *                      |
+ *                   request
+ * 
+ *
+ * case 3: 请求不断到来，之前的桶变得无效
+ * 
+ *  0    100ms    200ms	  800ms	   900ms  1000ms    1300ms
+ *  +-------+-------+ ...... +-------+-------+ ...... +-------+-----→ 滑动窗口
+ *                                                      ^
+ *                                                      |
+ *                                                    request
+ * 
+ *
+ * 滑动窗口变为:
+ * 
+ * 300ms     800ms  900ms  1000ms  1300ms
+ *  + ...... +-------+ ...... +-------+-----→ Sliding Windows
+ *                                                      ^
+ *                                                      |
+ *                                                    request
+ * 
+ *
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">StatisticNode</span> <span class="token keyword">implements</span> <span class="token class-name">Node</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/** 
+     * 保存最近毫秒间隔的统计信息。 
+     * 毫秒间隔 按给定的 桶 划分为时间跨度 
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token keyword">volatile</span> <span class="token class-name">Metric</span> rollingCounterInSecond <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayMetric</span><span class="token punctuation">(</span><span class="token class-name">SampleCountProperty</span><span class="token punctuation">.</span>SAMPLE_COUNT<span class="token punctuation">,</span>
+        <span class="token class-name">IntervalProperty</span><span class="token punctuation">.</span>INTERVAL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 保存最近60秒的统计信息。 
+     * windowLengthInMs 特意设置为1000毫秒，即每桶每秒，这样我们就可以准确统计每一秒。
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token class-name">Metric</span> rollingCounterInMinute <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayMetric</span><span class="token punctuation">(</span><span class="token number">60</span><span class="token punctuation">,</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 线程数计数器
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">LongAdder</span> curThreadNum <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LongAdder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 获取指标时的上一个时间戳。
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> lastFetchTime <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/** 添加请求次数 */</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addPassRequest</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    rollingCounterInSecond<span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    rollingCounterInMinute<span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-4-度量数组包装类-ArrayMetric"><a href="#4-4-度量数组包装类-ArrayMetric" class="headerlink" title="(4.4) 度量数组包装类-ArrayMetric"></a>(4.4) 度量数组包装类-ArrayMetric</h2><p>  <code>ArrayMetric</code>是<code>Metric</code>的一个实现类</p>
+<p>  在思考一个问题，会有<code>LinkedMetric</code>吗？</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>metric</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * Sentinel中使用BucketLeapArray内部的基本度量类。
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ArrayMetric</span> <span class="token keyword">implements</span> <span class="token class-name">Metric</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> data<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">ArrayMetric</span><span class="token punctuation">(</span><span class="token keyword">int</span> sampleCount<span class="token punctuation">,</span> <span class="token keyword">int</span> intervalInMs<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>data <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OccupiableBucketLeapArray</span><span class="token punctuation">(</span>sampleCount<span class="token punctuation">,</span> intervalInMs<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/** 添加请求数 */</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addPass</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 获取当前的桶/时间窗口</span>
+    <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MetricBucket</span><span class="token punctuation">></span></span> wrap <span class="token operator">=</span> data<span class="token punctuation">.</span><span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 添加调用次数</span>
+    wrap<span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">addPass</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-5-滑动窗口-LeapArray"><a href="#4-5-滑动窗口-LeapArray" class="headerlink" title="(4.5) 滑动窗口-LeapArray"></a>(4.5) 滑动窗口-LeapArray</h2><p>  规定 窗口长度、窗口个数、</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>base</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * Sentinel 中统计指标的基本数据结构。
+ * 
+ * Leap数组使用滑动窗口算法来统计数据。
+ * 每个桶/窗口覆盖windowLengthInMs时间跨度，总时间跨度为intervalInMs，
+ * 因此总桶数为：sampleCount = intervalInMs / windowLengthInMs
+ *              桶/窗口个数  = 毫秒单位间隔(默认1000) / 毫秒级窗口长度(默认500)
+ * 
+ * @param &lt;T> 统计类型数据
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 毫秒级别的窗口长度  默认为500</span>
+    <span class="token keyword">protected</span> <span class="token keyword">int</span> windowLengthInMs<span class="token punctuation">;</span>
+
+    <span class="token comment">// 桶/时间窗口个数  默认为2</span>
+    <span class="token keyword">protected</span> <span class="token keyword">int</span> sampleCount<span class="token punctuation">;</span>
+
+    <span class="token comment">// (毫秒级)时间跨度  默认是1000 </span>
+    <span class="token keyword">protected</span> <span class="token keyword">int</span> intervalInMs<span class="token punctuation">;</span>
+
+    <span class="token comment">// 以分钟为单位的时间跨度</span>
+    <span class="token keyword">private</span> <span class="token keyword">double</span> intervalInSecond<span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token class-name">AtomicReferenceArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">WindowWrap</span><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span><span class="token punctuation">></span></span> array<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 条件(谓词)更新锁仅在当前存储桶被弃用时使用。
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> updateLock <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ReentrantLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     *
+     * @param sampleCount  滑动窗口个数
+     * @param intervalInMs 总的时间间隔(单位毫秒)
+     */</span>
+    <span class="token keyword">public</span> <span class="token class-name">LeapArray</span><span class="token punctuation">(</span><span class="token keyword">int</span> sampleCount<span class="token punctuation">,</span> <span class="token keyword">int</span> intervalInMs<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">AssertUtil</span><span class="token punctuation">.</span><span class="token function">isTrue</span><span class="token punctuation">(</span>sampleCount <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"bucket count is invalid: "</span> <span class="token operator">+</span> sampleCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">AssertUtil</span><span class="token punctuation">.</span><span class="token function">isTrue</span><span class="token punctuation">(</span>intervalInMs <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"total time interval of the sliding window should be positive"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">AssertUtil</span><span class="token punctuation">.</span><span class="token function">isTrue</span><span class="token punctuation">(</span>intervalInMs <span class="token operator">%</span> sampleCount <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"time span needs to be evenly divided"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">this</span><span class="token punctuation">.</span>windowLengthInMs <span class="token operator">=</span> intervalInMs <span class="token operator">/</span> sampleCount<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>intervalInMs <span class="token operator">=</span> intervalInMs<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>intervalInSecond <span class="token operator">=</span> intervalInMs <span class="token operator">/</span> <span class="token number">1000.0</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>sampleCount <span class="token operator">=</span> sampleCount<span class="token punctuation">;</span>
+
+        <span class="token keyword">this</span><span class="token punctuation">.</span>array <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">AtomicReferenceArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>sampleCount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="4-5-1-currentWindow"><a href="#4-5-1-currentWindow" class="headerlink" title="(4.5.1) currentWindow()"></a>(4.5.1) currentWindow()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 获取当前时间戳对应的桶/时间窗口
+ *
+ * @return 
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token class-name">TimeUtil</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 根据时间戳获取当前的桶/时间窗口
+ *
+ * @param timeMillis 毫秒时间戳
+ * @return 当前时间戳对应的桶
+ */</span>
+<span class="token keyword">public</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token keyword">long</span> timeMillis<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>timeMillis <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 计算索引下标</span>
+    <span class="token keyword">int</span> idx <span class="token operator">=</span> <span class="token function">calculateTimeIdx</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 计算 桶/时间窗口 的开始时间戳</span>
+    <span class="token keyword">long</span> windowStart <span class="token operator">=</span> <span class="token function">calculateWindowStart</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/*
+     * 从数组获取指定时间的桶/时间窗口 
+     *
+     * (1) Bucket不存在，只需创建一个新的Bucket并将CAS更新为循环数组。
+     * (2) Bucket存在，并且是最新的，然后只需返回Bucket。
+     * (3) Bucket存在，但是是旧的数据，也就是已弃用，重置当前Bucket。
+     */</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> old <span class="token operator">=</span> array<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>old <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 当前桶/时间窗口是空的</span>
+            <span class="token comment">/*
+             *     B0       B1      B2    NULL      B4
+             * ||_______|_______|_______|_______|_______||___
+             * 200     400     600     800     1000    1200  timestamp
+             *                             ^
+             *                          time=888
+             *            桶是空的，所以创建一个新的并更新  
+             *
+             * 如果旧的bucket不存在，那么我们将在windowStart创建一个新的bucket，然后尝试通过CAS操作更新循环数组。
+             * 只有一个线程可以成功更新，而其他线程会让出时间片。 
+             */</span>
+            <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> window <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>windowLengthInMs<span class="token punctuation">,</span> windowStart<span class="token punctuation">,</span> <span class="token function">newEmptyBucket</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>array<span class="token punctuation">.</span><span class="token function">compareAndSet</span><span class="token punctuation">(</span>idx<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> window<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 成功更新，返回创建的桶</span>
+                <span class="token keyword">return</span> window<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 争用失败，线程将放弃其时间片以等待桶可用。 </span>
+                <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token keyword">yield</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>windowStart <span class="token operator">==</span> old<span class="token punctuation">.</span><span class="token function">windowStart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 桶存在，并且是最新的</span>
+            <span class="token comment">/*
+             *     B0       B1      B2     B3      B4
+             * ||_______|_______|_______|_______|_______||___
+             * 200     400     600     800     1000    1200  timestamp
+             *                             ^
+             *                          time=888
+             *            startTime of Bucket 3: 800, so it's up-to-date
+             *
+             * 如果当前 windowStart 等于旧bucket的起始时间戳，说明时间在bucket之内，直接返回bucket。 
+             */</span>
+            <span class="token keyword">return</span> old<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>windowStart <span class="token operator">></span> old<span class="token punctuation">.</span><span class="token function">windowStart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 桶存在，但是是旧的数据 </span>
+            <span class="token comment">/*
+             *   (old)
+             *             B0       B1      B2    NULL      B4
+             * |_______||_______|_______|_______|_______|_______||___
+             * ...    1200     1400    1600    1800    2000    2200  timestamp
+             *                              ^
+             *                           time=1676
+             *          startTime of Bucket 2: 400, deprecated, should be reset
+             *
+             * 如果旧桶的开始时间戳晚于提供的时间，则表示该桶数据是旧的，已弃用。
+             * 我们必须将存储桶重置为当前 windowStart 。
+             * 请注意，重置和清理操作很难是原子的，因此我们需要一个更新锁来保证存储桶更新的正确性。
+             *
+             * 更新锁是有条件的(作用域很小)，只有在桶被弃用时才会生效，所以在大多数情况下不会导致性能损失。
+             */</span>
+            <span class="token comment">// 尝试获取锁 </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>updateLock<span class="token punctuation">.</span><span class="token function">tryLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 成功拿到更新锁，现在我们重置桶。</span>
+                    <span class="token keyword">return</span> <span class="token function">resetWindowTo</span><span class="token punctuation">(</span>old<span class="token punctuation">,</span> windowStart<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 释放锁</span>
+                    updateLock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 争用失败，线程将放弃其时间片以等待桶可用。</span>
+                <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token keyword">yield</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>windowStart <span class="token operator">&lt;</span> old<span class="token punctuation">.</span><span class="token function">windowStart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 不应该经过这里，因为规定的时间已经晚了。</span>
+            <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>windowLengthInMs<span class="token punctuation">,</span> windowStart<span class="token punctuation">,</span> <span class="token function">newEmptyBucket</span><span class="token punctuation">(</span>timeMillis<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-5-2-根据时间定位到对应的下标-calculateTimeIdx"><a href="#4-5-2-根据时间定位到对应的下标-calculateTimeIdx" class="headerlink" title="(4.5.2) 根据时间定位到对应的下标-calculateTimeIdx()"></a>(4.5.2) 根据时间定位到对应的下标-calculateTimeIdx()</h3><p>  下标 = (当前时间 % 时间跨度) / 一个时间窗口的时间</p>
+<p>  Sentinel里采用的公式 <code>下标 = (当前时间 / 一个时间窗口的时间) % 一个时间跨度里的时间窗口个数</code><br>  把一个窗口当做一步，这个是先算出 走了多少步，然后按照已经走的步数 对 一圈里走多少步，即对应下标</p>
+<p>  比如 时间跨度(intervalInMs)是1000ms，时间窗口(windowLengthInMs)是200ms，桶/时间窗口个数(sampleCount)有5个</p>
+<p>  那么t1=2100，对应的下标就是 (2100 / 200) % 5 = 0</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * 公式 下标 = (当前时间 / 一个时间窗口的时间) % 一个时间跨度里的时间窗口个数
+ */</span>
+<span class="token keyword">private</span> <span class="token keyword">int</span> <span class="token function">calculateTimeIdx</span><span class="token punctuation">(</span><span class="token comment">/*@Valid*/</span> <span class="token keyword">long</span> timeMillis<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 走的步数</span>
+    <span class="token keyword">long</span> timeId <span class="token operator">=</span> timeMillis <span class="token operator">/</span> windowLengthInMs<span class="token punctuation">;</span>
+    <span class="token comment">// 走的步数 % 走一圈需要多少步</span>
+    <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span><span class="token punctuation">(</span>timeId <span class="token operator">%</span> array<span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-5-3-时间窗口的开始时间戳"><a href="#4-5-3-时间窗口的开始时间戳" class="headerlink" title="(4.5.3) 时间窗口的开始时间戳"></a>(4.5.3) 时间窗口的开始时间戳</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/** 时间窗口的开始时间戳 */</span>
+<span class="token keyword">protected</span> <span class="token keyword">long</span> <span class="token function">calculateWindowStart</span><span class="token punctuation">(</span><span class="token comment">/*@Valid*/</span> <span class="token keyword">long</span> timeMillis<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> timeMillis <span class="token operator">-</span> timeMillis <span class="token operator">%</span> windowLengthInMs<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  2100 - (2100 % 1000) = 2000，可以获取到当前时间对应的时间跨度开始时间是2000</p>
+<h3 id="4-5-4-TimeUtil-currentTimeMillis"><a href="#4-5-4-TimeUtil-currentTimeMillis" class="headerlink" title="(4.5.4) TimeUtil.currentTimeMillis()"></a>(4.5.4) TimeUtil.currentTimeMillis()</h3><p>  解决<code>System.currentTimeMillis()</code> CPU占用率高的问题</p>
+<p>  <a target="_blank" rel="noopener" href="https://github.com/alibaba/Sentinel/issues/1702">com.alibaba.csp.sentinel.util.TimeUtil high CPU usage</a></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>util</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 提供毫秒级的OS时间。
+ *  
+ * 在这里我们应该看到，并非所有时间 TimeUtil 都应该保持每秒循环 1_000 次（由于一些损失，实际上大约是 800/s）。
+ * 
+ * 在空闲条件下，它只是充当 System.currentTimeMillis();
+ * 在繁忙的情况下（明显超过 1_000/s），它会保持循环以降低成本。
+ * 
+ * 有关详细设计和建议，请转到 https://github.com/alibaba/Sentinel/issues/1702#issuecomment-692151160 
+ *
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">TimeUtil</span> <span class="token keyword">implements</span> <span class="token class-name">Runnable</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/** 单例模式 */</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">TimeUtil</span> INSTANCE<span class="token punctuation">;</span>
+
+    <span class="token comment">/** 当前时间戳  后台线程更新时间戳 */</span>
+    <span class="token keyword">private</span> <span class="token keyword">volatile</span> <span class="token keyword">long</span> currentTimeMillis<span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">volatile</span> <span class="token class-name">STATE</span> state <span class="token operator">=</span> STATE<span class="token punctuation">.</span>IDLE<span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token class-name">LeapArray</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Statistic</span><span class="token punctuation">></span></span> statistics<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * thread private variables
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> lastCheck <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">static</span> <span class="token punctuation">&#123;</span>
+        INSTANCE <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">TimeUtil</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">TimeUtil</span> <span class="token function">instance</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> INSTANCE<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">long</span> <span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> INSTANCE<span class="token punctuation">.</span><span class="token function">getTime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     * 当前时间戳(毫秒)
+     *
+     * @return
+     */</span>
+    <span class="token keyword">public</span> <span class="token keyword">long</span> <span class="token function">getTime</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">currentTime</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">long</span> <span class="token function">currentTime</span><span class="token punctuation">(</span><span class="token keyword">boolean</span> innerCall<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">long</span> now <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>currentTimeMillis<span class="token punctuation">;</span>
+        <span class="token class-name">Statistic</span> val <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>statistics<span class="token punctuation">.</span><span class="token function">currentWindow</span><span class="token punctuation">(</span>now<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>innerCall<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            val<span class="token punctuation">.</span><span class="token function">getReads</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">increment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">==</span> STATE<span class="token punctuation">.</span>IDLE <span class="token operator">||</span> <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">==</span> STATE<span class="token punctuation">.</span>PREPARE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            now <span class="token operator">=</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>currentTimeMillis <span class="token operator">=</span> now<span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>innerCall<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                val<span class="token punctuation">.</span><span class="token function">getWrites</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">increment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span> now<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**  */</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Mechanism optimized since 1.8.2</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">check</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">==</span> STATE<span class="token punctuation">.</span>RUNNING<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>currentTimeMillis <span class="token operator">=</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>statistics<span class="token punctuation">.</span><span class="token function">currentWindow</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>currentTimeMillis<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getWrites</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">increment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 休眠1ms</span>
+                    <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MILLISECONDS<span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token punctuation">&#125;</span>
+                <span class="token keyword">continue</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">==</span> STATE<span class="token punctuation">.</span>IDLE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 休眠300ms</span>
+                    <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MILLISECONDS<span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span><span class="token number">300</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token punctuation">&#125;</span>
+                <span class="token keyword">continue</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">==</span> STATE<span class="token punctuation">.</span>PREPARE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">RecordLog</span><span class="token punctuation">.</span><span class="token function">debug</span><span class="token punctuation">(</span><span class="token string">"TimeUtil switches to RUNNING"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>currentTimeMillis <span class="token operator">=</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> STATE<span class="token punctuation">.</span>RUNNING<span class="token punctuation">;</span>
+                <span class="token keyword">continue</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+<h2 id="4-6-时间窗口包装类-WindowWrap"><a href="#4-6-时间窗口包装类-WindowWrap" class="headerlink" title="(4.6) 时间窗口包装类-WindowWrap"></a>(4.6) 时间窗口包装类-WindowWrap</h2><p>  记录每个桶/时间窗口的 时间长度、开始时间戳、对应的桶/时间窗口的数据</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>base</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 一段时间窗口的包装器实体类。
+ *
+ * @param &lt;T> 数据类型
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">WindowWrap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 单个窗口桶的时间长度(毫秒)。
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> windowLengthInMs<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 窗口开始的毫秒时间戳。
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> windowStart<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 统计数据
+     */</span>
+    <span class="token keyword">private</span> <span class="token class-name">T</span> value<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * @param windowLengthInMs 单个窗口同的(毫秒)时间长度
+     * @param windowStart      窗口开始时间戳
+     * @param value            统计数据
+     */</span>
+    <span class="token keyword">public</span> <span class="token class-name">WindowWrap</span><span class="token punctuation">(</span><span class="token keyword">long</span> windowLengthInMs<span class="token punctuation">,</span> <span class="token keyword">long</span> windowStart<span class="token punctuation">,</span> <span class="token class-name">T</span> value<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>windowLengthInMs <span class="token operator">=</span> windowLengthInMs<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>windowStart <span class="token operator">=</span> windowStart<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>value <span class="token operator">=</span> value<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-7-度量桶-MetricBucket"><a href="#4-7-度量桶-MetricBucket" class="headerlink" title="(4.7) 度量桶-MetricBucket"></a>(4.7) 度量桶-MetricBucket</h2><p>  Sentinel 使用 Bucket 统计一个窗口时间内的各项指标数据，这些指标数据包括请求总数、成功总数、异常总数、总耗时、最小耗时、最大耗时等<br>  一个桶就是一个时间窗口</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic<span class="token punctuation">.</span>data</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 表示一段时间内的度量数据。
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">MetricBucket</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 度量数据 </span>
+    <span class="token comment">// 存储各事件的计数，比如异常总数、请求总数等</span>
+    <span class="token comment">// counters[0] 存储请求通过总数，    对应 MetricEvent::PASS </span>
+    <span class="token comment">// counters[1] 存储限流总数，       对应 MetricEvent::BLOCK</span>
+    <span class="token comment">// counters[2] 存储异常总数，       对应 MetricEvent::EXCEPTION</span>
+    <span class="token comment">// counters[3] 存储成功总数，       对应 MetricEvent::SUCCESS</span>
+    <span class="token comment">// counters[4] 存储响应时间之和，    对应 MetricEvent::RT</span>
+    <span class="token comment">// counters[5] 存储已通过未来配额，  对应 MetricEvent::OCCUPIED_PASS</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">LongAdder</span><span class="token punctuation">[</span><span class="token punctuation">]</span> counters<span class="token punctuation">;</span>
+
+    <span class="token comment">// 最小响应时间 </span>
+    <span class="token keyword">private</span> <span class="token keyword">volatile</span> <span class="token keyword">long</span> minRt<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">MetricBucket</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 枚举常量  长度是6 </span>
+        <span class="token class-name">MetricEvent</span><span class="token punctuation">[</span><span class="token punctuation">]</span> events <span class="token operator">=</span> <span class="token class-name">MetricEvent</span><span class="token punctuation">.</span><span class="token function">values</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>counters <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LongAdder</span><span class="token punctuation">[</span>events<span class="token punctuation">.</span>length<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">MetricEvent</span> event <span class="token operator">:</span> events<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 根据下标初始化</span>
+            counters<span class="token punctuation">[</span>event<span class="token punctuation">.</span><span class="token function">ordinal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LongAdder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token function">initMinRt</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">initMinRt</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 最小rt 用的是环境变量 对应数值是5000 </span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>minRt <span class="token operator">=</span> <span class="token class-name">SentinelConfig</span><span class="token punctuation">.</span><span class="token function">statisticMaxRt</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">MetricBucket</span> <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span> event<span class="token punctuation">,</span> <span class="token keyword">long</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    counters<span class="token punctuation">[</span>event<span class="token punctuation">.</span><span class="token function">ordinal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**  */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addPass</span><span class="token punctuation">(</span><span class="token keyword">int</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span><span class="token punctuation">.</span>PASS<span class="token punctuation">,</span> n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addOccupiedPass</span><span class="token punctuation">(</span><span class="token keyword">int</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span><span class="token punctuation">.</span>OCCUPIED_PASS<span class="token punctuation">,</span> n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addException</span><span class="token punctuation">(</span><span class="token keyword">int</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span><span class="token punctuation">.</span>EXCEPTION<span class="token punctuation">,</span> n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addBlock</span><span class="token punctuation">(</span><span class="token keyword">int</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span><span class="token punctuation">.</span>BLOCK<span class="token punctuation">,</span> n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addSuccess</span><span class="token punctuation">(</span><span class="token keyword">int</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span><span class="token punctuation">.</span>SUCCESS<span class="token punctuation">,</span> n<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">/** 添加响应时间 这里保存的是这个桶/窗口内所有响应时间之和 */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">addRT</span><span class="token punctuation">(</span><span class="token keyword">long</span> rt<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span><span class="token punctuation">.</span>RT<span class="token punctuation">,</span> rt<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Not thread-safe, but it's okay.</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rt <span class="token operator">&lt;</span> minRt<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        minRt <span class="token operator">=</span> rt<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**  */</span>
+<span class="token keyword">public</span> <span class="token keyword">long</span> <span class="token function">get</span><span class="token punctuation">(</span><span class="token class-name">MetricEvent</span> event<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> counters<span class="token punctuation">[</span>event<span class="token punctuation">.</span><span class="token function">ordinal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="度量事件类型-MetricEvent"><a href="#度量事件类型-MetricEvent" class="headerlink" title="度量事件类型-MetricEvent"></a>度量事件类型-MetricEvent</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">com<span class="token punctuation">.</span>alibaba<span class="token punctuation">.</span>csp<span class="token punctuation">.</span>sentinel<span class="token punctuation">.</span>slots<span class="token punctuation">.</span>statistic</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">enum</span> <span class="token class-name">MetricEvent</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 正常通过数
+     */</span>
+    PASS<span class="token punctuation">,</span>
+    <span class="token comment">/**
+     * 正常限流数
+     */</span>
+    BLOCK<span class="token punctuation">,</span>
+    EXCEPTION<span class="token punctuation">,</span>
+    SUCCESS<span class="token punctuation">,</span>
+    RT<span class="token punctuation">,</span>
+
+    <span class="token comment">/**
+     * 已通过未来配额（自1.5.0版本开始预占用）。
+     */</span>
+    OCCUPIED_PASS
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="LongAdder"><a href="#LongAdder" class="headerlink" title="LongAdder"></a>LongAdder</h3><p>   AtomicLong中有个内部变量value保存着实际的long值，所有的操作都是针对该变量进行。也就是说，高并发环境下，value变量其实是一个热点，也就是N个线程竞争一个热点。LongAdder的基本思路就是分散热点，将value值分散到一个数组中，不同线程会命中到数组的不同槽中，各个线程只对自己槽中的那个值进行CAS操作，这样热点就被分散了，冲突的概率就小很多。如果要获取真正的long值，只要将各个槽中的变量值累加返回。</p>
+<p>  <a target="_blank" rel="noopener" href="https://juejin.cn/post/7103872764984950797">LongAdder原理</a></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">LongAdder</span> <span class="token keyword">extends</span> <span class="token class-name">Striped64</span> <span class="token keyword">implements</span> <span class="token class-name">Serializable</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">long</span> serialVersionUID <span class="token operator">=</span> <span class="token number">7249069246863182397L</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * Creates a new adder with initial sum of zero.
+     */</span>
+    <span class="token keyword">public</span> <span class="token class-name">LongAdder</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token punctuation">&#125;</span>
+
+
+<span class="token punctuation">&#125;</span>    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token comment">/**
+ * Adds the given value.
+ *
+ * @param x the value to add
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">add</span><span class="token punctuation">(</span><span class="token keyword">long</span> x<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Cell</span><span class="token punctuation">[</span><span class="token punctuation">]</span> as<span class="token punctuation">;</span> <span class="token keyword">long</span> b<span class="token punctuation">,</span> v<span class="token punctuation">;</span> <span class="token keyword">int</span> m<span class="token punctuation">;</span> <span class="token class-name">Cell</span> a<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>as <span class="token operator">=</span> cells<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">||</span> <span class="token operator">!</span><span class="token function">casBase</span><span class="token punctuation">(</span>b <span class="token operator">=</span> base<span class="token punctuation">,</span> b <span class="token operator">+</span> x<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">boolean</span> uncontended <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>as <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span> <span class="token punctuation">(</span>m <span class="token operator">=</span> as<span class="token punctuation">.</span>length <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0</span> <span class="token operator">||</span>
+            <span class="token punctuation">(</span>a <span class="token operator">=</span> as<span class="token punctuation">[</span><span class="token function">getProbe</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> m<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span>
+            <span class="token operator">!</span><span class="token punctuation">(</span>uncontended <span class="token operator">=</span> a<span class="token punctuation">.</span><span class="token function">cas</span><span class="token punctuation">(</span>v <span class="token operator">=</span> a<span class="token punctuation">.</span>value<span class="token punctuation">,</span> v <span class="token operator">+</span> x<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token function">longAccumulate</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> uncontended<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">/**
+ * Equivalent to &#123;@code add(1)&#125;.
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">increment</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token number">1L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">/**
+ * Equivalent to &#123;@code add(-1)&#125;.
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">decrement</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">add</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">/**
+ * Returns the current sum.  The returned value is &lt;em>NOT&lt;/em> an
+ * atomic snapshot; invocation in the absence of concurrent
+ * updates returns an accurate result, but concurrent updates that
+ * occur while the sum is being calculated might not be
+ * incorporated.
+ *
+ * @return the sum
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">long</span> <span class="token function">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Cell</span><span class="token punctuation">[</span><span class="token punctuation">]</span> as <span class="token operator">=</span> cells<span class="token punctuation">;</span> <span class="token class-name">Cell</span> a<span class="token punctuation">;</span>
+    <span class="token keyword">long</span> sum <span class="token operator">=</span> base<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>as <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> as<span class="token punctuation">.</span>length<span class="token punctuation">;</span> <span class="token operator">++</span>i<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>a <span class="token operator">=</span> as<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                sum <span class="token operator">+=</span> a<span class="token punctuation">.</span>value<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> sum<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">/**
+ * Resets variables maintaining the sum to zero.  This method may
+ * be a useful alternative to creating a new adder, but is only
+ * effective if there are no concurrent updates.  Because this
+ * method is intrinsically racy, it should only be used when it is
+ * known that no threads are concurrently updating.
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">reset</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Cell</span><span class="token punctuation">[</span><span class="token punctuation">]</span> as <span class="token operator">=</span> cells<span class="token punctuation">;</span> <span class="token class-name">Cell</span> a<span class="token punctuation">;</span>
+    base <span class="token operator">=</span> <span class="token number">0L</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>as <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> as<span class="token punctuation">.</span>length<span class="token punctuation">;</span> <span class="token operator">++</span>i<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>a <span class="token operator">=</span> as<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                a<span class="token punctuation">.</span>value <span class="token operator">=</span> <span class="token number">0L</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a href=""></a> </p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/stability/" rel="tag"># stability</a>
+              <a href="/tags/sentinel/" rel="tag"># sentinel</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/12/12/java-reentrant-lock/" rel="prev" title="Java ReentrantLock 源码学习">
+                  <i class="fa fa-chevron-left"></i> Java ReentrantLock 源码学习
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/12/21/goods-oversold/" rel="next" title="电商经历之令人头疼的商品库存超卖">
+                  电商经历之令人头疼的商品库存超卖 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>
