@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="整数集合(intset)用于有序、无重复地保存多个整数值，根据元素的值，自动选择该用什么长度的整数类型来保存元素。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis数据结构之整数集合(intset)">
+<meta property="og:url" content="http://weikeqin.com/2023/01/15/redis-data-structure-intset/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="整数集合(intset)用于有序、无重复地保存多个整数值，根据元素的值，自动选择该用什么长度的整数类型来保存元素。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-01-15T08:36:54.000Z">
+<meta property="article:modified_time" content="2023-01-27T15:20:59.499Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/15/redis-data-structure-intset/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/15/redis-data-structure-intset/","path":"2023/01/15/redis-data-structure-intset/","title":"Redis数据结构之整数集合(intset)"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis数据结构之整数集合(intset) | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E4%B8%8D%E7%9B%B4%E6%8E%A5%E4%BD%BF%E7%94%A8%E6%95%B0%E7%BB%84"><span class="nav-number">1.</span> <span class="nav-text">(1) 为什么Redis不直接使用数组?</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E6%95%B4%E6%95%B0%E9%9B%86%E5%90%88"><span class="nav-number">2.</span> <span class="nav-text">(2) 整数集合</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E5%AE%9A%E4%B9%89"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 提供的功能</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-%E5%88%9B%E5%BB%BA%E6%95%B4%E6%95%B0%E9%9B%86%E5%90%88-intsetNew"><span class="nav-number">2.2.1.</span> <span class="nav-text">(2.2.1) 创建整数集合-intsetNew</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-2-%E6%B7%BB%E5%8A%A0%E6%96%B0%E5%85%83%E7%B4%A0-intsetAdd"><span class="nav-number">2.2.2.</span> <span class="nav-text">(2.2.2) 添加新元素-intsetAdd</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-3-%E6%B7%BB%E5%8A%A0%E6%96%B0%E5%85%83%E7%B4%A0-%E5%8D%87%E7%BA%A7-intsetUpgradeAndAdd"><span class="nav-number">2.2.3.</span> <span class="nav-text">(2.2.3) 添加新元素(升级)-intsetUpgradeAndAdd</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-4-%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0-intsetRemove"><span class="nav-number">2.2.4.</span> <span class="nav-text">(2.2.4) 删除元素-intsetRemove</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-5-%E6%8C%89%E7%B4%A2%E5%BC%95%E4%BF%AE%E6%94%B9%E5%85%83%E7%B4%A0-intsetSet"><span class="nav-number">2.2.5.</span> <span class="nav-text">(2.2.5) 按索引修改元素-_intsetSet</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-6-%E6%8C%89%E7%B4%A2%E5%BC%95%E6%9F%A5%E6%89%BE%E5%85%83%E7%B4%A0-intsetGet"><span class="nav-number">2.2.6.</span> <span class="nav-text">(2.2.6) 按索引查找元素-_intsetGet</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">3.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/15/redis-data-structure-intset/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis数据结构之整数集合(intset) | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis数据结构之整数集合(intset)
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-15 16:36:54" itemprop="dateCreated datePublished" datetime="2023-01-15T16:36:54+08:00">2023-01-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-27 23:20:59" itemprop="dateModified" datetime="2023-01-27T23:20:59+08:00">2023-01-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>6.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>6 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  整数集合(intset)用于<code>有序</code>、<code>无重复</code>地保存多个整数值，根据元素的值，自动选择该用什么长度的整数类型来保存元素。</p>
+<span id="more"></span>
+<h1 id="1-为什么Redis不直接使用数组"><a href="#1-为什么Redis不直接使用数组" class="headerlink" title="(1) 为什么Redis不直接使用数组?"></a>(1) 为什么Redis不直接使用数组?</h1><p>  整数集合是一块连续的内存空间，用于<code>有序</code>、<code>无重复</code>地保存多个整数值。<br><br></p>
+<h1 id="2-整数集合"><a href="#2-整数集合" class="headerlink" title="(2) 整数集合"></a>(2) 整数集合</h1><p>  整数集合(intset)用于<code>有序</code>、<code>无重复</code>地保存多个整数值，会根据元素的值，自动选择该用什么长度的整数类型来保存元素。</p>
+<h2 id="2-1-定义"><a href="#2-1-定义" class="headerlink" title="(2.1) 定义"></a>(2.1) 定义</h2><p>  <code>intset.h</code> 和 <code>intset.c</code> 分别包括了整数集合的定义和实现。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: inset.h
+
+typedef struct intset &#123;
+    uint32_t encoding; &#x2F;&#x2F; 编码方式 4字节
+    uint32_t length;  &#x2F;&#x2F; 长度&#x2F;元素个数 4字节
+    int8_t contents[]; &#x2F;&#x2F; 保存元素数组 n*len字节
+&#125; intset;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  contents 数组的 int8_t 类型声明比较容易让人误解，实际上， intset 并不使用 int8_t 类型来保存任何元素，结构中的这个类型声明只是作为一个占位符使用：在对 contents 中的元素进行读取或者写入时，程序并不是直接使用 contents 来对元素进行索引，而是根据 encoding 的值，对 contents 进行类型转换和指针运算，计算出元素在内存中的正确位置。</p>
+<p>  在添加新元素，进行内存分配时，分配的空间也是由 encoding 的值决定。</p>
+<h2 id="2-2-提供的功能"><a href="#2-2-提供的功能" class="headerlink" title="(2.2) 提供的功能"></a>(2.2) 提供的功能</h2><table>
+<thead>
+<tr>
+<th align="left">操作</th>
+<th align="left">函数</th>
+<th>复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">创建 intset</td>
+<td align="left">intsetNew</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td align="left">删除 intset</td>
+<td align="left">无</td>
+<td>无</td>
+</tr>
+<tr>
+<td align="left">添加新元素（不升级）</td>
+<td align="left">intsetAdd</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td align="left">添加新元素（升级）</td>
+<td align="left">intsetUpgradeAndAdd</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td align="left">按索引获取元素</td>
+<td align="left">_intsetGet</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td align="left">按索引设置元素</td>
+<td align="left">_intsetSet</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td align="left">查找元素，返回索引</td>
+<td align="left">intsetSearch</td>
+<td>O(lgN)</td>
+</tr>
+<tr>
+<td align="left">删除元素</td>
+<td align="left">intsetRemove</td>
+<td>O(N)</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-1-创建整数集合-intsetNew"><a href="#2-2-1-创建整数集合-intsetNew" class="headerlink" title="(2.2.1) 创建整数集合-intsetNew"></a>(2.2.1) 创建整数集合-intsetNew</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: inset.c
+
+&#x2F;* 创建空的整形数组 *&#x2F;
+intset *intsetNew(void) &#123;
+    &#x2F;&#x2F; inset接头体分配内存
+    intset *is &#x3D; zmalloc(sizeof(intset));
+    &#x2F;&#x2F; 编码方式
+    is-&gt;encoding &#x3D; intrev32ifbe(INTSET_ENC_INT16);
+    &#x2F;&#x2F; 设置长度
+    is-&gt;length &#x3D; 0;
+    return is;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  encoding 的值可以是以下三个常量之一</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: inset.c
+
+&#x2F;* 
+ * 请注意，这些编码是有序的，因此：
+ * INTSET_ENC_INT16 &lt; INTSET_ENC_INT32 &lt; INTSET_ENC_INT64. 
+ *&#x2F;
+#define INTSET_ENC_INT16 (sizeof(int16_t))
+#define INTSET_ENC_INT32 (sizeof(int32_t))
+#define INTSET_ENC_INT64 (sizeof(int64_t))<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* variants of the function doing the actual conversion only if the target
+ * host is big endian *&#x2F;
+#if (BYTE_ORDER &#x3D;&#x3D; LITTLE_ENDIAN)
+#define memrev16ifbe(p) ((void)(0))
+#define memrev32ifbe(p) ((void)(0))
+#define memrev64ifbe(p) ((void)(0))
+#define intrev16ifbe(v) (v)
+#define intrev32ifbe(v) (v)
+#define intrev64ifbe(v) (v)
+#else
+#define memrev16ifbe(p) memrev16(p)
+#define memrev32ifbe(p) memrev32(p)
+#define memrev64ifbe(p) memrev64(p)
+#define intrev16ifbe(v) intrev16(v)
+#define intrev32ifbe(v) intrev32(v)
+#define intrev64ifbe(v) intrev64(v)
+#endif<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-2-2-添加新元素-intsetAdd"><a href="#2-2-2-添加新元素-intsetAdd" class="headerlink" title="(2.2.2) 添加新元素-intsetAdd"></a>(2.2.2) 添加新元素-intsetAdd</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * 往整数集合插入一个整形数字
+ *&#x2F;
+intset *intsetAdd(intset *is, int64_t value, uint8_t *success) &#123;
+    &#x2F;&#x2F; 获取inset对应的encoding   ENC_INT16、ENC_INT32、ENC_INT64分别占用2、4、8字节
+    uint8_t valenc &#x3D; _intsetValueEncoding(value);
+    uint32_t pos;
+    if (success) *success &#x3D; 1;
+
+    &#x2F;* 如果必要升级编码
+     * 如果我们需要升级，我们需要知道这个值应该&gt;0或&lt;0 
+     * 因为
+     *  Upgrade encoding if necessary. If we need to upgrade, we know that
+     * this value should be either appended (if &gt; 0) or prepended (if &lt; 0),
+     * because it lies outside the range of existing values. *&#x2F;
+    if (valenc &gt; intrev32ifbe(is-&gt;encoding)) &#123; &#x2F;&#x2F; 当前数字的编码 和 整形数组编码 不一样
+        &#x2F;&#x2F; 
+        &#x2F;* This always succeeds, so we don&#39;t need to curry *success. *&#x2F;
+        return intsetUpgradeAndAdd(is,value);
+    &#125; else &#123;
+        &#x2F;* Abort if the value is already present in the set.
+         * This call will populate &quot;pos&quot; with the right position to insert
+         * the value when it cannot be found. *&#x2F;
+        &#x2F;&#x2F; 如果这个值已经在集合里就放弃
+        &#x2F;&#x2F; 这个调用 
+        if (intsetSearch(is,value,&amp;pos)) &#123;
+            if (success) *success &#x3D; 0;
+            return is;
+        &#125;
+
+        &#x2F;&#x2F; 需要插入新元素
+
+        &#x2F;&#x2F; 重置大小 
+        &#x2F;&#x2F; 这个每添加一个元素就要重置一次大小，成本比较高
+        is &#x3D; intsetResize(is,intrev32ifbe(is-&gt;length)+1);
+        &#x2F;&#x2F; 
+        if (pos &lt; intrev32ifbe(is-&gt;length)) intsetMoveTail(is,pos,pos+1);
+    &#125;
+
+    _intsetSet(is,pos,value);
+    is-&gt;length &#x3D; intrev32ifbe(intrev32ifbe(is-&gt;length)+1);
+    return is;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="2-2-3-添加新元素-升级-intsetUpgradeAndAdd"><a href="#2-2-3-添加新元素-升级-intsetUpgradeAndAdd" class="headerlink" title="(2.2.3) 添加新元素(升级)-intsetUpgradeAndAdd"></a>(2.2.3) 添加新元素(升级)-intsetUpgradeAndAdd</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Upgrades the intset to a larger encoding and inserts the given integer. *&#x2F;
+static intset *intsetUpgradeAndAdd(intset *is, int64_t value) &#123;
+    uint8_t curenc &#x3D; intrev32ifbe(is-&gt;encoding);
+    uint8_t newenc &#x3D; _intsetValueEncoding(value);
+    int length &#x3D; intrev32ifbe(is-&gt;length);
+    int prepend &#x3D; value &lt; 0 ? 1 : 0;
+
+    &#x2F;* First set new encoding and resize *&#x2F;
+    is-&gt;encoding &#x3D; intrev32ifbe(newenc);
+    is &#x3D; intsetResize(is,intrev32ifbe(is-&gt;length)+1);
+
+    &#x2F;* Upgrade back-to-front so we don&#39;t overwrite values.
+     * Note that the &quot;prepend&quot; variable is used to make sure we have an empty
+     * space at either the beginning or the end of the intset. *&#x2F;
+    while(length--)
+        _intsetSet(is,length+prepend,_intsetGetEncoded(is,length,curenc));
+
+    &#x2F;* Set the value at the beginning or the end. *&#x2F;
+    if (prepend)
+        _intsetSet(is,0,value);
+    else
+        _intsetSet(is,intrev32ifbe(is-&gt;length),value);
+    is-&gt;length &#x3D; intrev32ifbe(intrev32ifbe(is-&gt;length)+1);
+    return is;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-2-4-删除元素-intsetRemove"><a href="#2-2-4-删除元素-intsetRemove" class="headerlink" title="(2.2.4) 删除元素-intsetRemove"></a>(2.2.4) 删除元素-intsetRemove</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Delete integer from intset *&#x2F;
+intset *intsetRemove(intset *is, int64_t value, int *success) &#123;
+    uint8_t valenc &#x3D; _intsetValueEncoding(value);
+    uint32_t pos;
+    if (success) *success &#x3D; 0;
+
+    if (valenc &lt;&#x3D; intrev32ifbe(is-&gt;encoding) &amp;&amp; intsetSearch(is,value,&amp;pos)) &#123;
+        uint32_t len &#x3D; intrev32ifbe(is-&gt;length);
+
+        &#x2F;* We know we can delete *&#x2F;
+        if (success) *success &#x3D; 1;
+
+        &#x2F;* Overwrite value with tail and update length *&#x2F;
+        if (pos &lt; (len-1)) intsetMoveTail(is,pos+1,pos);
+        is &#x3D; intsetResize(is,len-1);
+        is-&gt;length &#x3D; intrev32ifbe(len-1);
+    &#125;
+    return is;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-2-5-按索引修改元素-intsetSet"><a href="#2-2-5-按索引修改元素-intsetSet" class="headerlink" title="(2.2.5) 按索引修改元素-_intsetSet"></a>(2.2.5) 按索引修改元素-_intsetSet</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Set the value at pos, using the configured encoding. *&#x2F;
+static void _intsetSet(intset *is, int pos, int64_t value) &#123;
+    uint32_t encoding &#x3D; intrev32ifbe(is-&gt;encoding);
+
+    if (encoding &#x3D;&#x3D; INTSET_ENC_INT64) &#123;
+        ((int64_t*)is-&gt;contents)[pos] &#x3D; value;
+        memrev64ifbe(((int64_t*)is-&gt;contents)+pos);
+    &#125; else if (encoding &#x3D;&#x3D; INTSET_ENC_INT32) &#123;
+        ((int32_t*)is-&gt;contents)[pos] &#x3D; value;
+        memrev32ifbe(((int32_t*)is-&gt;contents)+pos);
+    &#125; else &#123;
+        ((int16_t*)is-&gt;contents)[pos] &#x3D; value;
+        memrev16ifbe(((int16_t*)is-&gt;contents)+pos);
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="2-2-6-按索引查找元素-intsetGet"><a href="#2-2-6-按索引查找元素-intsetGet" class="headerlink" title="(2.2.6) 按索引查找元素-_intsetGet"></a>(2.2.6) 按索引查找元素-_intsetGet</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Return the value at pos, using the configured encoding. *&#x2F;
+static int64_t _intsetGet(intset *is, int pos) &#123;
+    return _intsetGetEncoded(is,pos,intrev32ifbe(is-&gt;encoding));
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Return the value at pos, given an encoding. *&#x2F;
+static int64_t _intsetGetEncoded(intset *is, int pos, uint8_t enc) &#123;
+    int64_t v64;
+    int32_t v32;
+    int16_t v16;
+
+    if (enc &#x3D;&#x3D; INTSET_ENC_INT64) &#123;
+        memcpy(&amp;v64,((int64_t*)is-&gt;contents)+pos,sizeof(v64));
+        memrev64ifbe(&amp;v64);
+        return v64;
+    &#125; else if (enc &#x3D;&#x3D; INTSET_ENC_INT32) &#123;
+        memcpy(&amp;v32,((int32_t*)is-&gt;contents)+pos,sizeof(v32));
+        memrev32ifbe(&amp;v32);
+        return v32;
+    &#125; else &#123;
+        memcpy(&amp;v16,((int16_t*)is-&gt;contents)+pos,sizeof(v16));
+        memrev16ifbe(&amp;v16);
+        return v16;
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/compress-datastruct/intset.html">Redis设计与实现-整数集合</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/402223">Redis源码剖析与实战 - 04 内存友好的数据结构该如何细化设计？</a><br>[3] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/intset.c">redis-inset源码-github</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/15/rocksdb-index-model/" rel="prev" title="RocksDB索引模型">
+                  <i class="fa fa-chevron-left"></i> RocksDB索引模型
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/21/redis-quicklsit/" rel="next" title="redis-quicklsit">
+                  redis-quicklsit <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

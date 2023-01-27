@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="有序集合(Sorted Set)是Redis中的一种对象，它本身是集合类型，同时也可以支持集合中的元素带有权重，并按权重排序。 为什么 Sorted Set 能同时提供以下两种操作接口，以及它们的复杂度分别是 O(logN)+M 和 O(1) 呢？ ZRANGEBYSCORE：按照元素权重返回一个范围内的元素。ZSCORE：返回某个元素的权重值。 实际上，这个问题背后的本质是：为什么 Sort">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis对象 之 有序集合 &#x2F; Sorted Set &#x2F; zset">
+<meta property="og:url" content="http://weikeqin.com/2023/01/22/redis-object-sorted-set/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="有序集合(Sorted Set)是Redis中的一种对象，它本身是集合类型，同时也可以支持集合中的元素带有权重，并按权重排序。 为什么 Sorted Set 能同时提供以下两种操作接口，以及它们的复杂度分别是 O(logN)+M 和 O(1) 呢？ ZRANGEBYSCORE：按照元素权重返回一个范围内的元素。ZSCORE：返回某个元素的权重值。 实际上，这个问题背后的本质是：为什么 Sort">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-01-22T03:18:49.000Z">
+<meta property="article:modified_time" content="2023-01-27T15:20:59.506Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/22/redis-object-sorted-set/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/22/redis-object-sorted-set/","path":"2023/01/22/redis-object-sorted-set/","title":"Redis对象 之 有序集合 / Sorted Set / zset"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis对象 之 有序集合 / Sorted Set / zset | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E6%9C%89%E5%BA%8F%E9%9B%86%E5%90%88-Sorted-Set"><span class="nav-number">1.</span> <span class="nav-text">(1) 有序集合(Sorted Set)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E6%9C%89%E5%BA%8F%E9%9B%86%E5%90%88%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 有序集合结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-Redis%E6%9C%89%E5%BA%8F%E9%9B%86%E5%90%88%E6%94%AF%E6%8C%81%E7%9A%84%E5%91%BD%E4%BB%A4"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) Redis有序集合支持的命令</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E6%96%B0%E5%BB%BA%E6%9C%89%E5%BA%8F%E9%9B%86%E5%90%88"><span class="nav-number">1.2.1.</span> <span class="nav-text">(1.2.1) 新建有序集合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-%E5%BE%80%E6%9C%89%E5%BA%8F%E9%9B%86%E5%90%88%E6%B7%BB%E5%8A%A0%E5%85%83%E7%B4%A0-zsetAdd"><span class="nav-number">1.2.2.</span> <span class="nav-text">(1.2.2) 往有序集合添加元素-zsetAdd</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-x-zadd%E5%91%BD%E4%BB%A4%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">1.2.3.</span> <span class="nav-text">(1.2.x) zadd命令源码解析</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AF%84%E8%AE%BA"><span class="nav-number">2.</span> <span class="nav-text">评论</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">3.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/22/redis-object-sorted-set/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis对象 之 有序集合 / Sorted Set / zset | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis对象 之 有序集合 / Sorted Set / zset
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-22 11:18:49" itemprop="dateCreated datePublished" datetime="2023-01-22T11:18:49+08:00">2023-01-22</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-27 23:20:59" itemprop="dateModified" datetime="2023-01-27T23:20:59+08:00">2023-01-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>13k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>11 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  有序集合(Sorted Set)是Redis中的一种对象，它本身是集合类型，同时也可以支持集合中的元素带有权重，并按权重排序。</p>
+<p>为什么 Sorted Set 能同时提供以下两种操作接口，以及它们的复杂度分别是 O(logN)+M 和 O(1) 呢？</p>
+<p><code>ZRANGEBYSCORE</code>：按照元素权重返回一个范围内的元素。<br><code>ZSCORE</code>：返回某个元素的权重值。</p>
+<p>实际上，这个问题背后的本质是：为什么 Sorted Set 既能支持高效的范围查询，同时还能以 O(1) 复杂度获取元素权重值？</p>
+<span id="more"></span>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zadd zset_user_1 <span class="token number">1</span> mysql
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zadd zset_user_1 <span class="token number">2</span> redis
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zadd zset_user_1 <span class="token number">3</span> es
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zadd zset_user_1 <span class="token number">4</span> hbase
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zadd zset_user_1 <span class="token number">5</span> clickhouse
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zrange zset_user_1 <span class="token number">0</span> <span class="token number">10</span>
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"mysql"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"redis"</span>
+<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"es"</span>
+<span class="token number">4</span><span class="token operator">)</span> <span class="token string">"hbase"</span>
+<span class="token number">5</span><span class="token operator">)</span> <span class="token string">"clickhouse"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zrange zset_user_1 <span class="token number">0</span> <span class="token number">10</span> withscores
+ <span class="token number">1</span><span class="token operator">)</span> <span class="token string">"mysql"</span>
+ <span class="token number">2</span><span class="token operator">)</span> <span class="token string">"1"</span>
+ <span class="token number">3</span><span class="token operator">)</span> <span class="token string">"redis"</span>
+ <span class="token number">4</span><span class="token operator">)</span> <span class="token string">"2"</span>
+ <span class="token number">5</span><span class="token operator">)</span> <span class="token string">"es"</span>
+ <span class="token number">6</span><span class="token operator">)</span> <span class="token string">"3"</span>
+ <span class="token number">7</span><span class="token operator">)</span> <span class="token string">"hbase"</span>
+ <span class="token number">8</span><span class="token operator">)</span> <span class="token string">"4"</span>
+ <span class="token number">9</span><span class="token operator">)</span> <span class="token string">"clickhouse"</span>
+<span class="token number">10</span><span class="token operator">)</span> <span class="token string">"5"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zrangebyscore zset_user_1 <span class="token number">2</span> <span class="token number">4</span>
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"redis"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"es"</span>
+<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"hbase"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zrangebyscore zset_user_1 <span class="token number">2</span> <span class="token number">4</span> withscores
+<span class="token number">1</span><span class="token operator">)</span> <span class="token string">"redis"</span>
+<span class="token number">2</span><span class="token operator">)</span> <span class="token string">"2"</span>
+<span class="token number">3</span><span class="token operator">)</span> <span class="token string">"es"</span>
+<span class="token number">4</span><span class="token operator">)</span> <span class="token string">"3"</span>
+<span class="token number">5</span><span class="token operator">)</span> <span class="token string">"hbase"</span>
+<span class="token number">6</span><span class="token operator">)</span> <span class="token string">"4"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zscore zset_user_1 mysql
+<span class="token string">"1"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> zscore zset_user_1 es
+<span class="token string">"3"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>这其实就和 Sorted Set 底层的设计实现有关了。<br>  Sorted Set 能支持范围查询，这是因为它的核心数据结构设计采用了跳表，<br>  而它能以常数复杂度获取元素权重，这是因为它同时采用了哈希表进行索引。</p>
+<p> Sorted Set 是如何把这两种数据结构结合在一起的？它们又是如何进行协作的呢？</p>
+<p> Sorted Set 采用的双索引的设计思想和实现。</p>
+<h1 id="1-有序集合-Sorted-Set"><a href="#1-有序集合-Sorted-Set" class="headerlink" title="(1) 有序集合(Sorted Set)"></a>(1) 有序集合(Sorted Set)</h1><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * ZSET 是有序集合，使用两个数据结构来保存相同的元素，以便将 O(log(N)) INSERT 和 REMOVE 操作放入已排序的数据结构中。
+ * 
+ * 这些元素被添加到将 Redis 对象映射到分数的哈希表中。
+ * 同时，将元素添加到将分数映射到 Redis 对象的跳跃列表（因此对象在此“视图”中按分数排序）。
+ *
+ * 请注意，为了节省内存，表示元素的 SDS 字符串在哈希表和跳表中都是相同的。 
+ * 为了更容易地管理共享的 SDS 字符串，我们所做的是仅在 zslFreeNode() 中释放 SDS 字符串。 
+ * 字典没有设置无值方法。
+ * 所以我们应该总是从字典中删除一个元素，然后再从跳过列表中删除。
+ *&#x2F;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="1-1-有序集合结构"><a href="#1-1-有序集合结构" class="headerlink" title="(1.1) 有序集合结构"></a>(1.1) 有序集合结构</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * 有序集合 zset 结构体
+ *&#x2F;
+typedef struct zset &#123;
+    dict *dict; &#x2F;&#x2F; 字典
+    zskiplist *zsl; &#x2F;&#x2F; 跳表
+&#125; zset;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  Sorted Set 同时采用<code>跳表</code>和<code>哈希表</code>两个索引结构<br>  利用了跳表高效支持范围查询(如 ZRANGEBYSCORE 操作)，以及哈希表高效支持单点查询(如 ZSCORE 操作)的特征<br>  可以在一个数据类型中，同时高效支持范围查询和单点查询，这是单一索引结构比较难达到的效果。</p>
+<p>跳表或是哈希表中，各自保存了什么样的数据？<br>跳表和哈希表保存的数据是如何保持一致的？</p>
+<h2 id="1-2-Redis有序集合支持的命令"><a href="#1-2-Redis有序集合支持的命令" class="headerlink" title="(1.2) Redis有序集合支持的命令"></a>(1.2) Redis有序集合支持的命令</h2><p>  支持的命令见 <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/server.c#L405">https://github.com/redis/redis/blob/6.0/src/server.c#L405</a> </p>
+<h3 id="1-2-1-新建有序集合"><a href="#1-2-1-新建有序集合" class="headerlink" title="(1.2.1) 新建有序集合"></a>(1.2.1) 新建有序集合</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: object.c
+
+&#x2F;**
+ * 创建有序集合对象
+ * 底层数据结构 跳表+哈希表
+ *&#x2F;
+robj *createZsetObject(void) &#123;
+    &#x2F;&#x2F; 为zset结构体分配内存
+    zset *zs &#x3D; zmalloc(sizeof(*zs));
+    robj *o;
+
+    &#x2F;&#x2F; 创建字典
+    zs-&gt;dict &#x3D; dictCreate(&amp;zsetDictType,NULL);
+    &#x2F;&#x2F; 创建跳表
+    zs-&gt;zsl &#x3D; zslCreate();
+
+    &#x2F;&#x2F; 创建redisObject对象，类型为有序集合
+    o &#x3D; createObject(OBJ_ZSET,zs);
+    &#x2F;&#x2F; 设置编码方式为 跳表
+    o-&gt;encoding &#x3D; OBJ_ENCODING_SKIPLIST;
+    return o;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: object.c
+
+&#x2F;**
+ * 创建有序集合压缩列表对象
+ * 底层数据结构 压缩列表
+ *&#x2F;
+robj *createZsetZiplistObject(void) &#123;
+    &#x2F;&#x2F; 创建压缩列表
+    unsigned char *zl &#x3D; ziplistNew();
+    &#x2F;&#x2F; 创建redisObject对象，类型为有序集合
+    robj *o &#x3D; createObject(OBJ_ZSET,zl);
+    &#x2F;&#x2F; 设置编码方式为 压缩列表 
+    o-&gt;encoding &#x3D; OBJ_ENCODING_ZIPLIST;
+    return o;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="1-2-2-往有序集合添加元素-zsetAdd"><a href="#1-2-2-往有序集合添加元素-zsetAdd" class="headerlink" title="(1.2.2) 往有序集合添加元素-zsetAdd"></a>(1.2.2) 往有序集合添加元素-zsetAdd</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: 
+
+&#x2F;**
+ * 添加新元素或更新排序集中现有元素的分数，无论其编码如何。
+ *
+ * 标记会更改命令行为。 它们通过整数指针传递，因为该函数将清除标志并用其他标志填充它们以指示不同的条件。
+ *
+ * 输入标记如下：
+ * ZADD_INCR: 将当前元素分数增加&#39;score&#39;，而不是更新当前元素分数。 如果该元素不存在，我们假设以前分数为0。
+ * ZADD_NX:   仅当元素不存在时才执行操作。
+ * ZADD_XX:   仅当元素不存在时才执行操作。
+ *
+ * 当使用 ZADD_INCR 时，如果 &#39;newscore&#39; 不为 NULL，则元素的新分数存储在 &#39;*newscore&#39; 中。
+ *
+ * 返回的标记如下：
+ * ZADD_NAN:     结果分数不是数字。
+ * ZADD_ADDED:   元素已添加(调用前不存在)。 
+ * ZADD_UPDATED: 元素分数已更新。
+ * ZADD_NOP:     由于 NX 或 XX，未执行任何操作。
+ *
+ * 返回值：
+ * 该函数在成功时返回 1，并设置适当的标志 ADDED 或 UPDATED 以指示操作期间发生的事情
+ * (请注意，如果我们使用与以前相同的分数重新添加元素，则不能设置任何标志，或者在这种情况下 使用零增量)。
+ *
+ * 该函数在出错时返回 0，目前仅当增量产生 NAN 条件时，或者当“score”值自开始以来为 NAN 时。 
+ * 
+ * 作为添加新元素的副作用的命令可能会将排序集内部编码从 ziplist 转换为 hashtable + skiplist。 
+ *
+ * &#39;ele&#39;的内存管理：
+ * 该函数不获取“ele”SDS 字符串的所有权，但会在需要时复制它。
+ * 
+ * 
+ * zadd zset_user_1 1 mysql 2 redis 
+ * @param *zobj 有序集合对象
+ * @param score 分数 对应 1 2
+ * @param ele 元素 其实就是 member 对应的是 mysql redis 
+ * @param *flags 
+ * @param *newscore 
+ *&#x2F;
+int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) &#123;
+    &#x2F;* 将选项变成简单的检查变量。 *&#x2F;
+    int incr &#x3D; (*flags &amp; ZADD_INCR) !&#x3D; 0;
+    int nx &#x3D; (*flags &amp; ZADD_NX) !&#x3D; 0;
+    int xx &#x3D; (*flags &amp; ZADD_XX) !&#x3D; 0;
+    *flags &#x3D; 0; &#x2F;* We&#39;ll return our response flags. *&#x2F;
+    double curscore;
+
+    &#x2F;* NaN as input is an error regardless of all the other parameters. *&#x2F;
+    &#x2F;&#x2F; 参数校验
+    if (isnan(score)) &#123;
+        *flags &#x3D; ZADD_NAN;
+        return 0;
+    &#125;
+
+    &#x2F;* 根据编码更新有序集合。 *&#x2F;
+    if (zobj-&gt;encoding &#x3D;&#x3D; OBJ_ENCODING_ZIPLIST) &#123; &#x2F;&#x2F; 编码是压缩列表
+        unsigned char *eptr;
+
+        if ((eptr &#x3D; zzlFind(zobj-&gt;ptr,ele,&amp;curscore)) !&#x3D; NULL) &#123;
+            &#x2F;* NX? Return, same element already exists. *&#x2F;
+            if (nx) &#123;
+                *flags |&#x3D; ZADD_NOP;
+                return 1;
+            &#125;
+
+            &#x2F;* Prepare the score for the increment if needed. *&#x2F;
+            if (incr) &#123;
+                score +&#x3D; curscore;
+                if (isnan(score)) &#123;
+                    *flags |&#x3D; ZADD_NAN;
+                    return 0;
+                &#125;
+                if (newscore) *newscore &#x3D; score;
+            &#125;
+
+            &#x2F;* Remove and re-insert when score changed. *&#x2F;
+            if (score !&#x3D; curscore) &#123;
+                zobj-&gt;ptr &#x3D; zzlDelete(zobj-&gt;ptr,eptr);
+                zobj-&gt;ptr &#x3D; zzlInsert(zobj-&gt;ptr,ele,score);
+                *flags |&#x3D; ZADD_UPDATED;
+            &#125;
+            return 1;
+        &#125; else if (!xx) &#123;
+            &#x2F;* check if the element is too large or the list
+             * becomes too long *before* executing zzlInsert. *&#x2F;
+            if (zzlLength(zobj-&gt;ptr)+1 &gt; server.zset_max_ziplist_entries ||
+                sdslen(ele) &gt; server.zset_max_ziplist_value ||
+                !ziplistSafeToAdd(zobj-&gt;ptr, sdslen(ele)))
+            &#123;
+                zsetConvert(zobj,OBJ_ENCODING_SKIPLIST);
+            &#125; else &#123;
+                zobj-&gt;ptr &#x3D; zzlInsert(zobj-&gt;ptr,ele,score);
+                if (newscore) *newscore &#x3D; score;
+                *flags |&#x3D; ZADD_ADDED;
+                return 1;
+            &#125;
+        &#125; else &#123;
+            *flags |&#x3D; ZADD_NOP;
+            return 1;
+        &#125;
+    &#125;
+
+    &#x2F;* 请注意，上面的块处理ziplist将返回 或 转换键为skiplist。 
+     * Note that the above block handling ziplist would have either returned or converted the key to skiplist. 
+     *&#x2F;
+
+    if (zobj-&gt;encoding &#x3D;&#x3D; OBJ_ENCODING_SKIPLIST) &#123; &#x2F;&#x2F; 编码是跳表
+        &#x2F;&#x2F; 有序集合
+        zset *zs &#x3D; zobj-&gt;ptr;
+        &#x2F;&#x2F; 跳表头节点
+        zskiplistNode *znode;
+        &#x2F;&#x2F; 字典
+        dictEntry *de;
+
+        &#x2F;&#x2F; ele是member  &#x2F;&#x2F; zscore key member 的时候获取score 用到了这儿
+        &#x2F;&#x2F; 从字典里根据key查到的节点
+        de &#x3D; dictFind(zs-&gt;dict,ele);
+        if (de !&#x3D; NULL) &#123; &#x2F;&#x2F; 节点已存在
+            &#x2F;* NX? Return, same element already exists. *&#x2F;
+            if (nx) &#123;
+                *flags |&#x3D; ZADD_NOP;
+                return 1;
+            &#125;
+            &#x2F;&#x2F; 获取节点的值 也就是 分数
+            curscore &#x3D; *(double*)dictGetVal(de);
+
+            &#x2F;* 如果需要，为增量准备分数。 *&#x2F;
+            if (incr) &#123;
+                score +&#x3D; curscore;
+                if (isnan(score)) &#123;
+                    *flags |&#x3D; ZADD_NAN;
+                    return 0;
+                &#125;
+                &#x2F;&#x2F; 更新分值
+                if (newscore) *newscore &#x3D; score;
+            &#125;
+
+            &#x2F;* 当分数改变时移除并重新插入。 *&#x2F;
+            if (score !&#x3D; curscore) &#123;
+                &#x2F;&#x2F; 
+                znode &#x3D; zslUpdateScore(zs-&gt;zsl,curscore,ele,score);
+                &#x2F;* 请注意，我们没有从表示已排序集合的哈希表中删除原始元素，因此我们只更新分数。 *&#x2F;
+                dictGetVal(de) &#x3D; &amp;znode-&gt;score; &#x2F;&#x2F; 更新分数指针
+                &#x2F;&#x2F; 更新标记
+                *flags |&#x3D; ZADD_UPDATED;
+            &#125;
+            return 1;
+        &#125; else if (!xx) &#123;
+            ele &#x3D; sdsdup(ele);
+            znode &#x3D; zslInsert(zs-&gt;zsl,score,ele);
+            serverAssert(dictAdd(zs-&gt;dict,ele,&amp;znode-&gt;score) &#x3D;&#x3D; DICT_OK);
+            *flags |&#x3D; ZADD_ADDED;
+            if (newscore) *newscore &#x3D; score;
+            return 1;
+        &#125; else &#123;
+            *flags |&#x3D; ZADD_NOP;
+            return 1;
+        &#125;
+    &#125; else &#123;
+        serverPanic(&quot;Unknown sorted set encoding&quot;);
+    &#125;
+    return 0; &#x2F;* Never reached. *&#x2F;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+<h3 id="1-2-x-zadd命令源码解析"><a href="#1-2-x-zadd命令源码解析" class="headerlink" title="(1.2.x) zadd命令源码解析"></a>(1.2.x) zadd命令源码解析</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">void zaddCommand(client *c) &#123;
+    zaddGenericCommand(c,ZADD_NONE);
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * This generic command implements both ZADD and ZINCRBY. 
+ * 
+ * zadd zset_user_1 1 mysql
+ *&#x2F;
+void zaddGenericCommand(client *c, int flags) &#123;
+    static char *nanerr &#x3D; &quot;resulting score is not a number (NaN)&quot;;
+    &#x2F;&#x2F; 输入的key  
+    robj *key &#x3D; c-&gt;argv[1];
+    robj *zobj;
+    sds ele;
+    double score &#x3D; 0, *scores &#x3D; NULL;
+    int j, elements;
+    int scoreidx &#x3D; 0;
+    &#x2F;* 以下变量用于跟踪命令在执行期间实际执行的操作、回复客户端并触发键空间更改通知。 *&#x2F;
+    int added &#x3D; 0;      &#x2F;* 添加的新元素个数 *&#x2F;
+    int updated &#x3D; 0;    &#x2F;* 更新分数的元素个数 *&#x2F;
+    int processed &#x3D; 0;  &#x2F;* 处理的元素个数， 对于 XX 等选项可能会保持为零。 *&#x2F;
+
+    &#x2F;* 解析选项。 最后，&#39;scoreidx&#39; 设置为第一个分数元素对的分数的参数位置。 *&#x2F;
+    scoreidx &#x3D; 2;
+    &#x2F;&#x2F; 解析后面的参数
+    while(scoreidx &lt; c-&gt;argc) &#123;
+        char *opt &#x3D; c-&gt;argv[scoreidx]-&gt;ptr;
+        &#x2F;&#x2F; 位运算 flag是0 对应二进制是 0000 0000 0000 0000 
+        &#x2F;&#x2F; |&#x3D; 按位或 
+        &#x2F;&#x2F; 如果包含就 执行 按位或运算   
+        if (!strcasecmp(opt,&quot;nx&quot;)) flags |&#x3D; ZADD_NX;
+        else if (!strcasecmp(opt,&quot;xx&quot;)) flags |&#x3D; ZADD_XX;
+        else if (!strcasecmp(opt,&quot;ch&quot;)) flags |&#x3D; ZADD_CH;
+        else if (!strcasecmp(opt,&quot;incr&quot;)) flags |&#x3D; ZADD_INCR;
+        else break;
+        scoreidx++;
+    &#125;
+
+    &#x2F;* 将选项变成简单的检查变量。 *&#x2F;
+    &#x2F;&#x2F; 位运算 
+    int incr &#x3D; (flags &amp; ZADD_INCR) !&#x3D; 0;
+    int nx &#x3D; (flags &amp; ZADD_NX) !&#x3D; 0;
+    int xx &#x3D; (flags &amp; ZADD_XX) !&#x3D; 0;
+    int ch &#x3D; (flags &amp; ZADD_CH) !&#x3D; 0;
+
+    &#x2F;* 在选项之后，我们希望有偶数个参数，因为我们希望有任意数量的分数元素对。 *&#x2F;
+    elements &#x3D; c-&gt;argc-scoreidx;
+    if (elements % 2 || !elements) &#123;
+        addReply(c,shared.syntaxerr);
+        return;
+    &#125;
+    elements &#x2F;&#x3D; 2; &#x2F;* Now this holds the number of score-element pairs. *&#x2F;
+
+    &#x2F;* Check for incompatible options. *&#x2F;
+    if (nx &amp;&amp; xx) &#123;
+        addReplyError(c,
+            &quot;XX and NX options at the same time are not compatible&quot;);
+        return;
+    &#125;
+
+    if (incr &amp;&amp; elements &gt; 1) &#123;
+        addReplyError(c,
+            &quot;INCR option supports a single increment-element pair&quot;);
+        return;
+    &#125;
+
+    &#x2F;* Start parsing all the scores, we need to emit any syntax error
+     * before executing additions to the sorted set, as the command should
+     * either execute fully or nothing at all. *&#x2F;
+    scores &#x3D; zmalloc(sizeof(double)*elements);
+    for (j &#x3D; 0; j &lt; elements; j++) &#123;
+        if (getDoubleFromObjectOrReply(c,c-&gt;argv[scoreidx+j*2],&amp;scores[j],NULL)
+            !&#x3D; C_OK) goto cleanup;
+    &#125;
+
+    &#x2F;* Lookup the key and create the sorted set if does not exist. *&#x2F;
+    &#x2F;&#x2F; 查找键并创建排序集(如果不存在)
+    &#x2F;&#x2F; 根据key查找value
+    zobj &#x3D; lookupKeyWrite(c-&gt;db,key);
+    &#x2F;&#x2F; zobj为空，表示有序集合还未创建
+    if (zobj &#x3D;&#x3D; NULL) &#123;
+        if (xx) goto reply_to_client; &#x2F;* No key + XX option: nothing to do. *&#x2F;
+        &#x2F;&#x2F; 服务器配置里 zset_max_ziplist_entries&#x3D;&#x3D;0 或  zset_max_ziplist_value &lt; 每个元素的长度 
+        if (server.zset_max_ziplist_entries &#x3D;&#x3D; 0 ||
+            server.zset_max_ziplist_value &lt; sdslen(c-&gt;argv[scoreidx+1]-&gt;ptr))
+        &#123;
+            &#x2F;&#x2F; 创建 Zset对象，底层数据结构是跳表和哈希表 
+            zobj &#x3D; createZsetObject();
+        &#125; else &#123;
+            &#x2F;&#x2F; 也就是 同时满足以下3个条件，会使用 ziplist 作为 有序集合的底层编码方式 
+            &#x2F;&#x2F; 压缩列表为空时，
+            &#x2F;&#x2F; 并且 服务器配置里 有序集合最大实体个数(zset_max_ziplist_entries) &gt; 0 
+            &#x2F;&#x2F; 并且 服务器配置里元素的长度(zset_max_ziplist_value) &gt;&#x3D; sdslen(c-&gt;argv[scoreidx+1]-&gt;ptr) 时
+
+            &#x2F;&#x2F; 创建压缩列表对象， 底层数据结构是ziplist 
+            zobj &#x3D; createZsetZiplistObject();
+        &#125;
+        dbAdd(c-&gt;db,key,zobj);
+    &#125; else &#123;
+        if (zobj-&gt;type !&#x3D; OBJ_ZSET) &#123;
+            addReply(c,shared.wrongtypeerr);
+            goto cleanup;
+        &#125;
+    &#125;
+
+    &#x2F;&#x2F; 往有序集合添加元素逻辑
+
+    for (j &#x3D; 0; j &lt; elements; j++) &#123;
+        double newscore;
+        score &#x3D; scores[j];
+        int retflags &#x3D; flags;
+
+        ele &#x3D; c-&gt;argv[scoreidx+1+j*2]-&gt;ptr;
+        &#x2F;&#x2F; 真正往有序集合添加元素添加逻辑
+        int retval &#x3D; zsetAdd(zobj, score, ele, &amp;retflags, &amp;newscore);
+        if (retval &#x3D;&#x3D; 0) &#123;
+            addReplyError(c,nanerr);
+            goto cleanup;
+        &#125;
+        if (retflags &amp; ZADD_ADDED) added++;
+        if (retflags &amp; ZADD_UPDATED) updated++;
+        if (!(retflags &amp; ZADD_NOP)) processed++;
+        score &#x3D; newscore;
+    &#125;
+    server.dirty +&#x3D; (added+updated);
+
+reply_to_client:
+    if (incr) &#123; &#x2F;* ZINCRBY or INCR option. *&#x2F;
+        if (processed)
+            addReplyDouble(c,score);
+        else
+            addReplyNull(c);
+    &#125; else &#123; &#x2F;* ZADD. *&#x2F;
+        addReplyLongLong(c,ch ? added+updated : added);
+    &#125;
+
+cleanup:
+    zfree(scores);
+    if (added || updated) &#123;
+        signalModifiedKey(c,c-&gt;db,key);
+        notifyKeyspaceEvent(NOTIFY_ZSET,
+            incr ? &quot;zincr&quot; : &quot;zadd&quot;, key, c-&gt;db-&gt;id);
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+
+<h1 id="评论"><a href="#评论" class="headerlink" title="评论"></a>评论</h1><p>1、ZSet 当数据比较少时，采用 ziplist 存储，每个 member/score 元素紧凑排列，节省内存</p>
+<p>2、当数据超过阈值（zset-max-ziplist-entries、zset-max-ziplist-value）后，转为 hashtable + skiplist 存储，降低查询的时间复杂度</p>
+<p>3、hashtable 存储 member-&gt;score 的关系，所以 ZSCORE 的时间复杂度为 O(1)</p>
+<p>4、skiplist 是一个「有序链表 + 多层索引」的结构，把查询元素的复杂度降到了 O(logN)，服务于 ZRANGE/ZREVRANGE 这类命令</p>
+<p>5、skiplist 的多层索引，采用「随机」的方式来构建，也就是说每次添加一个元素进来，要不要对这个元素建立「多层索引」？建立「几层索引」？都要通过「随机数」的方式来决定</p>
+<p>6、每次随机一个 0-1 之间的数，如果这个数小于 0.25（25% 概率），那就给这个元素加一层指针，持续随机直到大于 0.25 结束，最终确定这个元素的层数（层数越高，概率越低，且限制最多 64 层，详见 t_zset.c 的 zslRandomLevel 函数）</p>
+<p>7、这个预设「概率」决定了一个跳表的内存占用和查询复杂度：概率设置越低，层数越少，元素指针越少，内存占用也就越少，但查询复杂会变高，反之亦然。这也是 skiplist 的一大特点，可通过控制概率，进而控制内存和查询效率</p>
+<p>8、skiplist 新插入一个节点，只需修改这一层前后节点的指针，不影响其它节点的层数，降低了操作复杂度（相比平衡二叉树的再平衡，skiplist 插入性能更优）</p>
+<p>关于 Redis 的 ZSet 为什么用 skiplist 而不用平衡二叉树实现的问题，原因是：</p>
+<ul>
+<li>skiplist 更省内存：25% 概率的随机层数，可通过公式计算出 skiplist 平均每个节点的指针数是 1.33 个，平衡二叉树每个节点指针是 2 个（左右子树）</li>
+<li>skiplist 遍历更友好：skiplist 找到大于目标元素后，向后遍历链表即可，平衡树需要通过中序遍历方式来完成，实现也略复杂</li>
+<li>skiplist 更易实现和维护：扩展 skiplist 只需要改少量代码即可完成，平衡树维护起来较复杂</li>
+</ul>
+<p>课后题：在使用跳表和哈希表相结合的双索引机制时，在获得高效范围查询和单点查询的同时，你能想到有哪些不足之处么？</p>
+<p>这种发挥「多个数据结构」的优势，来完成某个功能的场景，最大的特点就是「空间换时间」，所以内存占用多是它的不足。</p>
+<p>不过也没办法，想要高效率查询，就得牺牲内存，鱼和熊掌不可兼得。</p>
+<p>不过 skiplist 在实现时，Redis 作者应该也考虑到这个问题了，就是上面提到的这个「随机概率」，Redis 后期维护可以通过调整这个概率，进而达到「控制」查询效率和内存平衡的结果。当然，这个预设值是固定写死的，不可配置，应该是 Redis 作者经过测试和权衡后的设定，我们这里只需要知晓原理就好。</p>
+<p>Redis只在两个地方用到了跳跃表，一个是实现有序集合键(zset)，另一个是在集群节点中用作内部数据结构，除此之外，跳表在Redis里面没有其他用途。</p>
+<p>但是为什么用跳表而不用红黑树呢？猜想如下：<br>1）在做范围查找的时候，平衡树比skiplist操作要复杂。在平衡树上，我们找到指定范围的小值之后，还需要以中序遍历的顺序继续寻找其它不超过大值的节点。如果不对平衡树进行一定的改造，这里的中序遍历并不容易实现。而在skiplist上进行范围查找就非常简单，只需要在找到小值之后，对第1层链表进行若干步的遍历就可以实现。<br>2）平衡树的插入和删除操作可能引发子树的调整，逻辑复杂，而skiplist的插入和删除只需要修改相邻节点的指针，操作简单又快速。<br>3）从内存占用上来说，skiplist比平衡树更灵活一些。一般来说，平衡树每个节点包含2个指针（分别指向左右子树），而skiplist每个节点包含的指针数目平均为1/(1-p)，具体取决于参数p的大小。如果像Redis里的实现一样，取p=1/4，那么平均每个节点包含1.33个指针，比平衡树更有优势。<br>4）查找单个key，skiplist和平衡树的时间复杂度都为O(log n)，大体相当；而哈希表在保持较低的哈希值冲突概率的前提下，查找时间复杂度接近O(1)，性能更高一些。所以我们平常使用的各种Map或dictionary结构，大都是基于哈希表实现的。<br>5）从算法实现难度上来比较，skiplist比平衡树要简单得多。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/404391">Redis源码剖析与实战 - 05 | 有序集合为何能同时支持点查询和范围查询？</a><br>[2] <a target="_blank" rel="noopener" href="https://blog.csdn.net/qq9808/article/details/104865385">redis为什么选择了跳跃表而不是红黑树</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/21/redis-data-structure-linked-list/" rel="prev" title="Redis数据结构之双向链表">
+                  <i class="fa fa-chevron-left"></i> Redis数据结构之双向链表
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/22/redis-data-structure-skiplist/" rel="next" title="Redis数据结构之跳表">
+                  Redis数据结构之跳表 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

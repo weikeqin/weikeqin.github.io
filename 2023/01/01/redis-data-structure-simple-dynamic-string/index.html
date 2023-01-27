@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，所以需要尽量满足以下三个要求：  能支持丰富且高效的字符串操作，比如字符串追加、拷贝、比较、获取长度等； 能保存二进制数据，比如byte[]等； 节省内存开销。    从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 简单动态字符串 设计">
+<meta property="og:url" content="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，所以需要尽量满足以下三个要求：  能支持丰富且高效的字符串操作，比如字符串追加、拷贝、比较、获取长度等； 能保存二进制数据，比如byte[]等； 节省内存开销。    从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/c-string.png">
+<meta property="article:published_time" content="2023-01-01T07:55:11.000Z">
+<meta property="article:modified_time" content="2023-01-27T15:20:59.500Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/c-string.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/","path":"2023/01/01/redis-data-structure-simple-dynamic-string/","title":"Redis 简单动态字符串 设计"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis 简单动态字符串 设计 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E9%87%8C%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8D%E7%94%A8char-%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">(1) 为什么Redis里的字符串不用char*？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-SDS%E8%AE%BE%E8%AE%A1%E6%80%9D%E6%83%B3"><span class="nav-number">2.</span> <span class="nav-text">(2) SDS设计思想</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-SDS%E5%AE%9A%E4%B9%89"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) SDS定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-SDS%E5%87%BD%E6%95%B0%E5%88%97%E8%A1%A8"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) SDS函数列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E5%88%9B%E5%BB%BA%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">2.3.</span> <span class="nav-text">(2.2) 创建字符串</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E5%88%A0%E9%99%A4"><span class="nav-number">2.4.</span> <span class="nav-text">(2.3) 删除</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-SDS%E4%BF%AE%E6%94%B9"><span class="nav-number">2.5.</span> <span class="nav-text">(2.4) SDS修改</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.6.</span> <span class="nav-text">(2.5) 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-6-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-number">2.7.</span> <span class="nav-text">(2.6) 内存预分配</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-7-SDS%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">2.8.</span> <span class="nav-text">(2.7) SDS内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-1-%E7%B4%A7%E5%87%91%E5%9E%8B%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.8.1.</span> <span class="nav-text">(2.6.1) 紧凑型设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-2-%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96"><span class="nav-number">2.8.2.</span> <span class="nav-text">(2.6.2) 编译优化</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E4%BD%BF%E7%94%A8SDS%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%9C%B0%E6%96%B9"><span class="nav-number">3.</span> <span class="nav-text">(3) 使用SDS字符串的地方</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis 简单动态字符串 设计 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 简单动态字符串 设计
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-01 15:55:11" itemprop="dateCreated datePublished" datetime="2023-01-01T15:55:11+08:00">2023-01-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-27 23:20:59" itemprop="dateModified" datetime="2023-01-27T23:20:59+08:00">2023-01-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>9.9k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>9 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>Redis绝大部分操作都会涉及到key，使用特别广泛，所以需要尽量满足以下三个要求：</p>
+<ol>
+<li>能支持丰富且高效的字符串操作，比如字符串追加、拷贝、比较、获取长度等；</li>
+<li>能保存二进制数据，比如byte[]等；</li>
+<li>节省内存开销。</li>
+</ol>
+<p>  从系统设计的角度来看，我们该如何设计实现字符串呢？</p>
+<p>  Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。</p>
+<span id="more"></span>
+
+<h1 id="1-为什么Redis里的字符串不用char-？"><a href="#1-为什么Redis里的字符串不用char-？" class="headerlink" title="(1) 为什么Redis里的字符串不用char*？"></a>(1) 为什么Redis里的字符串不用char*？</h1><p>  Redis是用c语言编写的，为什么Redis的key不直接使用char* ?</p>
+<p>  来看看 char* 字符数组的结构。<br>  char字符数组的结构比较简单，用一块连续的内存空间，依次存放了字符串中的每一个字符数组结构，结尾位置就用”\0”表示，表示结束。</p>
+<p>  <img src="/img/database/redis/data-structure/sds/c-string.png" alt="C语言字符串"></p>
+<p>不使用char*的原因</p>
+<ol>
+<li>操作效率低：获取字符串长度需遍历整个字符数组，O(N)复杂度</li>
+<li>二进制不安全：无法存储包含 \0 的数据</li>
+<li>修改字符串忘记分配内存容易造成缓冲区溢出 (buffer overflow) 。</li>
+<li>修改字符串需要重新分配内存，涉及系统调用。</li>
+</ol>
+<p>SDS优势</p>
+<ol>
+<li>操作效率高：获取长度无需遍历，O(1)复杂度</li>
+<li>二进制安全：因单独记录长度字段，所以可存储包含 “\0” 的数据</li>
+<li>兼容 C 字符串函数，可直接使用字符串 API</li>
+</ol>
+<p>另外 Redis 在操作 SDS 时，为了避免频繁操作字符串时，每次「申请、释放」内存的开销，还做了这些优化：</p>
+<ul>
+<li>内存预分配：SDS 扩容，会多申请一些内存（小于 1MB 翻倍扩容，大于 1MB 按 1MB 扩容）</li>
+<li>多余内存不释放：SDS 缩容，不释放多余的内存，下次使用可直接复用这些内存</li>
+</ul>
+<h1 id="2-SDS设计思想"><a href="#2-SDS设计思想" class="headerlink" title="(2) SDS设计思想"></a>(2) SDS设计思想</h1><p>  SDS 结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
+<h2 id="2-1-SDS定义"><a href="#2-1-SDS定义" class="headerlink" title="(2.1) SDS定义"></a>(2.1) SDS定义</h2><p>  redis 6.0版本源码  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/sds.c">https://github.com/redis/redis/blob/6.0/src/sds.c</a> </p>
+<p>  Redis里SDS定义，这里以<code>sdshdr64</code>为例</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">typedef char *sds;
+
+struct __attribute__ ((__packed__)) sdshdr64 &#123;
+    uint64_t len; &#x2F;&#x2F; 字符数组已使用长度   &#x2F;* used *&#x2F;
+    uint64_t alloc; &#x2F;&#x2F; 字符数组的已分配空间，不包括结构体和结束字符   &#x2F;* excluding the header and null terminator *&#x2F;
+    unsigned char flags; &#x2F;* SDS类型 占用一字节 实际使用了3bit，5bit未使用 *&#x2F; &#x2F;* 3 lsb of type, 5 unused bits *&#x2F;
+    char buf[];  &#x2F;** 实际存储的数据 *&#x2F;
+&#125;;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  类型 <code>sds</code> 是 <code>char*</code> 的别名（alias）<br>  结构 <code>sdshdr</code> 则保存了 <code>len</code> 、 <code>alloc</code> <code>flags</code>和 <code>buf[]</code> 四个属性</p>
+<p>  <code>uint64_t</code> 定义是 <code>typedef unsigned long long uint64_t;</code> 所以 uint64_t 长度是8字节<br>  <a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/32198368/unsigned-long-long-conflict-with-uint64-t">unsigned long long conflict with uint64_t?</a></p>
+<p>  SDS 本质还是字符数组，只是在字符数组基础上增加了额外的元数据。<br>  在 Redis 中需要用到字符数组时，就直接使用 sds 这个别名。</p>
+<h2 id="2-2-SDS函数列表"><a href="#2-2-SDS函数列表" class="headerlink" title="(2.2) SDS函数列表"></a>(2.2) SDS函数列表</h2><table>
+<thead>
+<tr>
+<th>函数</th>
+<th>作用</th>
+<th>算法复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>sdsnewlen</td>
+<td>创建一个指定长度的 sds ，接受一个 C 字符串作为初始化值</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsempty</td>
+<td>创建一个只包含空白字符串 “” 的 sds</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>sdsnew</td>
+<td>根据给定 C 字符串，创建一个相应的 sds</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsdup</td>
+<td>复制给定 sds</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsfree</td>
+<td>释放给定 sds</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsupdatelen</td>
+<td>更新给定 sds 所对应 sdshdr 结构的 free 和 len</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsclear</td>
+<td>清除给定 sds 的内容，将它初始化为 “”</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>sdsMakeRoomFor</td>
+<td>对 sds 所对应 sdshdr 结构的 buf 进行扩展</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsRemoveFreeSpace</td>
+<td>在不改动 buf 的情况下，将 buf 内多余的空间释放出去</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdsAllocSize</td>
+<td>计算给定 sds 的 buf 所占用的内存总数</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>sdsIncrLen</td>
+<td>对 sds 的 buf 的右端进行扩展（expand）或修剪（trim）</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>sdsgrowzero</td>
+<td>将给定 sds 的 buf 扩展至指定长度，无内容的部分用 \0 来填充</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdscatlen</td>
+<td>按给定长度对 sds 进行扩展，并将一个 C 字符串追加到 sds 的末尾</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdscat</td>
+<td>将一个 C 字符串追加到 sds 末尾</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdscatsds</td>
+<td>将一个 sds 追加到另一个 sds 末尾</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdscpylen</td>
+<td>将一个 C 字符串的部分内容复制到另一个 sds 中，需要时对 sds 进行扩展</td>
+<td>O(N)</td>
+</tr>
+<tr>
+<td>sdscpy</td>
+<td>将一个 C 字符串复制到 sds</td>
+<td>O(N)</td>
+</tr>
+</tbody></table>
+<h2 id="2-2-创建字符串"><a href="#2-2-创建字符串" class="headerlink" title="(2.2) 创建字符串"></a>(2.2) 创建字符串</h2><p>  在创建新的字符串时，Redis 会调用 SDS 创建函数 sdsnewlen。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 使用“init”指针和“initlen”指定的内容创建一个新的 sds 字符串。
+ * 
+ * 该字符串始终以 null 结尾
+ * 所以你可以这么创建一个 sds 字符串：
+ *   mystring &#x3D; sdsnewlen(&quot;abc&quot;,3);
+ * 
+ * 您可以使用 printf() 打印字符串，因为字符串末尾有一个隐含的 \0。 
+ * 该字符串是二进制安全的，并且可以在中间包含 &quot;\0&quot; 字符，因为长度存储在 sds 头部中。
+ *&#x2F;
+sds sdsnewlen(const void *init, size_t initlen) &#123;
+    void *sh;
+    sds s; &#x2F;&#x2F; sds类型变量 即char*字符数组
+    &#x2F;&#x2F; 获取SDS_TYPE    SDS_TYPE_8 ~ SDS_TYPE_64
+    char type &#x3D; sdsReqType(initlen);
+    &#x2F;&#x2F; 元数据长度
+    int hdrlen &#x3D; sdsHdrSize(type);
+    
+    &#x2F;&#x2F; 新建SDS结构，并分配内存空间 
+    &#x2F;&#x2F; hdrlen是结构体的长度  initlen是字符串长度  1是最后结束符&quot;\0&quot;的长度
+    sh &#x3D; s_malloc(hdrlen+initlen+1);
+
+    &#x2F;&#x2F; sds类型变量指向SDS结构体中的buf数组，sh指向SDS结构体起始位置，hdrlen是SDS结构体中元数据的长度
+    s &#x3D; (char*)sh+hdrlen;
+    fp &#x3D; ((unsigned char*)s)-1;
+
+    switch(type) &#123;
+        &#x2F;&#x2F; 省略部分代码 ...
+        &#x2F;&#x2F; 
+        case SDS_TYPE_64: &#123;
+            SDS_HDR_VAR(64,s);
+            sh-&gt;len &#x3D; initlen;
+            sh-&gt;alloc &#x3D; initlen;
+            *fp &#x3D; type;
+            break;
+        &#125;
+    &#125;
+
+    if (initlen &amp;&amp; init)
+        memcpy(s, init, initlen); &#x2F;&#x2F;将要传入的字符串拷贝给sds变量s
+    s[initlen] &#x3D; &#39;\0&#39;; &#x2F;&#x2F; 字符数组 末尾设置成&quot;\0&quot;，表示字符串结束
+    return s;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * 创建一个空的(长度为0) sds 字符串。 
+ * 即使在这种情况下，字符串也始终具有隐含的空项。
+ *&#x2F;
+sds sdsempty(void) &#123;
+    return sdsnewlen(&quot;&quot;,0);
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="2-3-删除"><a href="#2-3-删除" class="headerlink" title="(2.3) 删除"></a>(2.3) 删除</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * 释放 sds 字符串。
+ * 如果“s”为 NULL，则不执行任何操作。
+ *&#x2F;
+void sdsfree(sds s) &#123;
+    if (s &#x3D;&#x3D; NULL) return;
+    &#x2F;&#x2F; 只释放字符数组
+    &#x2F;&#x2F; 减去header的长度
+    s_free((char*)s-sdsHdrSize(s[-1]));
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="2-4-SDS修改"><a href="#2-4-SDS修改" class="headerlink" title="(2.4) SDS修改"></a>(2.4) SDS修改</h2><p>  SDS 结构中记录了字符数组已占用的空间和被分配的空间，这就比传统 C 语言实现的字符串能带来更高的操作效率。</p>
+<p>以字符串追加操作为例。Redis 中实现字符串追加的函数是 sds.c 文件中的 sdscatlen 函数。这个函数的参数一共有三个，分别是目标字符串 s、源字符串 t 和要追加的长度 len，源码如下所示：</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 将由“t”（共“len”个字节）指向的指定二进制安全字符串附加到指定的 sds 字符串“s”的末尾。
+ * 
+ * 调用后，传递的 sds 字符串不再有效，所有引用必须替换为调用返回的新指针。
+ *
+ * @param s
+ * @param *t
+ * @param len
+ *&#x2F;
+sds sdscatlen(sds s, const void *t, size_t len) &#123;
+    &#x2F;&#x2F;获取目标字符串s的当前长度
+    size_t curlen &#x3D; sdslen(s);
+    &#x2F;&#x2F;根据要追加的长度len和目标字符串s的现有长度，判断是否要增加新的空间
+    s &#x3D; sdsMakeRoomFor(s,len);
+    if (s &#x3D;&#x3D; NULL) return NULL;
+    &#x2F;&#x2F;将源字符串t中len长度的数据拷贝到目标字符串结尾
+    memcpy(s+curlen, t, len);
+    &#x2F;&#x2F;设置目标字符串的最新长度：拷贝前长度curlen加上拷贝长度
+    sdssetlen(s, curlen+len);
+    &#x2F;&#x2F;拷贝后，在目标字符串结尾加上\0
+    s[curlen+len] &#x3D; &#39;\0&#39;;
+    return s;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>首先，根据当前字符串长度和要追加的长度，判断是否要给目标字符串新增空间。<br>其次，在保证了目标字符串的空间足够后，将源字符串中指定长度 len 的数据追加到目标字符串。<br>最后，设置目标字符串的最新长度。</p>
+<p>SDS 把目标字符串的空间检查和扩容封装在了 sdsMakeRoomFor 函数中，并且在涉及字符串空间变化的操作中，如追加、复制等，会直接调用该函数。</p>
+<br>
+
+
+<h2 id="2-5-查询"><a href="#2-5-查询" class="headerlink" title="(2.5) 查询"></a>(2.5) 查询</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * 已使用字符数据的长度
+ *&#x2F;
+static inline size_t sdslen(const sds s) &#123;
+    &#x2F;&#x2F; SDS_TYPE  
+    unsigned char flags &#x3D; s[-1];
+    &#x2F;&#x2F; #define SDS_TYPE_MASK 7 也就是 SDS_TYPE_MASK 对应二进制是 0111  
+    &#x2F;&#x2F; flags的右边3位 按位与  
+    switch(flags&amp;SDS_TYPE_MASK) &#123;
+        case SDS_TYPE_5:
+            return SDS_TYPE_5_LEN(flags);
+        case SDS_TYPE_8:
+            &#x2F;&#x2F; 返回对应的字符长度
+            return SDS_HDR(8,s)-&gt;len;
+        case SDS_TYPE_16:
+            return SDS_HDR(16,s)-&gt;len;
+        case SDS_TYPE_32:
+            return SDS_HDR(32,s)-&gt;len;
+        case SDS_TYPE_64:
+            return SDS_HDR(64,s)-&gt;len;
+    &#125;
+    return 0;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  <code>flags &amp; SDS_TYPE_MASK</code> 进行与运算，SDS_TYPE_MASK 对应二进制是 <code>0000 0000 0000 0111</code>，无论flags是多少，最大是<code>0111</code>，也就是7</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">#define SDS_TYPE_5  0  &#x2F;&#x2F; 对应二进制 0000
+#define SDS_TYPE_8  1  &#x2F;&#x2F; 对应二进制 0001
+#define SDS_TYPE_16 2  &#x2F;&#x2F; 对应二进制 0010
+#define SDS_TYPE_32 3  &#x2F;&#x2F; 对应二进制 0011
+#define SDS_TYPE_64 4  &#x2F;&#x2F; 对应二进制 0100
+#define SDS_TYPE_MASK 7<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+ * 可用长度 &#x3D; 已分配 - 已使用
+ * avail &#x3D; alloc - len 
+ *
+ * @param s 
+ *&#x2F;
+static inline size_t sdsavail(const sds s) &#123;
+    &#x2F;&#x2F; SDS_TYPE
+    unsigned char flags &#x3D; s[-1];
+    &#x2F;&#x2F; 
+    switch(flags&amp;SDS_TYPE_MASK) &#123;
+        case SDS_TYPE_5: &#123;
+            return 0;
+        &#125;
+        case SDS_TYPE_8: &#123;
+            SDS_HDR_VAR(8,s);
+            return sh-&gt;alloc - sh-&gt;len;
+        &#125;
+        case SDS_TYPE_16: &#123;
+            SDS_HDR_VAR(16,s);
+            return sh-&gt;alloc - sh-&gt;len;
+        &#125;
+        case SDS_TYPE_32: &#123;
+            SDS_HDR_VAR(32,s);
+            return sh-&gt;alloc - sh-&gt;len;
+        &#125;
+        case SDS_TYPE_64: &#123;
+            SDS_HDR_VAR(64,s);
+            return sh-&gt;alloc - sh-&gt;len;
+        &#125;
+    &#125;
+    return 0;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="2-6-内存预分配"><a href="#2-6-内存预分配" class="headerlink" title="(2.6) 内存预分配"></a>(2.6) 内存预分配</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file:  src&#x2F;sds.c
+
+&#x2F;* 
+ * 扩大 sds 字符串末尾的可用空间，以便调用者确定调用此函数后可以覆盖字符串末尾后的 addlen 个字节，再加上一个 nul 项的字节。
+ *
+ * 注意：这不会改变 sdslen() 返回的 sds 字符串的长度，而只会改变我们拥有的可用缓冲区空间。
+ * 
+ * @param s 
+ * @param addlen 要添加的长度
+ *&#x2F;
+sds sdsMakeRoomFor(sds s, size_t addlen) &#123;
+    void *sh, *newsh;
+    &#x2F;&#x2F; 可用长度
+    size_t avail &#x3D; sdsavail(s);
+    size_t len, newlen, reqlen;
+    char type, oldtype &#x3D; s[-1] &amp; SDS_TYPE_MASK;
+    int hdrlen; &#x2F;&#x2F; 结构体长度
+
+    &#x2F;* 如果剩余空间足够，请尽快返回。 *&#x2F;
+    if (avail &gt;&#x3D; addlen) return s;
+
+    len &#x3D; sdslen(s); &#x2F;&#x2F; 字符串长度 &#x2F; 已使用字符数组长度
+    sh &#x3D; (char*)s-sdsHdrSize(oldtype);
+    reqlen &#x3D; newlen &#x3D; (len+addlen); &#x2F;&#x2F; 需要的字符长度 &#x3D; 现在的字符串长度 + 需要增加的字符长度
+    assert(newlen &gt; len);   &#x2F;* Catch size_t overflow *&#x2F;
+    &#x2F;&#x2F; 申请的字符串长度newlen &lt; 1KB 分配 newlen*2 的长度
+    &#x2F;&#x2F; 否则分配 newlen + 1KB 的长度
+    if (newlen &lt; SDS_MAX_PREALLOC) &#x2F;&#x2F; 申请的新字符串长度 newlen &lt; 1024*1024 (1KB) 
+        newlen *&#x3D; 2;
+    else
+        newlen +&#x3D; SDS_MAX_PREALLOC; 
+
+    &#x2F;&#x2F; 判断SDS_TYPE
+    type &#x3D; sdsReqType(newlen);
+
+    &#x2F;&#x2F; 不要使用SDS_TYPE_5：用户追加到字符串，SDS_TYPE_5 无法记住空格，因此必须在每次追加操作时调用 sdsMakeRoomFor()。
+    if (type &#x3D;&#x3D; SDS_TYPE_5) type &#x3D; SDS_TYPE_8;
+
+    &#x2F;&#x2F; header长度 &#x2F; 结构体长度
+    hdrlen &#x3D; sdsHdrSize(type);
+    &#x2F;&#x2F; 确保 结构体长度 + 申请字符串长度 + 结束字符长度 &gt; 申请的长度
+    assert(hdrlen + newlen + 1 &gt; reqlen);  &#x2F;* Catch size_t overflow *&#x2F;
+    &#x2F;&#x2F; 判断 SDS_TYPE 有没有变化 
+    if (oldtype&#x3D;&#x3D;type) &#123; &#x2F;&#x2F; SDS_TYPE_8 &#x3D;&#x3D; SDS_TYPE_8 
+        newsh &#x3D; s_realloc(sh, hdrlen+newlen+1);
+        if (newsh &#x3D;&#x3D; NULL) return NULL;
+        s &#x3D; (char*)newsh+hdrlen;
+    &#125; else &#123; &#x2F;&#x2F; SDS_TYPE_8 !&#x3D; SDS_TYPE_16
+        &#x2F;&#x2F; 由于标头大小发生变化，需要将字符串向前移动，并且无法使用 realloc
+        newsh &#x3D; s_malloc(hdrlen+newlen+1);
+        if (newsh &#x3D;&#x3D; NULL) return NULL;
+        &#x2F;&#x2F; 将字符串拷贝给sds变量s
+        memcpy((char*)newsh+hdrlen, s, len+1);
+        &#x2F;&#x2F; 释放老的sh 
+        s_free(sh);
+        &#x2F;&#x2F; sds类型变量指向SDS结构体中的buf数组，sh指向SDS结构体起始位置，hdrlen是SDS结构体中元数据的长度
+        s &#x3D; (char*)newsh+hdrlen;
+        &#x2F;&#x2F; 字符数组 设置 SDS_TYPE
+        s[-1] &#x3D; type;
+        &#x2F;&#x2F; 设置sds字符串长度
+        sdssetlen(s, len);
+    &#125;
+    &#x2F;&#x2F; 设置已分配空间的长度
+    sdssetalloc(s, newlen);
+    return s;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p> 备注</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file:  src&#x2F;sds.c
+
+#define SDS_MAX_PREALLOC (1024*1024)
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="2-7-SDS内存优化"><a href="#2-7-SDS内存优化" class="headerlink" title="(2.7) SDS内存优化"></a>(2.7) SDS内存优化</h2><h3 id="2-6-1-紧凑型设计"><a href="#2-6-1-紧凑型设计" class="headerlink" title="(2.6.1) 紧凑型设计"></a>(2.6.1) 紧凑型设计</h3><p>SDS 结构中有一个元数据 flags，表示的是 SDS 类型。<br>事实上，SDS 一共设计了 5 种类型，分别是 sdshdr5、sdshdr8、sdshdr16、sdshdr32 和 sdshdr64。<br>这 5 种类型的主要区别就在于，它们数据结构中的字符数组现有长度 len 和分配空间长度 alloc，这两个元数据的数据类型不同。</p>
+<p>  这里以<code>sdshdr64</code>为例</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">struct __attribute__ ((__packed__)) sdshdr64 &#123;
+    uint64_t len; &#x2F;&#x2F; 字符数组已使用长度   &#x2F;* used *&#x2F;
+    uint64_t alloc; &#x2F;&#x2F; 字符数组的已分配空间，不包括结构体和结束字符   &#x2F;* excluding the header and null terminator *&#x2F;
+    unsigned char flags; &#x2F;* SDS类型 占用一字节 实际使用了3bit，5bit未使用 *&#x2F; &#x2F;* 3 lsb of type, 5 unused bits *&#x2F;
+    char buf[];  &#x2F;** 实际存储的数据 *&#x2F;
+&#125;;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  现有长度 len 和已分配空间 alloc 的数据类型都是 uint64_t。uint64_t 是 64位无符号整型，会占用8字节的内存空间。<br>  当字符串类型是 sdshdr64 时，它能表示的字符数组长度（包括数组最后一位\0）不会超过 2^64 字节（2 的 64 次方）。</p>
+<p>  元数据各自占用的内存空间在 sdshdr8、sdshdr16、sdshdr32、sdshdr64 类型中，则分别是 1字节、2字节、4字节 和 8字节。</p>
+<p>  SDS之所以设计不同的结构头（即不同类型），是为了能灵活保存不同大小的字符串，从而有效节省内存空间。**因为在保存不同大小的字符串时，结构头占用的内存空间也不一样，这样一来，在保存小字符串时，结构头占用空间也比较少。</p>
+<h3 id="2-6-2-编译优化"><a href="#2-6-2-编译优化" class="headerlink" title="(2.6.2) 编译优化"></a>(2.6.2) 编译优化</h3><p>  Redis 在编程上还使用了专门的编译优化来节省内存空间。<br><code>struct __attribute__ ((__packed__)) sdshdr64</code>  ，attribute ((packed))的作用就是告诉编译器，在编译 sdshdr64 结构时，不要使用字节对齐的方式，而是采用紧凑的方式分配内存。</p>
+<p>  这是因为在默认情况下，编译器会按照 8 字节对齐的方式，给变量分配内存。也就是说，即使一个变量的大小不到 8 个字节，编译器也会给它分配 8 个字节。<br>  Redis采用了<code>__attribute__ ((packed))</code>属性定义结构体，结构体实际占用多少内存空间，编译器就分配多少空间。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">#include &lt;stdio.h&gt;
+int main() &#123;
+    struct __attribute__((packed)) s2&#123;
+      char a;
+      int b;
+    &#125; ts2;
+    printf(&quot;%lu\n&quot;, sizeof(ts2));
+    return 0;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  当你运行这段代码时，你可以看到，打印的结果是 5，表示编译器用了紧凑型内存分配，s2 结构体只占用 5 个字节的空间。</p>
+<h1 id="3-使用SDS字符串的地方"><a href="#3-使用SDS字符串的地方" class="headerlink" title="(3) 使用SDS字符串的地方"></a>(3) 使用SDS字符串的地方</h1><ol>
+<li>server.h 文件中的 <code>redisObject</code> 对象，key 和 value 都是对象，key （键对象）都是 SDS 简单动态字符串对象</li>
+<li>cluter.c 的 clusterGenNodesDescription 函数中。这个函数代表以 csv 格式记录当前节点已知所有节点的信息。</li>
+<li>client.h 的 clusterLink 结构体中。clusterLink 包含了与其他节点进行通讯所需的全部信息，用 SDS 来存储输出缓冲区和输入缓冲区。</li>
+<li>server.h 的 client 结构体中。缓冲区 querybuf、pending_querybuf 用的 sds 数据结构。</li>
+<li>networking.c 中的 catClientInfoString 函数。获取客户端的各项信息，将它们储存到 sds 值 s 里面，并返回。</li>
+<li>sentinel.c 中的 sentinelGetMasterByName 函数。根据名字查找主服务器，而参数名字会先转化为 SDS 后再去找主服务器。</li>
+<li>server.h 中的结构体 redisServer，aof_buf 缓存区用的 是 sds。</li>
+<li>slowlog.h 中的结构体 slowlogEntry，用来记录慢查询日志，其他 client 的名字和 ip 地址用的是 sds。</li>
+</ol>
+<p>SDS 字符串在 Redis 内部模块实现中也被广泛使用，你能在 Redis server 和客户端的实现中，找到使用 SDS 字符串的地方么？<br>1、Redis 中所有 key 的类型就是 SDS（详见 db.c 的 dbAdd 函数）<br>2、Redis Server 在读取 Client 发来的请求时，会先读到一个缓冲区中，这个缓冲区也是 SDS（详见 server.h 中 struct client 的 querybuf 字段）<br>3、写操作追加到 AOF 时，也会先写到 AOF 缓冲区，这个缓冲区也是 SDS （详见 server.h 中 struct client 的 aof_buf 字段）</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/400314">Redis源码剖析与实战 - 02 键值对中字符串的实现，用char还是结构体？</a><br>[2] <a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/32198368/unsigned-long-long-conflict-with-uint64-t">unsigned long long conflict with uint64_t?</a><br>[3] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/internal-datastruct/sds.html">Redis设计与实现 - 简单动态字符串</a><br>[4] <a target="_blank" rel="noopener" href="https://www.modb.pro/db/102037">Redis sds动态字符串学习三</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/01/redis-source-code-overall-overview/" rel="prev" title="Redis源码整体概览">
+                  <i class="fa fa-chevron-left"></i> Redis源码整体概览
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/07/redis-data-structure-hash-tables/" rel="next" title="Redis里的哈希表">
+                  Redis里的哈希表 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

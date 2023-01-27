@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="在Redis的命令中，用于对键（key）进行处理的命令占了很大一部分， 而对于键所保存的值的类型(后简称”键的类型”)，键能执行的命令又各不相同。 　比如说，LPUSH 和 LLEN 只能用于列表键，如果用错了会提示 (error) WRONGTYPE Operation against a key holding the wrong kind of value   比如在string类型上">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis对象处理机制">
+<meta property="og:url" content="http://weikeqin.com/2023/01/08/redis-datatype-object/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在Redis的命令中，用于对键（key）进行处理的命令占了很大一部分， 而对于键所保存的值的类型(后简称”键的类型”)，键能执行的命令又各不相同。 　比如说，LPUSH 和 LLEN 只能用于列表键，如果用错了会提示 (error) WRONGTYPE Operation against a key holding the wrong kind of value   比如在string类型上">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/redis-object.svg">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object-object-encoding-mapping.svg">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/embedded-string/embedded-string.png">
+<meta property="article:published_time" content="2023-01-08T15:25:58.000Z">
+<meta property="article:modified_time" content="2023-01-27T15:20:59.501Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/redis-object/redis-object.svg">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/08/redis-datatype-object/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/08/redis-datatype-object/","path":"2023/01/08/redis-datatype-object/","title":"Redis对象处理机制"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis对象处理机制 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E5%AF%B9%E8%B1%A1%E7%B3%BB%E7%BB%9F"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis对象系统</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-redisObject%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) redisObject结构定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-redisObject%E7%9A%84%E4%BD%9C%E7%94%A8"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) redisObject的作用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-redisObject%E9%87%8Ctype%E5%AF%B9%E5%BA%94%E7%9A%84Redis%E5%AF%B9%E8%B1%A1"><span class="nav-number">1.3.</span> <span class="nav-text">(1.3) redisObject里type对应的Redis对象</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-redisObject%E9%87%8Cencoding%E5%AF%B9%E5%BA%94%E7%9A%84%E5%AF%B9%E8%B1%A1%E7%BC%96%E7%A0%81"><span class="nav-number">1.4.</span> <span class="nav-text">(1.4) redisObject里encoding对应的对象编码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-5-%E5%91%BD%E4%BB%A4%E7%9A%84%E7%B1%BB%E5%9E%8B%E6%A3%80%E6%9F%A5%E5%92%8C%E5%A4%9A%E6%80%81"><span class="nav-number">1.5.</span> <span class="nav-text">(1.5) 命令的类型检查和多态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-6-%E5%AF%B9%E8%B1%A1%E5%85%B1%E4%BA%AB"><span class="nav-number">1.6.</span> <span class="nav-text">(1.6) 对象共享</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-7-%E5%BC%95%E7%94%A8%E8%AE%A1%E6%95%B0%E4%BB%A5%E5%8F%8A%E5%AF%B9%E8%B1%A1%E7%9A%84%E9%94%80%E6%AF%81"><span class="nav-number">1.7.</span> <span class="nav-text">(1.7) 引用计数以及对象的销毁</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-redisObject%E9%87%8C%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">2.</span> <span class="nav-text">(2) redisObject里内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E4%BD%8D%E5%9F%9F%E5%AE%9A%E4%B9%89%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 位域定义方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E5%B5%8C%E5%85%A5%E5%BC%8F%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 嵌入式字符串</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88EMBSTR%E7%9A%84%E5%A4%A7%E5%B0%8F%E8%A6%81-lt-44"><span class="nav-number">2.2.1.</span> <span class="nav-text">为什么EMBSTR的大小要&lt;&#x3D;44</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AF%84%E8%AE%BA"><span class="nav-number">3.</span> <span class="nav-text">评论</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/08/redis-datatype-object/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis对象处理机制 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis对象处理机制
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-08 23:25:58" itemprop="dateCreated datePublished" datetime="2023-01-08T23:25:58+08:00">2023-01-08</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-27 23:20:59" itemprop="dateModified" datetime="2023-01-27T23:20:59+08:00">2023-01-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>10k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>9 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>   在Redis的命令中，用于对键（key）进行处理的命令占了很大一部分， 而对于键所保存的值的类型(后简称”键的类型”)，键能执行的命令又各不相同。</p>
+<p>　比如说，LPUSH 和 LLEN 只能用于列表键，如果用错了会提示 <code>(error) WRONGTYPE Operation against a key holding the wrong kind of value</code></p>
+<p>  比如在string类型上用了 llen 就会提示这个错误，那么redis是怎么做到发现类型错误并提示<code>WRONGTYPE</code>的？</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> set key1 value1
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> get key1
+<span class="token string">"value1"</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  llen key1
+<span class="token operator">(</span>error<span class="token operator">)</span> WRONGTYPE Operation against a key holding the wrong kind of value
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  实际上，Redis每个键都带有类型信息，使得程序可以检查键的类型，并为它选择合适的处理方式。</p>
+<p>  另外，Redis 的每一种数据类型，比如字符串、列表、有序集， 它们都拥有不只一种底层实现(Redis内部称之为编码，encoding)，这说明，每当对某种数据类型的键进行操作时，程序都必须根据键所采取的编码，进行不同的操作。</p>
+<h1 id="1-Redis对象系统"><a href="#1-Redis对象系统" class="headerlink" title="(1) Redis对象系统"></a>(1) Redis对象系统</h1><p>为了应对不同的对象类型(type)和对象编码(encoding)，Redis构建了自己的类型系统，这个系统的主要功能包括：</p>
+<blockquote>
+<p>redisObject 对象。<br>基于 redisObject 对象的类型检查。<br>基于 redisObject 对象的显式多态函数。<br>对 redisObject 进行分配、共享和销毁的机制。</p>
+</blockquote>
+<p>  Redis 的 key 是 String 类型，但 value 可以是很多类型（String/List/Hash/Set/ZSet等），所以 Redis 要想存储多种数据类型，就要设计一个通用的对象进行封装，这个对象就是 redisObject。</p>
+<p>  <code>redisObject</code> 是Redis类型系统的核心， 数据库中的每个键、值，以及Redis本身处理的参数，都表示为这种数据类型。</p>
+<h2 id="1-1-redisObject结构定义"><a href="#1-1-redisObject结构定义" class="headerlink" title="(1.1) redisObject结构定义"></a>(1.1) redisObject结构定义</h2><p>  Redis 使用的基本数据对象结构体 redisObject</p>
+<p>  源码: <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/server.h#L633">https://github.com/redis/redis/blob/6.0/src/server.h#L633</a></p>
+<p>  <img src="/img/database/redis/redis-object/redis-object.svg" alt="redisObject"></p>
+<span id="more"></span>
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: server.h 
+
+&#x2F;**
+ * redis对象
+ *&#x2F;
+typedef struct redisObject &#123;
+    unsigned type:4;  &#x2F;&#x2F; 数据类型  4个bits  面向使用者的数据类型（string &#x2F; list &#x2F; hash &#x2F; set &#x2F; zset等）
+    unsigned encoding:4;  &#x2F;&#x2F; 编码方式 4个bits 
+    unsigned lru:LRU_BITS;  &#x2F;&#x2F; LRU时间(相对于全局 lru_clock) 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  LRU_BITS为24个bits
+    int refcount;  &#x2F;&#x2F; 引用计数  4字节
+    void *ptr;  &#x2F;&#x2F; 指针 指向对象的值  8字节
+&#125; robj;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+<h2 id="1-2-redisObject的作用"><a href="#1-2-redisObject的作用" class="headerlink" title="(1.2) redisObject的作用"></a>(1.2) redisObject的作用</h2><p> String对象类型，存储的字符串长度&lt;=44时，用embstr(嵌入式字符串，redisObject和SDS分配的内存是连起来的)；字符串长度&gt;44时，使用raw格式存储；存储的的是一个「数字」时，会使用long long类型来存储，节省内存。</p>
+<p>  同理，hash / set / zset 在数据量少时，采用 压缩列表(ziplist) 存储，否则就转为 哈希表(dictht) 来存。</p>
+<p>redisObject 的作用在于：</p>
+<ol>
+<li>为多种数据类型提供统一的表示方式</li>
+<li>同一种数据类型，底层可以对应不同实现，节省内存</li>
+<li>支持对象共享和引用计数，共享对象存储一份，可多次使用，节省内存</li>
+</ol>
+<p>redisObject 更像是连接「上层数据类型」和「底层数据结构」之间的桥梁。</p>
+<h2 id="1-3-redisObject里type对应的Redis对象"><a href="#1-3-redisObject里type对应的Redis对象" class="headerlink" title="(1.3) redisObject里type对应的Redis对象"></a>(1.3) redisObject里type对应的Redis对象</h2><p><code>type</code>对应<code>redisObject</code>的数据类型，对应redis里的<code>string</code> <code>list</code> <code>set</code> <code>sorted set</code> <code>hash</code>  <code>stream</code> 等。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 实际的Redis对象 
+ * The actual Redis Object 
+ *&#x2F;
+#define OBJ_STRING 0    &#x2F;* String object. *&#x2F;
+#define OBJ_LIST 1      &#x2F;* List object. *&#x2F;
+#define OBJ_SET 2       &#x2F;* Set object. *&#x2F;
+#define OBJ_ZSET 3      &#x2F;* Sorted set object. *&#x2F;
+#define OBJ_HASH 4      &#x2F;* Hash object. *&#x2F;
+
+#define OBJ_MODULE 5    &#x2F;* Module object. *&#x2F;
+#define OBJ_STREAM 6    &#x2F;* Stream object. *&#x2F;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="1-4-redisObject里encoding对应的对象编码"><a href="#1-4-redisObject里encoding对应的对象编码" class="headerlink" title="(1.4) redisObject里encoding对应的对象编码"></a>(1.4) redisObject里encoding对应的对象编码</h2><p>  <code>encoding</code>对应redis里的编码方式，有 <code>raw</code> <code>int</code> <code>ht</code> <code>zipmap</code> <code>linkedlist</code> <code>ziplist</code> <code>intset</code> <code>skiplist</code> <code>embstr</code> <code>quicklist</code> <code>stream</code></p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 对象编码。 
+ * 某些类型的对象（如字符串和哈希）可以在内部以多种方式表示。 
+ * 对象的&quot;encoding&quot;字段设置为此对象的此字段之一。
+ *
+ * Objects encoding. 
+ * Some kind of objects like Strings and Hashes can be internally represented in multiple ways. 
+ * The &#39;encoding&#39; field of the object is set to one of this fields for this object. 
+ *&#x2F;
+#define OBJ_ENCODING_RAW 0     &#x2F;* Raw representation *&#x2F;
+#define OBJ_ENCODING_INT 1     &#x2F;* Encoded as integer *&#x2F;
+#define OBJ_ENCODING_HT 2      &#x2F;* Encoded as hash table *&#x2F;
+#define OBJ_ENCODING_ZIPMAP 3  &#x2F;* Encoded as zipmap *&#x2F;
+#define OBJ_ENCODING_LINKEDLIST 4 &#x2F;* No longer used: old list encoding. *&#x2F;
+#define OBJ_ENCODING_ZIPLIST 5 &#x2F;* Encoded as ziplist *&#x2F;
+#define OBJ_ENCODING_INTSET 6  &#x2F;* Encoded as intset *&#x2F;
+#define OBJ_ENCODING_SKIPLIST 7  &#x2F;* Encoded as skiplist *&#x2F;
+#define OBJ_ENCODING_EMBSTR 8  &#x2F;* Embedded sds string encoding *&#x2F;
+#define OBJ_ENCODING_QUICKLIST 9 &#x2F;* Encoded as linked list of ziplists *&#x2F;
+#define OBJ_ENCODING_STREAM 10 &#x2F;* Encoded as a radix tree of listpacks *&#x2F;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p> <code>redisObject</code> 、<code>Redis对象(Redis Object)</code> 以及 <code>对象编码(Objects encoding)</code> 三者之间的关系：</p>
+<p>  <img src="/img/database/redis/redis-object-object-encoding-mapping.svg" alt="redisObject-object-encoding-mapping"></p>
+<h2 id="1-5-命令的类型检查和多态"><a href="#1-5-命令的类型检查和多态" class="headerlink" title="(1.5) 命令的类型检查和多态"></a>(1.5) 命令的类型检查和多态</h2><p>有了 redisObject 结构的存在， 在执行处理数据类型的命令时， 进行类型检查和对编码进行多态操作就简单得多了。</p>
+<p>当执行一个处理数据类型的命令时， Redis 执行以下步骤：</p>
+<blockquote>
+<p>根据给定 key ，在数据库字典中查找和它相对应的 redisObject ，如果没找到，就返回 NULL 。<br>检查 redisObject 的 type 属性和执行命令所需的类型是否相符，如果不相符，返回类型错误。<br>根据 redisObject 的 encoding 属性所指定的编码，选择合适的操作函数来处理底层的数据结构。<br>返回数据结构的操作结果作为命令的返回值。</p>
+</blockquote>
+<p>  比如在 list 类型上使用 get命令会提示 <code>WRONGTYPE</code></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> lpush key_list_msg msg_1
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> get key_list_msg
+<span class="token operator">(</span>error<span class="token operator">)</span> WRONGTYPE Operation against a key holding the wrong kind of value
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> llen  key_list_msg
+<span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">1</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="1-6-对象共享"><a href="#1-6-对象共享" class="headerlink" title="(1.6) 对象共享"></a>(1.6) 对象共享</h2><p>有一些对象在 Redis 中非常常见， 比如命令的返回值 OK、ERROR、WRONGTYPE 等字符， 另外，一些小范围的整数，比如个位、十位、百位的整数都非常常见。</p>
+<p>为了利用这种常见情况，Redis在内部使用了享元模式(Flyweight Pattern)，通过预分配一些常见的值对象，并在多个数据结构之间共享这些对象，避免了重复分配的麻烦，也节约了一些CPU时间。</p>
+<h2 id="1-7-引用计数以及对象的销毁"><a href="#1-7-引用计数以及对象的销毁" class="headerlink" title="(1.7) 引用计数以及对象的销毁"></a>(1.7) 引用计数以及对象的销毁</h2><p>当将<code>redisObject</code>用作数据库的键或者值，而不是用来储存参数时，对象的生命期是非常长的，因为C语言本身没有自动释放内存的相关机制。</p>
+<p>另一方面，一个共享对象可能被多个数据结构所引用，这时像是”这个对象被引用了多少次？”之类的问题就会出现。</p>
+<p>为了解决以上两个问题， Redis 的对象系统使用了引用计数技术来负责维持和销毁对象， 它的运作机制如下：</p>
+<blockquote>
+<p>每个 redisObject 结构都带有一个 refcount 属性，指示这个对象被引用了多少次。<br>当新创建一个对象时，它的 refcount 属性被设置为 1 。<br>当对一个对象进行共享时，Redis 将这个对象的 refcount 增一。<br>当使用完一个对象之后，或者取消对共享对象的引用之后，程序将对象的 refcount 减一。<br>当对象的 refcount 降至 0 时，这个 redisObject 结构，以及它所引用的数据结构的内存，都会被释放。</p>
+</blockquote>
+<br>
+
+
+<h1 id="2-redisObject里内存优化"><a href="#2-redisObject里内存优化" class="headerlink" title="(2) redisObject里内存优化"></a>(2) redisObject里内存优化</h1><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: server.h 
+
+&#x2F;**
+ * redis对象
+ *&#x2F;
+typedef struct redisObject &#123;
+    unsigned type:4;  &#x2F;&#x2F; 数据类型  4个bits
+    unsigned encoding:4;  &#x2F;&#x2F; 编码方式 4个bits
+    unsigned lru:LRU_BITS;  &#x2F;&#x2F; LRU时间(相对于全局 lru_clock) 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  LRU_BITS为24个bits
+    int refcount;  &#x2F;&#x2F; 引用计数  4字节
+    void *ptr;  &#x2F;&#x2F; 指针 指向对象的值  8字节
+&#125; robj;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="2-1-位域定义方法"><a href="#2-1-位域定义方法" class="headerlink" title="(2.1) 位域定义方法"></a>(2.1) 位域定义方法</h2><p>  在 <code>type</code>、<code>encoding</code> 和 <code>lru</code> 三个变量后面都有一个冒号，并紧跟着一个数值，表示该元数据占用的比特数。<br>  其中，<code>type</code> 和 <code>encoding</code> 分别占 <code>4bits</code>， <code>lru</code> 占用 <code>24bits</code> (LRU_BITS = 24bits) ，三个字段一共占用32bits=4字节</p>
+<p>  变量后使用冒号和数值的定义方法。是C语言中的位域定义方法，可以用来有效地节省内存开销。</p>
+<p>  当一个变量占用不了一个数据类型的所有 bits 时，就可以使用位域定义方法，把一个数据类型中的 bits，划分成多个位域，每个位域占一定的 bit 数。这样一来，一个数据类型的所有 bits 就可以定义多个变量了，从而也就有效节省了内存开销。</p>
+<h2 id="2-2-嵌入式字符串"><a href="#2-2-嵌入式字符串" class="headerlink" title="(2.2) 嵌入式字符串"></a>(2.2) 嵌入式字符串</h2><p>  SDS 在保存比较小的字符串时，会使用嵌入式字符串的设计方法，将字符串直接保存在 redisObject 结构体中。然后在 redisObject 结构体中，存在一个指向值的指针 ptr，而一般来说，这个 ptr 指针会指向值的数据结构。</p>
+<p>  以创建一个 String 类型的值为例，Redis 会调用 createStringObject 函数，来创建相应的 redisObject，而这个 redisObject 中的 ptr 指针，就会指向 SDS 数据结构，如下图所示。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: object.c
+
+&#x2F;* 
+ * 如果小于 OBJ_ENCODING_EMBSTR_SIZE_LIMIT，则使用 EMBSTR 编码创建一个字符串对象，否则使用 RAW 编码。
+ *
+ * The current limit of 44 is chosen so that the biggest string object
+ * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. 
+ *&#x2F;
+#define OBJ_ENCODING_EMBSTR_SIZE_LIMIT 44
+robj *createStringObject(const char *ptr, size_t len) &#123;
+    &#x2F;&#x2F; 判断字符长度， &lt;44 使用 EMBSTR，否则使用 RAW 
+    if (len &lt;&#x3D; OBJ_ENCODING_EMBSTR_SIZE_LIMIT)
+        return createEmbeddedStringObject(ptr,len); &#x2F;&#x2F; EMBSTR编码
+    else
+        return createRawStringObject(ptr,len); &#x2F;&#x2F; RAW编码
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: object.c
+
+&#x2F;* 
+ * 创建一个编码为 OBJ_ENCODING_EMBSTR 的字符串对象，
+ * 这是一个对象，其中 sds 字符串实际上是一个不可修改的字符串，分配在与对象本身相同的块中。
+ *  
+ * @param *ptr
+ * @param len
+ *&#x2F;
+robj *createEmbeddedStringObject(const char *ptr, size_t len) &#123;
+    &#x2F;&#x2F; 分配内存空间 
+    &#x2F;&#x2F; 包括 redisObject结构体空间、sdshdr8结构体空间、字符串长度、以及结束符&quot;\0&quot;的长度1 
+    &#x2F;&#x2F; robj长度是16字节  sdshdr8长度是3字节 
+    robj *o &#x3D; zmalloc(sizeof(robj)+sizeof(struct sdshdr8)+len+1);
+    
+    &#x2F;&#x2F; o是redisObject结构体的变量，o+1 表示将内存地址从变量o开始往后移动1，这个位置是sdshdr8结构体内存地址开始的地方。
+    struct sdshdr8 *sh &#x3D; (void*)(o+1);
+
+    &#x2F;&#x2F; 
+    o-&gt;type &#x3D; OBJ_STRING;
+    &#x2F;&#x2F; 编码 设置为 OBJ_ENCODING_EMBSTR
+    o-&gt;encoding &#x3D; OBJ_ENCODING_EMBSTR;
+    &#x2F;&#x2F; 把 redisObject 中的指针 ptr，指向 SDS 结构中的字符数组
+    &#x2F;&#x2F; sh+1 表示将内存地址从变量sh开始往后移动1，这个位置是字符串内存地址开始的地方。
+    o-&gt;ptr &#x3D; sh+1;
+    &#x2F;&#x2F; 引用计数设置为1 
+    o-&gt;refcount &#x3D; 1;
+    &#x2F;&#x2F; 设置内存淘汰策略
+    if (server.maxmemory_policy &amp; MAXMEMORY_FLAG_LFU) &#123;
+        o-&gt;lru &#x3D; (LFUGetTimeInMinutes()&lt;&lt;8) | LFU_INIT_VAL;
+    &#125; else &#123;
+        o-&gt;lru &#x3D; LRU_CLOCK();
+    &#125;
+
+    sh-&gt;len &#x3D; len;
+    sh-&gt;alloc &#x3D; len;
+    sh-&gt;flags &#x3D; SDS_TYPE_8;
+    if (ptr &#x3D;&#x3D; SDS_NOINIT)
+        sh-&gt;buf[len] &#x3D; &#39;\0&#39;;
+    else if (ptr) &#123;
+        memcpy(sh-&gt;buf,ptr,len);
+        sh-&gt;buf[len] &#x3D; &#39;\0&#39;;
+    &#125; else &#123;
+        memset(sh-&gt;buf,0,len+1);
+    &#125;
+    return o;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  <img src="/img/database/redis/data-structure/sds/embedded-string/embedded-string.png" alt="嵌入字符串"></p>
+<p>  使用一块连续的内存空间，来同时保存 <code>redisObject</code> 和 <code>SDS</code> 结构。这样一来，内存分配只有一次，而且也避免了内存碎片。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: object.c
+
+&#x2F;* 
+ * 创建一个编码为 OBJ_ENCODING_RAW 的字符串对象，这是一个普通字符串对象，其中 o-&gt;ptr 指向正确的 sds 字符串。
+ * 
+ * @param *ptr
+ * @param len
+ *&#x2F;
+robj *createRawStringObject(const char *ptr, size_t len) &#123;
+    &#x2F;&#x2F; 创建一个字符串对象 type是OBJ_STRING  encoding是OBJ_ENCODING_RAW  长度是字符串长度
+    return createObject(OBJ_STRING, sdsnewlen(ptr,len));
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: object.c
+
+robj *createObject(int type, void *ptr) &#123;
+    &#x2F;&#x2F; 为redisObject结构体分配内存空间
+    robj *o &#x3D; zmalloc(sizeof(*o));
+    &#x2F;&#x2F;设置redisObject的类型
+    o-&gt;type &#x3D; type;
+    &#x2F;&#x2F; 设置redisObject的编码类型，此处是OBJ_ENCODING_RAW，表示常规的SDS
+    o-&gt;encoding &#x3D; OBJ_ENCODING_RAW;
+    &#x2F;&#x2F; 直接将传入的指针赋值给redisObject中的指针。 指向 char[]
+    o-&gt;ptr &#x3D; ptr;
+    &#x2F;&#x2F; 引用计数设置成1 
+    o-&gt;refcount &#x3D; 1;
+
+    &#x2F;&#x2F; 将lru字段设置为当前的 lruclock（分钟分辨率），或者 LFU 计数器。 
+    &#x2F;&#x2F; 判断内存过期策略
+    if (server.maxmemory_policy &amp; MAXMEMORY_FLAG_LFU) &#123;
+        &#x2F;&#x2F; 对应lfu 
+        &#x2F;&#x2F; LFU_INIT_VAL&#x3D;5 对应二进制是 0101 
+        &#x2F;&#x2F; 或运算 
+        o-&gt;lru &#x3D; (LFUGetTimeInMinutes()&lt;&lt;8) | LFU_INIT_VAL;
+    &#125; else &#123;
+        &#x2F;&#x2F; 对应lru 
+        o-&gt;lru &#x3D; LRU_CLOCK();
+    &#125;
+    return o;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  在创建普通字符串时，Redis需要分别给 <code>redisObject</code> 和 <code>SDS</code> 分别分配一次内存，这样就既带来了内存分配开销，同时也会导致内存碎片。</p>
+<h3 id="为什么EMBSTR的大小要-lt-44"><a href="#为什么EMBSTR的大小要-lt-44" class="headerlink" title="为什么EMBSTR的大小要&lt;=44"></a>为什么EMBSTR的大小要&lt;=44</h3><p>  <code>44</code>是因为 N = <code>64(CPU缓存行大小)</code> - <code>16(redisObject结构体占用内存大小)</code> - <code>3(sdshr8结构体占用内存大小)</code> - <code>1(结束符大小&#39;\0&#39;)</code>， N = 44 字节。<br>  那么为什么是64减呢，为什么不是别的，CPU访问内存读取数据时以cache line为单位，在目前的x86体系下，一般的缓存行大小是64字节，如果整个结构体起始地址64字节对齐，一次内存IO就可以读取全部数据，redis为了一次能加载完成，因此采用64自己作为embstr类型(保存redisObject)的最大长度。</p>
+<h1 id="评论"><a href="#评论" class="headerlink" title="评论"></a>评论</h1><p>1、要想理解 Redis 数据类型的设计，必须要先了解 redisObject。</p>
+<p>Redis 的 key 是 String 类型，但 value 可以是很多类型（String/List/Hash/Set/ZSet等），所以 Redis 要想存储多种数据类型，就要设计一个通用的对象进行封装，这个对象就是 redisObject。</p>
+<p>其中，最重要的 2 个字段：</p>
+<ul>
+<li>type：面向用户的数据类型（String/List/Hash/Set/ZSet等）</li>
+<li>encoding：每一种数据类型，可以对应不同的底层数据结构来实现（SDS/ziplist/intset/hashtable/skiplist等）</li>
+</ul>
+<p>例如 String，可以用 embstr（嵌入式字符串，redisObject 和 SDS 一起分配内存），也可以用 rawstr（redisObject 和 SDS 分开存储）实现。</p>
+<p>又或者，当用户写入的是一个「数字」时，底层会转成 long 来存储，节省内存。</p>
+<p>同理，Hash/Set/ZSet 在数据量少时，采用 ziplist 存储，否则就转为 hashtable 来存。</p>
+<p>所以，redisObject 的作用在于：</p>
+<ol>
+<li>为多种数据类型提供统一的表示方式</li>
+<li>同一种数据类型，底层可以对应不同实现，节省内存<br>3）支持对象共享和引用计数，共享对象存储一份，可多次使用，节省内存</li>
+</ol>
+<p>redisObject 更像是连接「上层数据类型」和「底层数据结构」之间的桥梁。</p>
+<p>2、关于 String 类型的实现，底层对应 3 种数据结构：</p>
+<ul>
+<li>embstr：小于 44 字节，嵌入式存储，redisObject 和 SDS 一起分配内存，只分配 1 次内存</li>
+<li>rawstr：大于 44 字节，redisObject 和 SDS 分开存储，需分配 2 次内存</li>
+<li>long：整数存储（小于 10000，使用共享对象池存储，但有个前提：Redis 没有设置淘汰策略，详见 object.c 的 tryObjectEncoding 函数）</li>
+</ul>
+<p>3、ziplist 的特点：</p>
+<ol>
+<li>连续内存存储：每个元素紧凑排列，内存利用率高</li>
+<li>变长编码：存储数据时，采用变长编码（满足数据长度的前提下，尽可能少分配内存）<br>3）寻找元素需遍历：存放太多元素，性能会下降（适合少量数据存储）</li>
+<li>级联更新：更新、删除元素，会引发级联更新（因为内存连续，前面数据膨胀/删除了，后面要跟着一起动）</li>
+</ol>
+<p>List、Hash、Set、ZSet 底层都用到了 ziplist。</p>
+<p>4、intset 的特点：</p>
+<ol>
+<li>Set 存储如果都是数字，采用 intset 存储</li>
+<li>变长编码：数字范围不同，intset 会选择 int16/int32/int64 编码（intset.c 的 _intsetValueEncoding 函数）<br>3）有序：intset 在存储时是有序的，这意味着查找一个元素，可使用「二分查找」（intset.c 的 intsetSearch 函数）</li>
+<li>编码升级/降级：添加、更新、删除元素，数据范围发生变化，会引发编码长度升级或降级</li>
+</ol>
+<p>课后题：SDS 判断是否使用嵌入式字符串的条件是 44 字节，你知道为什么是 44 字节吗？</p>
+<p>嵌入式字符串会把 redisObject 和 SDS 一起分配内存，那在存储时结构是这样的：</p>
+<ul>
+<li>redisObject：16 个字节</li>
+<li>SDS：sdshdr8（3 个字节）+ SDS 字符数组（N 字节 + \0 结束符 1 个字节）</li>
+</ul>
+<p>Redis 规定嵌入式字符串最大以 64 字节存储，所以 N = 64 - 16(redisObject) - 3(sdshr8) - 1(\0)， N = 44 字节。</p>
+<p>了解一下jemalloc 分配内存机制，jemalloc 为了方便管理，在每次分配内存的时候都会返回2的幂次的空间大小，比如我需要分配5字节空间，jemalloc 会返回8字节，15字节会返回16字节。其常见的分配空间大小有： 8, 16, 32, 64, …, 2kb, 4kb, 8kb。</p>
+<p>但是这种方式也可能会造成，空间的浪费，比如我需要33字节，结果给我64字节，为了解决这个问题jemalloc将内存分配划分为，小内存（small_class）和大内存（large_class）通过不同的内存大小使用不同阶级策略。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/datatype/object.html">Redis设计与实现-对象处理机制</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/402223">Redis源码剖析与实战 - 04 内存友好的数据结构该如何细化设计？</a><br>[3] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/object.c">Redis源码-github</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/07/redis-data-structure-hash-tables/" rel="prev" title="Redis里的哈希表">
+                  <i class="fa fa-chevron-left"></i> Redis里的哈希表
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/14/redis-data-structure-ziplist/" rel="next" title="Redis数据结构之压缩列表">
+                  Redis数据结构之压缩列表 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>
