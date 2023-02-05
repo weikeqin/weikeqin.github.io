@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Redis3.2版本使用 quicklist 代替了 ziplist 和 linkedlist. (1) 快速列表(quicklist)是什么  快速列表(quicklist)是 (压缩列表)ziplist 的 双向链表。   A generic doubly linked quicklist implementation .      快速列表(quicklist)是把压缩列表(ziplis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 数据结构 快速列表(quicklist)">
+<meta property="og:url" content="http://weikeqin.com/2023/01/21/redis-data-structure-quicklist/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Redis3.2版本使用 quicklist 代替了 ziplist 和 linkedlist. (1) 快速列表(quicklist)是什么  快速列表(quicklist)是 (压缩列表)ziplist 的 双向链表。   A generic doubly linked quicklist implementation .      快速列表(quicklist)是把压缩列表(ziplis">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-01-21T10:46:32.000Z">
+<meta property="article:modified_time" content="2023-02-04T04:21:29.949Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/21/redis-data-structure-quicklist/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/21/redis-data-structure-quicklist/","path":"2023/01/21/redis-data-structure-quicklist/","title":"Redis 数据结构 快速列表(quicklist)"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis 数据结构 快速列表(quicklist) | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8-quicklist-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) 快速列表(quicklist)是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8-quicklist"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用快速列表(quicklist)</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E7%9A%84%E7%89%B9%E7%82%B9"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 快速列表的特点</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) 快速列表的原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) 源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8-quicklist-%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 快速列表(quicklist)结构定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E5%8A%9F%E8%83%BD%E5%88%97%E8%A1%A8"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 功能列表</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-3-%E6%96%B0%E5%BB%BA%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8"><span class="nav-number">5.</span> <span class="nav-text">(4.3) 新建快速列表</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E5%A4%B4%E9%83%A8%E6%B7%BB%E5%8A%A0%E8%8A%82%E7%82%B9-quicklistPushHead"><span class="nav-number">5.1.</span> <span class="nav-text">(4.4) 快速链表头部添加节点-quicklistPushHead</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-5-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E5%B0%BE%E9%83%A8%E6%8F%92%E5%85%A5%E8%8A%82%E7%82%B9"><span class="nav-number">5.2.</span> <span class="nav-text">(4.5) 快速列表尾部插入节点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-6-%E6%8F%92%E5%85%A5%E8%8A%82%E7%82%B9"><span class="nav-number">5.3.</span> <span class="nav-text">(4.6) 插入节点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-7-%E5%88%A0%E9%99%A4%E8%8A%82%E7%82%B9-quicklistDelEntry"><span class="nav-number">5.4.</span> <span class="nav-text">(4.7) 删除节点-quicklistDelEntry</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-8-%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E8%8C%83%E5%9B%B4%E5%88%A0%E9%99%A4-quicklistDelRange"><span class="nav-number">5.5.</span> <span class="nav-text">(4.8) 快速链表范围删除-quicklistDelRange</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-x-%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E6%93%8D%E4%BD%9C"><span class="nav-number">5.6.</span> <span class="nav-text">(4.x) 快速链表操作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-x-1-quicklistSetCompressDepth"><span class="nav-number">5.6.1.</span> <span class="nav-text">(4.x.1) quicklistSetCompressDepth</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-x-2-quicklistSetFill"><span class="nav-number">5.6.2.</span> <span class="nav-text">(4.x.2) quicklistSetFill</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-x-3-quicklistSetOptions"><span class="nav-number">5.6.3.</span> <span class="nav-text">(4.x.3) quicklistSetOptions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-x-4-%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E9%87%8A%E6%94%BE-quicklistRelease"><span class="nav-number">5.6.4.</span> <span class="nav-text">(4.x.4) 快速链表释放-quicklistRelease</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-x-5-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E5%8E%8B%E7%BC%A9-quicklistCompress"><span class="nav-number">5.6.5.</span> <span class="nav-text">(4.x.5) 快速列表压缩-__quicklistCompress</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-y-%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E8%8A%82%E7%82%B9-quicklistNode-%E6%93%8D%E4%BD%9C"><span class="nav-number">5.7.</span> <span class="nav-text">(4.y) 快速链表节点(quicklistNode)操作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-y-1-%E5%88%9B%E5%BB%BA%E8%8A%82%E7%82%B9-quicklistCreateNode"><span class="nav-number">5.7.1.</span> <span class="nav-text">(4.y.1) 创建节点-quicklistCreateNode</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-y-2-quicklistNodeAllowInsert"><span class="nav-number">5.7.2.</span> <span class="nav-text">(4.y.2) _quicklistNodeAllowInsert</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-y-3-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E6%89%80%E6%9C%89entry%E4%B8%AA%E6%95%B0-quicklistCount"><span class="nav-number">5.7.3.</span> <span class="nav-text">(4.y.3) 快速列表所有entry个数-quicklistCount</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-y-4-%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E5%8E%8B%E7%BC%A9%E8%8A%82%E7%82%B9-quicklistCompressNode"><span class="nav-number">5.7.4.</span> <span class="nav-text">(4.y.4) 快速链表压缩节点-quicklistCompressNode</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-y-5-%E8%A7%A3%E5%8E%8B%E7%BC%A9-quicklistDecompressNode"><span class="nav-number">5.7.5.</span> <span class="nav-text">(4.y.5) 解压缩-__quicklistDecompressNode</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E7%B4%A2%E5%BC%95%E5%88%A0%E9%99%A4%E8%8A%82%E7%82%B9-quicklistDelIndex"><span class="nav-number">5.7.6.</span> <span class="nav-text">按索引删除节点-quicklistDelIndex</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BF%AB%E9%80%9F%E9%93%BE%E8%A1%A8%E5%88%A0%E9%99%A4%E8%8A%82%E7%82%B9-quicklistDelNode"><span class="nav-number">5.7.7.</span> <span class="nav-text">() 快速链表删除节点-__quicklistDelNode</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-z-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E9%87%8C%E7%9A%84%E4%B9%A6%E7%AD%BE"><span class="nav-number">5.8.</span> <span class="nav-text">(4.z) 快速列表里的书签</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-z-1-quicklistBookmarkCreate"><span class="nav-number">5.8.1.</span> <span class="nav-text">(4.z.1) quicklistBookmarkCreate</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-z-2-%E5%BF%AB%E9%80%9F%E5%88%97%E8%A1%A8%E4%B9%A6%E7%AD%BE%E6%9F%A5%E6%89%BE%E8%8A%82%E7%82%B9-quicklistBookmarkFindByNode"><span class="nav-number">5.8.2.</span> <span class="nav-text">(4.z.2) 快速列表书签查找节点-_quicklistBookmarkFindByNode</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">304</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/21/redis-data-structure-quicklist/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis 数据结构 快速列表(quicklist) | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 数据结构 快速列表(quicklist)
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-21 18:46:32" itemprop="dateCreated datePublished" datetime="2023-01-21T18:46:32+08:00">2023-01-21</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-02-04 12:21:29" itemprop="dateModified" datetime="2023-02-04T12:21:29+08:00">2023-02-04</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>23k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>21 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Redis3.2版本使用 <code>quicklist</code> 代替了 <code>ziplist</code> 和 <code>linkedlist</code>.</p>
+<h1 id="1-快速列表-quicklist-是什么"><a href="#1-快速列表-quicklist-是什么" class="headerlink" title="(1) 快速列表(quicklist)是什么"></a>(1) 快速列表(quicklist)是什么</h1><p>  快速列表(quicklist)是 (压缩列表)ziplist 的 双向链表。</p>
+<p>  A generic doubly linked quicklist implementation .</p>
+<p>  <img src="" alt="快速列表"></p>
+<p>  快速列表(quicklist)是把压缩列表(ziplist)和双向链表结合起来。<br>  每个双链表节点中保存一个ziplist，然后每个ziplist中存一批list中的数据(具体ziplist大小可配置)，这样既可以避免大量链表指针带来的内存消耗，也可以避免ziplist更新导致的大量性能损耗。</p>
+<span id="more"></span>
+
+
+<h1 id="2-为什么要用快速列表-quicklist"><a href="#2-为什么要用快速列表-quicklist" class="headerlink" title="(2) 为什么要用快速列表(quicklist)"></a>(2) 为什么要用快速列表(quicklist)</h1><p>  如果一个列表非常大且更新频繁，那就会给redis带来非常大的负担。如何既保留ziplist的空间高效性，又能不让其更新复杂度过高？</p>
+<p>  ziplist 设计出的紧凑型数据块可以有效利用内存，但在更新上，由于每一个 entry 都保留了前一个 entry 的 prevlen 长度，因此在插入或者更新时可能会出现连锁更新，这是一个影响效率的大问题。<br>因此，接着又设计出 「链表 + ziplist」组成的 quicklist 结构来避免单个 ziplist 过大，可以有效降低连锁更新的影响面。</p>
+<h2 id="2-1-快速列表的特点"><a href="#2-1-快速列表的特点" class="headerlink" title="(2.1) 快速列表的特点"></a>(2.1) 快速列表的特点</h2><ol>
+<li>节省内存。</li>
+<li>相比压缩列表，在节点数比较多时操作不会对内存压力太大。 (分而治之)</li>
+</ol>
+<p>  quicklist 结构在 ziplist 基础上，使用链表将 ziplist 串联起来，链表的每个元素就是一个 ziplist。这种设计减少了数据插入时内存空间的重新分配，以及内存数据的拷贝。同时，quicklist 限制了每个节点上 ziplist 的大小，一旦一个 ziplist 过大，就会采用新增 quicklist 节点的方法。</p>
+<p> 从 ziplist 到 quicklist，再到 listpack 结构；可以看到，初衷都是设计一款数据结构能够高效的使用内存。</p>
+<br>
+
+
+<h1 id="3-快速列表的原理"><a href="#3-快速列表的原理" class="headerlink" title="(3) 快速列表的原理"></a>(3) 快速列表的原理</h1><p>  quicklist 的设计，其实是结合了链表和 ziplist 各自的优势。</p>
+<p>  为什么不全部节点都压缩，而是流出compress这个可配置的口子呢？<br>  其实从统计数据来看，列表两端的数据变更最为频繁，像lpush,rpush,lpop,rpop等命令都是在两端操作，如果频繁压缩或解压缩会代码不必要的性能损耗。</p>
+<p>  可以看出，redis其实并不是一味追求性能，也在<code>内存占用</code>和<code>性能</code>之间做取舍。</p>
+<br>  
+
+
+<h1 id="4-源码解读"><a href="#4-源码解读" class="headerlink" title="(4) 源码解读"></a>(4) 源码解读</h1><p>  源码: <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/quicklist.c">https://github.com/redis/redis/blob/6.0/src/quicklist.c</a></p>
+<h2 id="4-1-快速列表-quicklist-结构定义"><a href="#4-1-快速列表-quicklist-结构定义" class="headerlink" title="(4.1) 快速列表(quicklist)结构定义"></a>(4.1) 快速列表(quicklist)结构定义</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: quicklist.h</span>
+
+<span class="token comment">/* 
+ *  快速列表是一个40字节的结构体(在64位系统) 
+ * 'count' 是总entry数。
+ * 'len' 是快速链表的个数。 
+ * 'compress' : 0:禁用压缩，否则是在quicklist末尾未压缩的quicklistNodes的数量。
+ * 'fill' 是用户请求的(或默认的)填充因子。
+ * 'bookmakrs 是 realloc 这个结构使用的可选功能，这样它们在不使用时就不会消耗内存。
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">quicklist</span> <span class="token punctuation">&#123;</span>
+    quicklistNode <span class="token operator">*</span>head<span class="token punctuation">;</span>  <span class="token comment">// 头结点</span>
+    quicklistNode <span class="token operator">*</span>tail<span class="token punctuation">;</span>  <span class="token comment">// 尾结点</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> count<span class="token punctuation">;</span>        <span class="token comment">// 所有ziplist中的总元素个数 /* total count of all entries in all ziplists */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> len<span class="token punctuation">;</span>          <span class="token comment">// quicklistNodes个数</span>
+    <span class="token keyword">int</span> fill <span class="token operator">:</span> QL_FILL_BITS<span class="token punctuation">;</span>    <span class="token comment">// 单个节点的填充因子</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> compress <span class="token operator">:</span> QL_COMP_BITS<span class="token punctuation">;</span>  <span class="token comment">// 0:不压缩  /* depth of end nodes not to compress;0=off */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> bookmark_count<span class="token operator">:</span> QL_BM_BITS<span class="token punctuation">;</span>  <span class="token comment">//  </span>
+    quicklistBookmark bookmarks<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span> quicklist<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  quicklist 作为一个链表结构，在它的数据结构中，是定义了整个 quicklist 的头、尾指针，<br>  可以快速定位到 quicklist 的链表头和链表尾。</p>
+<p>  quicklist 中还定义了 quicklistNode 的个数、所有 ziplist 的总元素个数等属性。</p>
+<p>fill字段，它的含义是每个quicknode的节点最大容量，不同的数值有不同的含义，默认是-2，当然也可以配置为其他数值，具体数值含义如下：<br>-1: 每个quicklistNode节点的ziplist所占字节数不能超过4kb。（建议配置）<br>-2: 每个quicklistNode节点的ziplist所占字节数不能超过8kb。（默认配置&amp;建议配置）<br>-3: 每个quicklistNode节点的ziplist所占字节数不能超过16kb。<br>-4: 每个quicklistNode节点的ziplist所占字节数不能超过32kb。<br>-5: 每个quicklistNode节点的ziplist所占字节数不能超过64kb。<br>任意正数: 表示：ziplist结构所最多包含的entry个数，最大为215215。  </p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: quicklist.h</span>
+
+<span class="token comment">/* 
+ * quicklistNode 是一个32 字节的结构体，描述了包含ziplist的quicklist。
+ * 我们使用位字段将 quicklistNode 保持在 32 字节。
+ * count: 16 bits，最大 65536 (最大 zl 字节为 65k，因此最大计数实际上 &lt; 32k)。
+ * encoding: 2 bits，RAW=1，LZF=2。
+ * container: 2 bits，NONE=1，ZIPLIST=2。
+ * recompress: 1 bit，bool，如果节点临时解压缩以供使用，则为 true。
+ * attempted_compress: 1 bit，boolean，用于测试时验证。
+ * extra: 10 bits，供将来使用； 填充 32 位的剩余部分
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">quicklistNode</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">struct</span> <span class="token class-name">quicklistNode</span> <span class="token operator">*</span>prev<span class="token punctuation">;</span>  <span class="token comment">// 前一个quicklistNode</span>
+    <span class="token keyword">struct</span> <span class="token class-name">quicklistNode</span> <span class="token operator">*</span>next<span class="token punctuation">;</span>  <span class="token comment">// 后一个quicklistNode</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">;</span>           <span class="token comment">// 未压缩时quicklistNode->zl指向ziplist，压缩时quicklistNode->zl指向quicklistLZF</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> sz<span class="token punctuation">;</span>             <span class="token comment">// ziplist的字节大小</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> count <span class="token operator">:</span> <span class="token number">16</span><span class="token punctuation">;</span>     <span class="token comment">// ziplist中的元素个数 </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> encoding <span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">;</span>   <span class="token comment">// 编码格式，原生字节数组或压缩存储  RAW==1 or LZF==2  </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> container <span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">;</span>  <span class="token comment">// 存储方式  NONE==1 or ZIPLIST==2 </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> recompress <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token comment">// 数据是否被压缩  </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> attempted_compress <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">;</span>  <span class="token comment">// 数据能否被压缩 /* node can't compress; too small */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> extra <span class="token operator">:</span> <span class="token number">10</span><span class="token punctuation">;</span>     <span class="token comment">// 预留的bit位</span>
+<span class="token punctuation">&#125;</span> quicklistNode<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 书签的作用是用于加速查询速度？
+ *  
+ * 书签在 quicklist 结构的末尾用 realloc 填充。
+ * 如果数千个节点的额外内存使用可以忽略不计，那么它们应该只用于非常大的列表，并且确实需要分段迭代它们。
+ * 当不使用时，它们不会增加任何内存开销，但是当使用然后删除时，一些开销仍然存在（以避免共振）。
+ * 使用的书签数量应保持在最低限度，因为它还会增加节点删除的开销（搜索要更新的书签）。
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">quicklistBookmark</span> <span class="token punctuation">&#123;</span>
+    quicklistNode <span class="token operator">*</span>node<span class="token punctuation">;</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>name<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span> quicklistBookmark<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  书签的作用是用于比较大(上千)的列表，方便分段处理。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * quicklistLZF 是一个 4+N 字节的结构，包含“sz”，后跟“compressed”。
+ * 'sz' 是 'compressed' 字段的字节长度。
+ * 'compressed' 是总(压缩)长度为 'sz' 的 LZF 数据
+ * 注意：未压缩的长度存储在 quicklistNode->sz 中。
+ * quicklistNode->zl压缩时，node->zl指向一个quicklistLZF
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">quicklistLZF</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> sz<span class="token punctuation">;</span>  <span class="token comment">// LZF的字节大小</span>
+    <span class="token keyword">char</span> compressed<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>  <span class="token comment">// 压缩后的字节数组</span>
+<span class="token punctuation">&#125;</span> quicklistLZF<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<p>也正因为 quicklist 采用了链表结构，所以当插入一个新的元素时，quicklist 首先就会检查插入位置的 ziplist 是否能容纳该元素，这是通过 _quicklistNodeAllowInsert 函数来完成判断的。</p>
+<p>_quicklistNodeAllowInsert 函数会计算新插入元素后的大小（new_sz），这个大小等于 quicklistNode 的当前大小（node-&gt;sz）、插入元素的大小（sz），以及插入元素后 ziplist 的 prevlen 占用大小。</p>
+<p>在计算完大小之后，_quicklistNodeAllowInsert 函数会依次判断新插入的数据大小（sz）是否满足要求，即单个 ziplist 是否不超过 8KB，或是单个 ziplist 里的元素个数是否满足要求。</p>
+<p>只要这里面的一个条件能满足，quicklist 就可以在当前的 quicklistNode 中插入新元素，否则 quicklist 就会新建一个 quicklistNode，以此来保存新插入的元素。</p>
+<h2 id="4-2-功能列表"><a href="#4-2-功能列表" class="headerlink" title="(4.2) 功能列表"></a>(4.2) 功能列表</h2><table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">功能</th>
+<th align="left">备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">quicklistCreate</td>
+<td align="left">创建快速链表</td>
+<td align="left">时间复杂度O(1)</td>
+</tr>
+<tr>
+<td align="left">quicklistNew</td>
+<td align="left">新建快速链表(带参数)</td>
+<td align="left">时间复杂度O(1)</td>
+</tr>
+<tr>
+<td align="left">quicklistPushHead</td>
+<td align="left">新增节点</td>
+<td align="left">时间复杂度O(1)</td>
+</tr>
+<tr>
+<td align="left">quicklistPushTail</td>
+<td align="left">新增节点</td>
+<td align="left">时间复杂度O(1)</td>
+</tr>
+<tr>
+<td align="left">quicklistDelEntry</td>
+<td align="left">删除节点</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">quicklistSetCompressDepth</td>
+<td align="left">设置压缩深度</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">quicklistSetFill</td>
+<td align="left">设置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">quicklistSetOptions</td>
+<td align="left">设置参数</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">quicklistRelease</td>
+<td align="left"></td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">quicklistPush</td>
+<td align="left"></td>
+<td align="left"></td>
+</tr>
+</tbody></table>
+<h1 id="4-3-新建快速列表"><a href="#4-3-新建快速列表" class="headerlink" title="(4.3) 新建快速列表"></a>(4.3) 新建快速列表</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/* 
+ * 创建一个快速列表
+ * 使用 quicklistRelease() 释放内存
+ */</span>
+quicklist <span class="token operator">*</span><span class="token function">quicklistCreate</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    
+    <span class="token keyword">struct</span> <span class="token class-name">quicklist</span> <span class="token operator">*</span>quicklist<span class="token punctuation">;</span>
+
+    <span class="token comment">// 分配内存</span>
+    quicklist <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>quicklist<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 头结点 尾结点 设置默认值null</span>
+    quicklist<span class="token operator">-></span>head <span class="token operator">=</span> quicklist<span class="token operator">-></span>tail <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置默认长度0</span>
+    quicklist<span class="token operator">-></span>len <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置默认元素个数0</span>
+    quicklist<span class="token operator">-></span>count <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置默认</span>
+    quicklist<span class="token operator">-></span>compress <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    quicklist<span class="token operator">-></span>fill <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token comment">//</span>
+    quicklist<span class="token operator">-></span>bookmark_count <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> quicklist<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p><strong>新建快速列表带参数</strong></p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/*
+ * 创建快速列表带默认参数
+ */</span>
+quicklist <span class="token operator">*</span><span class="token function">quicklistNew</span><span class="token punctuation">(</span><span class="token keyword">int</span> fill<span class="token punctuation">,</span> <span class="token keyword">int</span> compress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 创建快速链表</span>
+    quicklist <span class="token operator">*</span>quicklist <span class="token operator">=</span> <span class="token function">quicklistCreate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置参数</span>
+    <span class="token function">quicklistSetOptions</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> fill<span class="token punctuation">,</span> compress<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> quicklist<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h2 id="4-4-快速链表头部添加节点-quicklistPushHead"><a href="#4-4-快速链表头部添加节点-quicklistPushHead" class="headerlink" title="(4.4) 快速链表头部添加节点-quicklistPushHead"></a>(4.4) 快速链表头部添加节点-quicklistPushHead</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/* 
+ * 快速列表头部添加节点
+ *
+ * 返回0时 使用已存在头节点 
+ * 返回1时 使用新创建的头结点 
+ *
+ * @param *quicklist
+ * @param *value
+ * @param sz
+ */</span>
+<span class="token keyword">int</span> <span class="token function">quicklistPushHead</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>value<span class="token punctuation">,</span> <span class="token class-name">size_t</span> sz<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 原来的头结点</span>
+    quicklistNode <span class="token operator">*</span>orig_head <span class="token operator">=</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">;</span>
+    <span class="token comment">// 确保</span>
+    <span class="token function">assert</span><span class="token punctuation">(</span>sz <span class="token operator">&lt;</span> UINT32_MAX<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// TODO 添加对sds编码(未压缩)快速列表节点的支持 </span>
+    <span class="token comment">// </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">likely</span><span class="token punctuation">(</span>
+            <span class="token function">_quicklistNodeAllowInsert</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>head<span class="token punctuation">,</span> quicklist<span class="token operator">-></span>fill<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 头节点(quicklistNode)里的压缩列表添加新元素</span>
+        quicklist<span class="token operator">-></span>head<span class="token operator">-></span>zl <span class="token operator">=</span>
+            <span class="token function">ziplistPush</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>head<span class="token operator">-></span>zl<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_HEAD<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 更新头结点元素个数    </span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>head<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 创建一个新节点(quicklistNode)</span>
+        quicklistNode <span class="token operator">*</span>node <span class="token operator">=</span> <span class="token function">quicklistCreateNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 新创建一个压缩列表，添加值，然后node->zl指向压缩列表</span>
+        node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span><span class="token function">ziplistNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_HEAD<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 更新节点元素个数</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// </span>
+        <span class="token function">_quicklistInsertNodeBefore</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 所有节点个数+1</span>
+    quicklist<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token comment">// 头结点(quicklistNode)里的压缩列表(ziplist)元素个数+1 </span>
+    quicklist<span class="token operator">-></span>head<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token punctuation">(</span>orig_head <span class="token operator">!=</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h2 id="4-5-快速列表尾部插入节点"><a href="#4-5-快速列表尾部插入节点" class="headerlink" title="(4.5) 快速列表尾部插入节点"></a>(4.5) 快速列表尾部插入节点</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/* 
+ * 快速列表尾部添加节点
+ *
+ * 返回0时 使用已存在头节点 
+ * 返回1时 使用新创建的头结点 
+ *
+ * @param *quicklist
+ * @param *value
+ * @param sz
+ */</span>
+<span class="token keyword">int</span> <span class="token function">quicklistPushTail</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>value<span class="token punctuation">,</span> <span class="token class-name">size_t</span> sz<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 尾结点</span>
+    quicklistNode <span class="token operator">*</span>orig_tail <span class="token operator">=</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">;</span>
+    <span class="token comment">// 校验</span>
+    <span class="token function">assert</span><span class="token punctuation">(</span>sz <span class="token operator">&lt;</span> UINT32_MAX<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* TODO: add support for quicklist nodes that are sds encoded (not zipped) */</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">likely</span><span class="token punctuation">(</span>
+            <span class="token function">_quicklistNodeAllowInsert</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>tail<span class="token punctuation">,</span> quicklist<span class="token operator">-></span>fill<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 头节点(quicklistNode)里的压缩列表添加新元素      </span>
+        quicklist<span class="token operator">-></span>tail<span class="token operator">-></span>zl <span class="token operator">=</span>
+            <span class="token function">ziplistPush</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>tail<span class="token operator">-></span>zl<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_TAIL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 更新头结点元素个数 </span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>tail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token comment">// 新建快速列表节点</span>
+        quicklistNode <span class="token operator">*</span>node <span class="token operator">=</span> <span class="token function">quicklistCreateNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 新创建一个压缩列表，添加值，然后node->zl指向压缩列表</span>
+        node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span><span class="token function">ziplistNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_TAIL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 更新节点元素个数</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// </span>
+        <span class="token function">_quicklistInsertNodeAfter</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 所有节点个数+1</span>
+    quicklist<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token comment">// 尾结点(quicklistNode)里的压缩列表(ziplist)元素个数+1 </span>
+    quicklist<span class="token operator">-></span>tail<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token punctuation">(</span>orig_tail <span class="token operator">!=</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h2 id="4-6-插入节点"><a href="#4-6-插入节点" class="headerlink" title="(4.6) 插入节点"></a>(4.6) 插入节点</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Insert a new entry before or after existing entry 'entry'.
+ *
+ * If after==1, the new value is inserted after 'entry', otherwise
+ * the new value is inserted before 'entry'. */</span>
+REDIS_STATIC <span class="token keyword">void</span> <span class="token function">_quicklistInsert</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> quicklistEntry <span class="token operator">*</span>entry<span class="token punctuation">,</span>
+                                   <span class="token keyword">void</span> <span class="token operator">*</span>value<span class="token punctuation">,</span> <span class="token keyword">const</span> <span class="token class-name">size_t</span> sz<span class="token punctuation">,</span> <span class="token keyword">int</span> after<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> full <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> at_tail <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> at_head <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> full_next <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> full_prev <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> fill <span class="token operator">=</span> quicklist<span class="token operator">-></span>fill<span class="token punctuation">;</span>
+    quicklistNode <span class="token operator">*</span>node <span class="token operator">=</span> entry<span class="token operator">-></span>node<span class="token punctuation">;</span>
+    quicklistNode <span class="token operator">*</span>new_node <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token function">assert</span><span class="token punctuation">(</span>sz <span class="token operator">&lt;</span> UINT32_MAX<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* TODO: add support for quicklist nodes that are sds encoded (not zipped) */</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* we have no reference node, so let's create only node in the list */</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"No node given!"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node <span class="token operator">=</span> <span class="token function">quicklistCreateNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span><span class="token function">ziplistNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_HEAD<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">__quicklistInsertNode</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">,</span> new_node<span class="token punctuation">,</span> after<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        quicklist<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Populate accounting flags for easier boolean checks later */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">_quicklistNodeAllowInsert</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> fill<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Current node is full with count %d with requested fill %lu"</span><span class="token punctuation">,</span>
+          node<span class="token operator">-></span>count<span class="token punctuation">,</span> fill<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        full <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>after <span class="token operator">&amp;&amp;</span> <span class="token punctuation">(</span>entry<span class="token operator">-></span>offset <span class="token operator">==</span> node<span class="token operator">-></span>count<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"At Tail of current ziplist"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        at_tail <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">_quicklistNodeAllowInsert</span><span class="token punctuation">(</span>node<span class="token operator">-></span>next<span class="token punctuation">,</span> fill<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Next node is full too."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            full_next <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>after <span class="token operator">&amp;&amp;</span> <span class="token punctuation">(</span>entry<span class="token operator">-></span>offset <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"At Head"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        at_head <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">_quicklistNodeAllowInsert</span><span class="token punctuation">(</span>node<span class="token operator">-></span>prev<span class="token punctuation">,</span> fill<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Prev node is full too."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            full_prev <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Now determine where and how to insert the new element */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>full <span class="token operator">&amp;&amp;</span> after<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Not full, inserting after current position."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNodeForUse</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>next <span class="token operator">=</span> <span class="token function">ziplistNext</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> entry<span class="token operator">-></span>zi<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>next <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_TAIL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistInsert</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> next<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistRecompressOnly</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>full <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>after<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Not full, inserting before current position."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNodeForUse</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistInsert</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> entry<span class="token operator">-></span>zi<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistRecompressOnly</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>full <span class="token operator">&amp;&amp;</span> at_tail <span class="token operator">&amp;&amp;</span> node<span class="token operator">-></span>next <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>full_next <span class="token operator">&amp;&amp;</span> after<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* If we are: at tail, next has free space, and inserting after:
+         *   - insert entry at head of next node. */</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Full and tail, but next isn't full; inserting next node head"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node <span class="token operator">=</span> node<span class="token operator">-></span>next<span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNodeForUse</span><span class="token punctuation">(</span>new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span>new_node<span class="token operator">-></span>zl<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_HEAD<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistRecompressOnly</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>full <span class="token operator">&amp;&amp;</span> at_head <span class="token operator">&amp;&amp;</span> node<span class="token operator">-></span>prev <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>full_prev <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>after<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* If we are: at head, previous has free space, and inserting before:
+         *   - insert entry at tail of previous node. */</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Full and head, but prev isn't full, inserting prev node tail"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node <span class="token operator">=</span> node<span class="token operator">-></span>prev<span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNodeForUse</span><span class="token punctuation">(</span>new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span>new_node<span class="token operator">-></span>zl<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_TAIL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistRecompressOnly</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>full <span class="token operator">&amp;&amp;</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>at_tail <span class="token operator">&amp;&amp;</span> node<span class="token operator">-></span>next <span class="token operator">&amp;&amp;</span> full_next <span class="token operator">&amp;&amp;</span> after<span class="token punctuation">)</span> <span class="token operator">||</span>
+                        <span class="token punctuation">(</span>at_head <span class="token operator">&amp;&amp;</span> node<span class="token operator">-></span>prev <span class="token operator">&amp;&amp;</span> full_prev <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>after<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* If we are: full, and our prev/next is full, then:
+         *   - create new node and attach to quicklist */</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"\tprovisioning new node..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node <span class="token operator">=</span> <span class="token function">quicklistCreateNode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span><span class="token function">ziplistNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span> ZIPLIST_HEAD<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">__quicklistInsertNode</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">,</span> new_node<span class="token punctuation">,</span> after<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>full<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* else, node is full we need to split it. */</span>
+        <span class="token comment">/* covers both after and !after cases */</span>
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"\tsplitting node..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNodeForUse</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node <span class="token operator">=</span> <span class="token function">_quicklistSplitNode</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> entry<span class="token operator">-></span>offset<span class="token punctuation">,</span> after<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistPush</span><span class="token punctuation">(</span>new_node<span class="token operator">-></span>zl<span class="token punctuation">,</span> value<span class="token punctuation">,</span> sz<span class="token punctuation">,</span>
+                                   after <span class="token operator">?</span> ZIPLIST_HEAD <span class="token operator">:</span> ZIPLIST_TAIL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        new_node<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>new_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">__quicklistInsertNode</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">,</span> new_node<span class="token punctuation">,</span> after<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">_quicklistMergeNodes</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    quicklist<span class="token operator">-></span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h2 id="4-7-删除节点-quicklistDelEntry"><a href="#4-7-删除节点-quicklistDelEntry" class="headerlink" title="(4.7) 删除节点-quicklistDelEntry"></a>(4.7) 删除节点-quicklistDelEntry</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Delete one element represented by 'entry'
+ *
+ * 'entry' stores enough metadata to delete the proper position in
+ * the correct ziplist in the correct quicklist node. */</span>
+<span class="token keyword">void</span> <span class="token function">quicklistDelEntry</span><span class="token punctuation">(</span>quicklistIter <span class="token operator">*</span>iter<span class="token punctuation">,</span> quicklistEntry <span class="token operator">*</span>entry<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    quicklistNode <span class="token operator">*</span>prev <span class="token operator">=</span> entry<span class="token operator">-></span>node<span class="token operator">-></span>prev<span class="token punctuation">;</span>
+    quicklistNode <span class="token operator">*</span>next <span class="token operator">=</span> entry<span class="token operator">-></span>node<span class="token operator">-></span>next<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> deleted_node <span class="token operator">=</span> <span class="token function">quicklistDelIndex</span><span class="token punctuation">(</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span><span class="token punctuation">)</span>entry<span class="token operator">-></span>quicklist<span class="token punctuation">,</span>
+                                         entry<span class="token operator">-></span>node<span class="token punctuation">,</span> <span class="token operator">&amp;</span>entry<span class="token operator">-></span>zi<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* after delete, the zi is now invalid for any future usage. */</span>
+    iter<span class="token operator">-></span>zi <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* If current node is deleted, we must update iterator node and offset. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>deleted_node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>iter<span class="token operator">-></span>direction <span class="token operator">==</span> AL_START_HEAD<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            iter<span class="token operator">-></span>current <span class="token operator">=</span> next<span class="token punctuation">;</span>
+            iter<span class="token operator">-></span>offset <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>iter<span class="token operator">-></span>direction <span class="token operator">==</span> AL_START_TAIL<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            iter<span class="token operator">-></span>current <span class="token operator">=</span> prev<span class="token punctuation">;</span>
+            iter<span class="token operator">-></span>offset <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">/* else if (!deleted_node), no changes needed.
+     * we already reset iter->zi above, and the existing iter->offset
+     * doesn't move again because:
+     *   - [1, 2, 3] => delete offset 1 => [1, 3]: next element still offset 1
+     *   - [1, 2, 3] => delete offset 0 => [2, 3]: next element still offset 0
+     *  if we deleted the last element at offet N and now
+     *  length of this ziplist is N-1, the next call into
+     *  quicklistNext() will jump to the next node. */</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h2 id="4-8-快速链表范围删除-quicklistDelRange"><a href="#4-8-快速链表范围删除-quicklistDelRange" class="headerlink" title="(4.8) 快速链表范围删除-quicklistDelRange"></a>(4.8) 快速链表范围删除-quicklistDelRange</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/*  
+ * 从快速列表中删除一系列元素。
+ * 
+ * 元素可能跨越多个 quicklistNodes，所以我们必须小心跟踪我们的开始和结束位置。
+ * 
+ * 如果条目被删除则返回 1，如果没有删除则返回 0。
+ *
+ * @param *quicklist  快速列表指针
+ * @param start  开始
+ * param count  个数
+ */</span>
+<span class="token keyword">int</span> <span class="token function">quicklistDelRange</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> <span class="token keyword">const</span> <span class="token keyword">long</span> start<span class="token punctuation">,</span>
+                      <span class="token keyword">const</span> <span class="token keyword">long</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>count <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 要删除的范围 / 要删除的个数  // 范围包括起始位置</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> extent <span class="token operator">=</span> count<span class="token punctuation">;</span>
+
+    <span class="token comment">// 删除范围大小处理</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>start <span class="token operator">>=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> extent <span class="token operator">></span> <span class="token punctuation">(</span>quicklist<span class="token operator">-></span>count <span class="token operator">-</span> start<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 如果请求删除的元素多于存在的元素，则限制删除范围最大为列表大小。</span>
+        extent <span class="token operator">=</span> quicklist<span class="token operator">-></span>count <span class="token operator">-</span> start<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>start <span class="token operator">&lt;</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> extent <span class="token operator">></span> <span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">long</span><span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token operator">-</span>start<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 否则，如果处于负偏移量，则将最大大小限制为列表的其余部分。  </span>
+        <span class="token comment">// 删除范围 从 -start(start&lt;0) 到 链表结尾</span>
+        extent <span class="token operator">=</span> <span class="token operator">-</span>start<span class="token punctuation">;</span> <span class="token comment">/* c.f. LREM -29 29; just delete until end. */</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// </span>
+    quicklistEntry entry<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">quicklistIndex</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> start<span class="token punctuation">,</span> <span class="token operator">&amp;</span>entry<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"Quicklist delete request for start %ld, count %ld, extent: %ld"</span><span class="token punctuation">,</span> start<span class="token punctuation">,</span>
+      count<span class="token punctuation">,</span> extent<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 节点  </span>
+    quicklistNode <span class="token operator">*</span>node <span class="token operator">=</span> entry<span class="token punctuation">.</span>node<span class="token punctuation">;</span>
+
+    <span class="token comment">// 遍历下一个节点，直到删除所有内容。</span>
+    <span class="token comment">// 遍历链表</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>extent<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 当event>0</span>
+        <span class="token comment">// 链表下一个节点</span>
+        quicklistNode <span class="token operator">*</span>next <span class="token operator">=</span> node<span class="token operator">-></span>next<span class="token punctuation">;</span>
+
+        <span class="token comment">// 删除的压缩列表节的点个数</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">long</span> del<span class="token punctuation">;</span>
+        <span class="token comment">// 是否删除整个(quicklistNode)节点  0:否  1:是</span>
+        <span class="token keyword">int</span> delete_entire_node <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>entry<span class="token punctuation">.</span>offset <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> extent <span class="token operator">>=</span> node<span class="token operator">-></span>count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 如果我们要删除的数量超过这个节点的数量，我们可以删除整个(quicklistNode)节点而不用计算。 </span>
+            delete_entire_node <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+            del <span class="token operator">=</span> node<span class="token operator">-></span>count<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>entry<span class="token punctuation">.</span>offset <span class="token operator">>=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> extent <span class="token operator">>=</span> node<span class="token operator">-></span>count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 如果在此之后删除更多节点，则根据当前节点的大小计算删除。</span>
+            del <span class="token operator">=</span> node<span class="token operator">-></span>count <span class="token operator">-</span> entry<span class="token punctuation">.</span>offset<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>entry<span class="token punctuation">.</span>offset <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 如果 offset 为负，则我们处于此循环的第一次运行中，我们将删除从该起始偏移量到列表末尾的整个范围。 </span>
+            <span class="token comment">// 由于Negative offset是到链表尾部的元素个数，直接作为删除计数即可。 </span>
+            del <span class="token operator">=</span> <span class="token operator">-</span>entry<span class="token punctuation">.</span>offset<span class="token punctuation">;</span>
+
+            <span class="token comment">// 如果正偏移量大于剩余范围，我们只删除剩余范围，而不是整个偏移量。 </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>del <span class="token operator">></span> extent<span class="token punctuation">)</span>
+                del <span class="token operator">=</span> extent<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 否则，我们将删除小于该节点的范围，因此直接使用范围。 </span>
+            del <span class="token operator">=</span> extent<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token function">D</span><span class="token punctuation">(</span><span class="token string">"[%ld]: asking to del: %ld because offset: %d; (ENTIRE NODE: %d), "</span>
+          <span class="token string">"node count: %u"</span><span class="token punctuation">,</span>
+          extent<span class="token punctuation">,</span> del<span class="token punctuation">,</span> entry<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> delete_entire_node<span class="token punctuation">,</span> node<span class="token operator">-></span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>delete_entire_node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 删除了整个快速链表节点 </span>
+            <span class="token function">__quicklistDelNode</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 删除(quicklistNode)节点</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">quicklistDecompressNodeForUse</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 压缩列表范围删除</span>
+            node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistDeleteRange</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> entry<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> del<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 快速列表节点更新大小</span>
+            <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// quicklistNode更新压缩列表节点个数</span>
+            node<span class="token operator">-></span>count <span class="token operator">-=</span> del<span class="token punctuation">;</span>
+            <span class="token comment">// quicklist更新压缩列表节点个数</span>
+            quicklist<span class="token operator">-></span>count <span class="token operator">-=</span> del<span class="token punctuation">;</span>
+            <span class="token comment">// 删除空节点</span>
+            <span class="token function">quicklistDeleteIfEmpty</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token punctuation">)</span>
+                <span class="token function">quicklistRecompressOnly</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 压缩</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// 更新剩余要删除的个数</span>
+        extent <span class="token operator">-=</span> del<span class="token punctuation">;</span>
+
+        <span class="token comment">// 更新下一个节点</span>
+        node <span class="token operator">=</span> next<span class="token punctuation">;</span>
+
+        entry<span class="token punctuation">.</span>offset <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<br>
+
+
+<h2 id="4-x-快速链表操作"><a href="#4-x-快速链表操作" class="headerlink" title="(4.x) 快速链表操作"></a>(4.x) 快速链表操作</h2><h3 id="4-x-1-quicklistSetCompressDepth"><a href="#4-x-1-quicklistSetCompressDepth" class="headerlink" title="(4.x.1) quicklistSetCompressDepth"></a>(4.x.1) quicklistSetCompressDepth</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">COMPRESS_MAX</span> <span class="token expression"><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">&lt;&lt;</span> QL_COMP_BITS<span class="token punctuation">)</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span></span></span>
+
+<span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">void</span> <span class="token function">quicklistSetCompressDepth</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> <span class="token keyword">int</span> compress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>compress <span class="token operator">></span> COMPRESS_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        compress <span class="token operator">=</span> COMPRESS_MAX<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>compress <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        compress <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 设置</span>
+    quicklist<span class="token operator">-></span>compress <span class="token operator">=</span> compress<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-x-2-quicklistSetFill"><a href="#4-x-2-quicklistSetFill" class="headerlink" title="(4.x.2) quicklistSetFill"></a>(4.x.2) quicklistSetFill</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">FILL_MAX</span> <span class="token expression"><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">&lt;&lt;</span> <span class="token punctuation">(</span>QL_FILL_BITS<span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span></span></span>
+
+<span class="token keyword">void</span> <span class="token function">quicklistSetFill</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> <span class="token keyword">int</span> fill<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>fill <span class="token operator">></span> FILL_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        fill <span class="token operator">=</span> FILL_MAX<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>fill <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">5</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        fill <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">5</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    quicklist<span class="token operator">-></span>fill <span class="token operator">=</span> fill<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-x-3-quicklistSetOptions"><a href="#4-x-3-quicklistSetOptions" class="headerlink" title="(4.x.3) quicklistSetOptions"></a>(4.x.3) quicklistSetOptions</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">void</span> <span class="token function">quicklistSetOptions</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> <span class="token keyword">int</span> fill<span class="token punctuation">,</span> <span class="token keyword">int</span> depth<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">quicklistSetFill</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> fill<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">quicklistSetCompressDepth</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> depth<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-x-4-快速链表释放-quicklistRelease"><a href="#4-x-4-快速链表释放-quicklistRelease" class="headerlink" title="(4.x.4) 快速链表释放-quicklistRelease"></a>(4.x.4) 快速链表释放-quicklistRelease</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/* Free entire quicklist. */</span>
+<span class="token keyword">void</span> <span class="token function">quicklistRelease</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> len<span class="token punctuation">;</span>
+    quicklistNode <span class="token operator">*</span>current<span class="token punctuation">,</span> <span class="token operator">*</span>next<span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    current <span class="token operator">=</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">;</span>
+    len <span class="token operator">=</span> quicklist<span class="token operator">-></span>len<span class="token punctuation">;</span>
+    <span class="token comment">// 遍历快速链表</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>len<span class="token operator">--</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 下一个节点</span>
+        next <span class="token operator">=</span> current<span class="token operator">-></span>next<span class="token punctuation">;</span>
+
+        <span class="token comment">// 释放quicklistNode指向的ziplist</span>
+        <span class="token function">zfree</span><span class="token punctuation">(</span>current<span class="token operator">-></span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 更新entry个数</span>
+        quicklist<span class="token operator">-></span>count <span class="token operator">-=</span> current<span class="token operator">-></span>count<span class="token punctuation">;</span>
+
+        <span class="token comment">// 释放当前节点</span>
+        <span class="token function">zfree</span><span class="token punctuation">(</span>current<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 更新链表长度</span>
+        quicklist<span class="token operator">-></span>len<span class="token operator">--</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 更新下一个阶段</span>
+        current <span class="token operator">=</span> next<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// </span>
+    <span class="token function">quicklistBookmarksClear</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 释放快速链表内存</span>
+    <span class="token function">zfree</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-x-5-快速列表压缩-quicklistCompress"><a href="#4-x-5-快速列表压缩-quicklistCompress" class="headerlink" title="(4.x.5) 快速列表压缩-__quicklistCompress"></a>(4.x.5) 快速列表压缩-__quicklistCompress</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Force 'quicklist' to meet compression guidelines set by compress depth.
+ * The only way to guarantee interior nodes get compressed is to iterate
+ * to our "interior" compress depth then compress the next node we find.
+ * If compress depth is larger than the entire list, we return immediately. */</span>
+REDIS_STATIC <span class="token keyword">void</span> <span class="token function">__quicklistCompress</span><span class="token punctuation">(</span><span class="token keyword">const</span> quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span>
+                                      quicklistNode <span class="token operator">*</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* If length is less than our compress depth (from both sides),
+     * we can't compress anything. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">quicklistAllowsCompression</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">)</span> <span class="token operator">||</span>
+        quicklist<span class="token operator">-></span>len <span class="token operator">&lt;</span> <span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">int</span><span class="token punctuation">)</span><span class="token punctuation">(</span>quicklist<span class="token operator">-></span>compress <span class="token operator">*</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">if</span> <span class="token expression"><span class="token number">0</span></span></span>
+    <span class="token comment">/* Optimized cases for small depth counts */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>quicklist<span class="token operator">-></span>compress <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        quicklistNode <span class="token operator">*</span>h <span class="token operator">=</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">,</span> <span class="token operator">*</span>t <span class="token operator">=</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>h<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>h <span class="token operator">!=</span> node <span class="token operator">&amp;&amp;</span> t <span class="token operator">!=</span> node<span class="token punctuation">)</span>
+            <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>quicklist<span class="token operator">-></span>compress <span class="token operator">==</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        quicklistNode <span class="token operator">*</span>h <span class="token operator">=</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">,</span> <span class="token operator">*</span>hn <span class="token operator">=</span> h<span class="token operator">-></span>next<span class="token punctuation">,</span> <span class="token operator">*</span>hnn <span class="token operator">=</span> hn<span class="token operator">-></span>next<span class="token punctuation">;</span>
+        quicklistNode <span class="token operator">*</span>t <span class="token operator">=</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">,</span> <span class="token operator">*</span>tp <span class="token operator">=</span> t<span class="token operator">-></span>prev<span class="token punctuation">,</span> <span class="token operator">*</span>tpp <span class="token operator">=</span> tp<span class="token operator">-></span>prev<span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>h<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>hn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>tp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>h <span class="token operator">!=</span> node <span class="token operator">&amp;&amp;</span> hn <span class="token operator">!=</span> node <span class="token operator">&amp;&amp;</span> t <span class="token operator">!=</span> node <span class="token operator">&amp;&amp;</span> tp <span class="token operator">!=</span> node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>hnn <span class="token operator">!=</span> t<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>hnn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>tpp <span class="token operator">!=</span> h<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>tpp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">endif</span></span>
+
+    <span class="token comment">/* Iterate until we reach compress depth for both sides of the list.a
+     * Note: because we do length checks at the *top* of this function,
+     *       we can skip explicit null checks below. Everything exists. */</span>
+    quicklistNode <span class="token operator">*</span>forward <span class="token operator">=</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">;</span>
+    quicklistNode <span class="token operator">*</span>reverse <span class="token operator">=</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> depth <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> in_depth <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>depth<span class="token operator">++</span> <span class="token operator">&lt;</span> quicklist<span class="token operator">-></span>compress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>forward<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistDecompressNode</span><span class="token punctuation">(</span>reverse<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>forward <span class="token operator">==</span> node <span class="token operator">||</span> reverse <span class="token operator">==</span> node<span class="token punctuation">)</span>
+            in_depth <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>forward <span class="token operator">==</span> reverse<span class="token punctuation">)</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+        forward <span class="token operator">=</span> forward<span class="token operator">-></span>next<span class="token punctuation">;</span>
+        reverse <span class="token operator">=</span> reverse<span class="token operator">-></span>prev<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>in_depth<span class="token punctuation">)</span>
+        <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>depth <span class="token operator">></span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* At this point, forward and reverse are one node beyond depth */</span>
+        <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>forward<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">quicklistCompressNode</span><span class="token punctuation">(</span>reverse<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+<h2 id="4-y-快速链表节点-quicklistNode-操作"><a href="#4-y-快速链表节点-quicklistNode-操作" class="headerlink" title="(4.y) 快速链表节点(quicklistNode)操作"></a>(4.y) 快速链表节点(quicklistNode)操作</h2><h3 id="4-y-1-创建节点-quicklistCreateNode"><a href="#4-y-1-创建节点-quicklistCreateNode" class="headerlink" title="(4.y.1) 创建节点-quicklistCreateNode"></a>(4.y.1) 创建节点-quicklistCreateNode</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/*
+ * 创建节点
+ */</span>
+REDIS_STATIC quicklistNode <span class="token operator">*</span><span class="token function">quicklistCreateNode</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    quicklistNode <span class="token operator">*</span>node<span class="token punctuation">;</span>
+    node <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>node<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    node<span class="token operator">-></span>count <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 压缩列表占用字节大小为0</span>
+    node<span class="token operator">-></span>sz <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> 
+    node<span class="token operator">-></span>next <span class="token operator">=</span> node<span class="token operator">-></span>prev <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token comment">// 编码使用原生字节数组</span>
+    node<span class="token operator">-></span>encoding <span class="token operator">=</span> QUICKLIST_NODE_ENCODING_RAW<span class="token punctuation">;</span>
+    <span class="token comment">// 容器格式使用压缩列表</span>
+    node<span class="token operator">-></span>container <span class="token operator">=</span> QUICKLIST_NODE_CONTAINER_ZIPLIST<span class="token punctuation">;</span>
+    <span class="token comment">// 压缩</span>
+    node<span class="token operator">-></span>recompress <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> node<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-y-2-quicklistNodeAllowInsert"><a href="#4-y-2-quicklistNodeAllowInsert" class="headerlink" title="(4.y.2) _quicklistNodeAllowInsert"></a>(4.y.2) _quicklistNodeAllowInsert</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 
+ * @param *node 快速链表节点
+ * @param fill 
+ * @param sz  新插入的数据大小 
+ */</span>
+REDIS_STATIC <span class="token keyword">int</span> <span class="token function">_quicklistNodeAllowInsert</span><span class="token punctuation">(</span><span class="token keyword">const</span> quicklistNode <span class="token operator">*</span>node<span class="token punctuation">,</span>
+                                           <span class="token keyword">const</span> <span class="token keyword">int</span> fill<span class="token punctuation">,</span> <span class="token keyword">const</span> <span class="token class-name">size_t</span> sz<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">unlikely</span><span class="token punctuation">(</span><span class="token operator">!</span>node<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">int</span> ziplist_overhead<span class="token punctuation">;</span>
+  
+    <span class="token comment">// 前一个节点的长度 占用的内存大小</span>
+    <span class="token comment">// size of previous offset </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>sz <span class="token operator">&lt;</span> <span class="token number">254</span><span class="token punctuation">)</span>
+        ziplist_overhead <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>  <span class="token comment">// 1字节</span>
+    <span class="token keyword">else</span>
+        ziplist_overhead <span class="token operator">=</span> <span class="token number">5</span><span class="token punctuation">;</span>  <span class="token comment">// 5字节</span>
+
+    <span class="token comment">// 压缩列表节点编码占用内存大小 1/2/5字节</span>
+    <span class="token comment">// size of forward offset</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>sz <span class="token operator">&lt;</span> <span class="token number">64</span><span class="token punctuation">)</span>
+        ziplist_overhead <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">likely</span><span class="token punctuation">(</span>sz <span class="token operator">&lt;</span> <span class="token number">16384</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  <span class="token comment">// 2^14 = 16384</span>
+        ziplist_overhead <span class="token operator">+=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span>
+        ziplist_overhead <span class="token operator">+=</span> <span class="token number">5</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 需要新增的内存 sz(压缩列表节点占用内存大小) + ziplist_overhead(压缩列表)</span>
+    <span class="token comment">// 如果"sz"编码为整数类型，new_sz 会高估</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> new_sz <span class="token operator">=</span> node<span class="token operator">-></span>sz <span class="token operator">+</span> sz <span class="token operator">+</span> ziplist_overhead<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">likely</span><span class="token punctuation">(</span><span class="token function">_quicklistNodeSizeMeetsOptimizationRequirement</span><span class="token punctuation">(</span>new_sz<span class="token punctuation">,</span> fill<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token comment">// 当返回 1 时，我们知道限制是大小限制 &lt; 8192</span>
+    <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">sizeMeetsSafetyLimit</span><span class="token punctuation">(</span>new_sz<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span>node<span class="token operator">-></span>count <span class="token operator">&lt;</span> fill<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c">
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name function">sizeMeetsSafetyLimit</span><span class="token expression"><span class="token punctuation">(</span>sz<span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>sz<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> SIZE_SAFETY_LIMIT<span class="token punctuation">)</span></span></span>
+
+
+<span class="token comment">/* 
+ * ziplist 的最大大小(以字节为单位)。
+ * 较大的值将存在于它们自己独立的 ziplist 中。
+ * 仅当我们受记录数限制时才使用。 当我们受大小限制时，最大限制更大，但仍然安全。 
+ * 8k 是推荐/默认大小限制
+ */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">SIZE_SAFETY_LIMIT</span> <span class="token expression"><span class="token number">8192</span></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-y-3-快速列表所有entry个数-quicklistCount"><a href="#4-y-3-快速列表所有entry个数-quicklistCount" class="headerlink" title="(4.y.3) 快速列表所有entry个数-quicklistCount"></a>(4.y.3) 快速列表所有entry个数-quicklistCount</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Return cached quicklist count */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">long</span> <span class="token function">quicklistCount</span><span class="token punctuation">(</span><span class="token keyword">const</span> quicklist <span class="token operator">*</span>ql<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token keyword">return</span> ql<span class="token operator">-></span>count<span class="token punctuation">;</span> <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-y-4-快速链表压缩节点-quicklistCompressNode"><a href="#4-y-4-快速链表压缩节点-quicklistCompressNode" class="headerlink" title="(4.y.4) 快速链表压缩节点-quicklistCompressNode"></a>(4.y.4) 快速链表压缩节点-quicklistCompressNode</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 仅压缩未压缩的节点。
+ * 
+ * 节点的编码是 QUICKLIST_NODE_ENCODING_RAW 格式的，压缩节点
+ */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name function">quicklistCompressNode</span><span class="token expression"><span class="token punctuation">(</span>_node<span class="token punctuation">)</span>                                           </span><span class="token punctuation">\</span>
+    <span class="token expression"><span class="token keyword">do</span> <span class="token punctuation">&#123;</span>                                                                       </span><span class="token punctuation">\</span>
+        <span class="token expression"><span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>_node<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> <span class="token punctuation">(</span>_node<span class="token punctuation">)</span><span class="token operator">-></span>encoding <span class="token operator">==</span> QUICKLIST_NODE_ENCODING_RAW<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>     </span><span class="token punctuation">\</span>
+            <span class="token expression"><span class="token function">__quicklistCompressNode</span><span class="token punctuation">(</span><span class="token punctuation">(</span>_node<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>                                  </span><span class="token punctuation">\</span>
+        <span class="token expression"><span class="token punctuation">&#125;</span>                                                                      </span><span class="token punctuation">\</span>
+    <span class="token expression"><span class="token punctuation">&#125;</span> <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 压缩"节点"中的 ziplist 并更新编码细节。
+ * 如果 ziplist 压缩成功则返回 1。
+ * 如果压缩失败或 ziplist 太小而无法压缩，则返回 0。
+ */</span>
+REDIS_STATIC <span class="token keyword">int</span> <span class="token function">__quicklistCompressNode</span><span class="token punctuation">(</span>quicklistNode <span class="token operator">*</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">ifdef</span> <span class="token expression">REDIS_TEST</span></span>
+    node<span class="token operator">-></span>attempted_compress <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">endif</span></span>
+
+    <span class="token comment">// 如果压缩列表占用内存大小 &lt; 48字节</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-></span>sz <span class="token operator">&lt;</span> MIN_COMPRESS_BYTES<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// ziplist压缩后的格式</span>
+    quicklistLZF <span class="token operator">*</span>lzf <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>lzf<span class="token punctuation">)</span> <span class="token operator">+</span> node<span class="token operator">-></span>sz<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Cancel if compression fails or doesn't compress small enough */</span>
+    <span class="token comment">// 如果压缩失败或压缩不够小则取消</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>lzf<span class="token operator">-></span>sz <span class="token operator">=</span> <span class="token function">lzf_compress</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> node<span class="token operator">-></span>sz<span class="token punctuation">,</span> lzf<span class="token operator">-></span>compressed<span class="token punctuation">,</span>
+                                 node<span class="token operator">-></span>sz<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">||</span>
+        lzf<span class="token operator">-></span>sz <span class="token operator">+</span> MIN_COMPRESS_IMPROVE <span class="token operator">>=</span> node<span class="token operator">-></span>sz<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 如果值不可压缩，lzf_compress 中止/拒绝压缩。</span>
+        <span class="token function">zfree</span><span class="token punctuation">(</span>lzf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 重新申请内存</span>
+    lzf <span class="token operator">=</span> <span class="token function">zrealloc</span><span class="token punctuation">(</span>lzf<span class="token punctuation">,</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>lzf<span class="token punctuation">)</span> <span class="token operator">+</span> lzf<span class="token operator">-></span>sz<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 释放 node->zl对应的ziplist内存</span>
+    <span class="token function">zfree</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// node->zl指向 压缩格式的 quicklistLZF</span>
+    node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token punctuation">)</span>lzf<span class="token punctuation">;</span>
+    <span class="token comment">// 更新节点编码为 ENCODING_LZF</span>
+    node<span class="token operator">-></span>encoding <span class="token operator">=</span> QUICKLIST_NODE_ENCODING_LZF<span class="token punctuation">;</span>
+    <span class="token comment">// 重新压缩 = false  </span>
+    node<span class="token operator">-></span>recompress <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-y-5-解压缩-quicklistDecompressNode"><a href="#4-y-5-解压缩-quicklistDecompressNode" class="headerlink" title="(4.y.5) 解压缩-__quicklistDecompressNode"></a>(4.y.5) 解压缩-__quicklistDecompressNode</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 解压缩ziplist 并且 更新编码细节
+ * 解压成功返回1  失败返回0
+ */</span>
+REDIS_STATIC <span class="token keyword">int</span> <span class="token function">__quicklistDecompressNode</span><span class="token punctuation">(</span>quicklistNode <span class="token operator">*</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">ifdef</span> <span class="token expression">REDIS_TEST</span></span>
+    node<span class="token operator">-></span>attempted_compress <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">endif</span></span>
+
+    <span class="token comment">// 解压缩后的ziplist</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>decompressed <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span>node<span class="token operator">-></span>sz<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    quicklistLZF <span class="token operator">*</span>lzf <span class="token operator">=</span> <span class="token punctuation">(</span>quicklistLZF <span class="token operator">*</span><span class="token punctuation">)</span>node<span class="token operator">-></span>zl<span class="token punctuation">;</span>
+
+    <span class="token comment">// 解压缩失败</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">lzf_decompress</span><span class="token punctuation">(</span>lzf<span class="token operator">-></span>compressed<span class="token punctuation">,</span> lzf<span class="token operator">-></span>sz<span class="token punctuation">,</span> decompressed<span class="token punctuation">,</span> node<span class="token operator">-></span>sz<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 解压失败，释放申请的内存</span>
+        <span class="token function">zfree</span><span class="token punctuation">(</span>decompressed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 释放压缩节点lzf</span>
+    <span class="token function">zfree</span><span class="token punctuation">(</span>lzf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// node->zl指向压缩列表</span>
+    node<span class="token operator">-></span>zl <span class="token operator">=</span> decompressed<span class="token punctuation">;</span>
+    <span class="token comment">// 编码格式使用原生字节</span>
+    node<span class="token operator">-></span>encoding <span class="token operator">=</span> QUICKLIST_NODE_ENCODING_RAW<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<h3 id="按索引删除节点-quicklistDelIndex"><a href="#按索引删除节点-quicklistDelIndex" class="headerlink" title="按索引删除节点-quicklistDelIndex"></a>按索引删除节点-quicklistDelIndex</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/* 
+ * 删除快速列表(quicklist)给定的压缩列表节点(quicklistNode)里指向的压缩列表(ziplist)里的一个值
+ * quicklistNode = quicklist->head->next (某个next) 
+ * ziplist = quicklistNode->zl
+ * 
+ * 注意：quicklistDelIndex() *需要*未压缩的节点，因为您已经必须从某个地方的未压缩节点获取 *p。
+ *
+ * 如果整个节点被删除则返回 1，如果节点仍然存在则返回 0。
+ * 还使用 ziplist 中的下一个偏移量更新输入/输出参数"p"。
+ */</span>
+REDIS_STATIC <span class="token keyword">int</span> <span class="token function">quicklistDelIndex</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span> quicklistNode <span class="token operator">*</span>node<span class="token punctuation">,</span>
+                                   <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>p<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> gone <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 删除压缩列表里的指定值</span>
+    node<span class="token operator">-></span>zl <span class="token operator">=</span> <span class="token function">ziplistDelete</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">,</span> p<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 更新压缩列表节点里entry个数</span>
+    node<span class="token operator">-></span>count<span class="token operator">--</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-></span>count <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 节点个数=0</span>
+        gone <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token comment">// 快速列表(quicklist)删除节点(quicklistNode)</span>
+        <span class="token function">__quicklistDelNode</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 快速列表 更新大小</span>
+        <span class="token function">quicklistNodeUpdateSz</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 更新entry个数</span>
+    quicklist<span class="token operator">-></span>count<span class="token operator">--</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> gone <span class="token operator">?</span> <span class="token number">1</span> <span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="快速链表删除节点-quicklistDelNode"><a href="#快速链表删除节点-quicklistDelNode" class="headerlink" title="() 快速链表删除节点-__quicklistDelNode"></a>() 快速链表删除节点-__quicklistDelNode</h3><p>  和链表删除节点类似</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/*
+ * 快速链表删除节点
+ */</span>
+REDIS_STATIC <span class="token keyword">void</span> <span class="token function">__quicklistDelNode</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>quicklist<span class="token punctuation">,</span>
+                                     quicklistNode <span class="token operator">*</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* Update the bookmark if any */</span>
+    <span class="token comment">// </span>
+    quicklistBookmark <span class="token operator">*</span>bm <span class="token operator">=</span> <span class="token function">_quicklistBookmarkFindByNode</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>bm<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 更新</span>
+        bm<span class="token operator">-></span>node <span class="token operator">=</span> node<span class="token operator">-></span>next<span class="token punctuation">;</span>
+        <span class="token comment">/* if the bookmark was to the last node, delete it. */</span>
+        <span class="token comment">// </span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>bm<span class="token operator">-></span>node<span class="token punctuation">)</span>
+            <span class="token function">_quicklistBookmarkDelete</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> bm<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 当前节点断开链接</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-></span>next<span class="token punctuation">)</span>
+        node<span class="token operator">-></span>next<span class="token operator">-></span>prev <span class="token operator">=</span> node<span class="token operator">-></span>prev<span class="token punctuation">;</span> <span class="token comment">// 下一个节点的前驱节点 = 当前节点的前驱节点</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-></span>prev<span class="token punctuation">)</span>
+        node<span class="token operator">-></span>prev<span class="token operator">-></span>next <span class="token operator">=</span> node<span class="token operator">-></span>next<span class="token punctuation">;</span> <span class="token comment">// 前一个节点的后继节点 = 当前阶段的后继节点</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node <span class="token operator">==</span> quicklist<span class="token operator">-></span>tail<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 更新尾结点</span>
+        quicklist<span class="token operator">-></span>tail <span class="token operator">=</span> node<span class="token operator">-></span>prev<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node <span class="token operator">==</span> quicklist<span class="token operator">-></span>head<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 更新头结点</span>
+        quicklist<span class="token operator">-></span>head <span class="token operator">=</span> node<span class="token operator">-></span>next<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 如果我们在压缩深度内删除了一个节点，我们现在有需要解压缩的压缩节点。</span>
+    <span class="token function">__quicklistCompress</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 更新快速链表节点个数</span>
+    quicklist<span class="token operator">-></span>count <span class="token operator">-=</span> node<span class="token operator">-></span>count<span class="token punctuation">;</span>
+
+    <span class="token comment">// 释放ziplist</span>
+    <span class="token function">zfree</span><span class="token punctuation">(</span>node<span class="token operator">-></span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 释放quicklistNode</span>
+    <span class="token function">zfree</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 更新快去链表里的quicklistNode个数</span>
+    quicklist<span class="token operator">-></span>len<span class="token operator">--</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+
+<h2 id="4-z-快速列表里的书签"><a href="#4-z-快速列表里的书签" class="headerlink" title="(4.z) 快速列表里的书签"></a>(4.z) 快速列表里的书签</h2><p>  bookmarks[] 的作用是？</p>
+<h3 id="4-z-1-quicklistBookmarkCreate"><a href="#4-z-1-quicklistBookmarkCreate" class="headerlink" title="(4.z.1) quicklistBookmarkCreate"></a>(4.z.1) quicklistBookmarkCreate</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Create or update a bookmark in the list which will be updated to the next node
+ * automatically when the one referenced gets deleted.
+ * Returns 1 on success (creation of new bookmark or override of an existing one).
+ * Returns 0 on failure (reached the maximum supported number of bookmarks).
+ * NOTE: use short simple names, so that string compare on find is quick.
+ * NOTE: bookmakrk creation may re-allocate the quicklist, so the input pointer
+         may change and it's the caller responsibilty to update the reference.
+ */</span>
+<span class="token keyword">int</span> <span class="token function">quicklistBookmarkCreate</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span><span class="token operator">*</span>ql_ref<span class="token punctuation">,</span> <span class="token keyword">const</span> <span class="token keyword">char</span> <span class="token operator">*</span>name<span class="token punctuation">,</span> quicklistNode <span class="token operator">*</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    quicklist <span class="token operator">*</span>ql <span class="token operator">=</span> <span class="token operator">*</span>ql_ref<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>ql<span class="token operator">-></span>bookmark_count <span class="token operator">>=</span> QL_MAX_BM<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    quicklistBookmark <span class="token operator">*</span>bm <span class="token operator">=</span> <span class="token function">_quicklistBookmarkFindByName</span><span class="token punctuation">(</span>ql<span class="token punctuation">,</span> name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>bm<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        bm<span class="token operator">-></span>node <span class="token operator">=</span> node<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    ql <span class="token operator">=</span> <span class="token function">zrealloc</span><span class="token punctuation">(</span>ql<span class="token punctuation">,</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>quicklist<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span>ql<span class="token operator">-></span>bookmark_count<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>quicklistBookmark<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token operator">*</span>ql_ref <span class="token operator">=</span> ql<span class="token punctuation">;</span>
+    ql<span class="token operator">-></span>bookmarks<span class="token punctuation">[</span>ql<span class="token operator">-></span>bookmark_count<span class="token punctuation">]</span><span class="token punctuation">.</span>node <span class="token operator">=</span> node<span class="token punctuation">;</span>
+    ql<span class="token operator">-></span>bookmarks<span class="token punctuation">[</span>ql<span class="token operator">-></span>bookmark_count<span class="token punctuation">]</span><span class="token punctuation">.</span>name <span class="token operator">=</span> <span class="token function">zstrdup</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    ql<span class="token operator">-></span>bookmark_count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-z-2-快速列表书签查找节点-quicklistBookmarkFindByNode"><a href="#4-z-2-快速列表书签查找节点-quicklistBookmarkFindByNode" class="headerlink" title="(4.z.2) 快速列表书签查找节点-_quicklistBookmarkFindByNode"></a>(4.z.2) 快速列表书签查找节点-_quicklistBookmarkFindByNode</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/quicklist.c</span>
+
+<span class="token comment">/*
+ * 
+ */</span>
+quicklistBookmark <span class="token operator">*</span><span class="token function">_quicklistBookmarkFindByNode</span><span class="token punctuation">(</span>quicklist <span class="token operator">*</span>ql<span class="token punctuation">,</span> quicklistNode <span class="token operator">*</span>node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> i<span class="token punctuation">;</span>
+    <span class="token comment">// 遍历</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>i<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">;</span> i<span class="token operator">&lt;</span>ql<span class="token operator">-></span>bookmark_count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 节点相同</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>ql<span class="token operator">-></span>bookmarks<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">.</span>node <span class="token operator">==</span> node<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 返回节点</span>
+            <span class="token keyword">return</span> <span class="token operator">&amp;</span>ql<span class="token operator">-></span>bookmarks<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/quicklist.c">redis-quicklist-github</a><br>[2] <a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1777876">Redis源码剖析之快速列表(quicklist)</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/15/redis-data-structure-intset/" rel="prev" title="Redis 数据结构 整数集合(intset)">
+                  <i class="fa fa-chevron-left"></i> Redis 数据结构 整数集合(intset)
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/21/redis-data-structure-linked-list/" rel="next" title="Redis 数据结构 双向链表(linkedlist)">
+                  Redis 数据结构 双向链表(linkedlist) <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

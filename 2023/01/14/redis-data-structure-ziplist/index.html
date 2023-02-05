@@ -19,20 +19,21 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
 
-    <meta name="description" content="(1) 压缩列表Ziplist 是由一系列特殊编码的内存块构成的列表，一个 ziplist 可以包含多个节点（entry）， 每个节点可以保存一个长度受限的字符数组（不以 \0 结尾的 char 数组）或者整数， 包括：  字符数组   长度小于等于 63 （26−1）字节的字符数组 长度小于等于 16383 （214−1） 字节的字符数组 长度小于等于 4294967295 （232−1）字节的">
+    <meta name="description" content="Redis是内存数据库，为了节省内存，在一些条件下使用了紧凑型数据结构，其中一个就是压缩列表(ziplist) (1) 压缩列表(ziplist)是什么  ziplist是一种特殊编码的双向链表，旨在提高内存效率。  它存储字符串和整数值，其中整数被编码为实际整数而不是一系列字符。  它允许在O(1)时间内对列表的任一侧进行推送和弹出操作。  但是，由于每个操作都需要重新分配 ziplist">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Redis数据结构之压缩列表">
+<meta property="og:title" content="Redis 数据结构 压缩列表(ziplist)">
 <meta property="og:url" content="http://weikeqin.com/2023/01/14/redis-data-structure-ziplist/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="(1) 压缩列表Ziplist 是由一系列特殊编码的内存块构成的列表，一个 ziplist 可以包含多个节点（entry）， 每个节点可以保存一个长度受限的字符数组（不以 \0 结尾的 char 数组）或者整数， 包括：  字符数组   长度小于等于 63 （26−1）字节的字符数组 长度小于等于 16383 （214−1） 字节的字符数组 长度小于等于 4294967295 （232−1）字节的">
+<meta property="og:description" content="Redis是内存数据库，为了节省内存，在一些条件下使用了紧凑型数据结构，其中一个就是压缩列表(ziplist) (1) 压缩列表(ziplist)是什么  ziplist是一种特殊编码的双向链表，旨在提高内存效率。  它存储字符串和整数值，其中整数被编码为实际整数而不是一系列字符。  它允许在O(1)时间内对列表的任一侧进行推送和弹出操作。  但是，由于每个操作都需要重新分配 ziplist">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/empty_ziplist_structure.png">
 <meta property="article:published_time" content="2023-01-14T08:36:24.000Z">
-<meta property="article:modified_time" content="2023-01-27T15:20:59.501Z">
+<meta property="article:modified_time" content="2023-02-04T04:21:29.950Z">
 <meta property="article:author" content="WKQ">
-<meta property="article:tag" content="database">
 <meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png">
 
@@ -41,10 +42,10 @@
 
 
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/14/redis-data-structure-ziplist/","path":"2023/01/14/redis-data-structure-ziplist/","title":"Redis数据结构之压缩列表"}</script>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/14/redis-data-structure-ziplist/","path":"2023/01/14/redis-data-structure-ziplist/","title":"Redis 数据结构 压缩列表(ziplist)"}</script>
 
 <script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>Redis数据结构之压缩列表 | 天道酬勤</title>
+<title>Redis 数据结构 压缩列表(ziplist) | 天道酬勤</title>
   
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
   <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
@@ -153,7 +154,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">(1) 压缩列表</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 压缩列表结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 压缩列表提供的功能</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E5%88%9B%E5%BB%BA%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8"><span class="nav-number">1.2.1.</span> <span class="nav-text">(1.2.1) 创建压缩列表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-%E6%96%B0%E5%A2%9E%E5%85%83%E7%B4%A0-ziplistPush"><span class="nav-number">1.2.2.</span> <span class="nav-text">(1.2.2) 新增元素-ziplistPush</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-3-%E4%BF%AE%E6%94%B9"><span class="nav-number">1.2.3.</span> <span class="nav-text">(1.2.3) 修改</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-4-%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0-ziplistDelete"><span class="nav-number">1.2.4.</span> <span class="nav-text">(1.2.4) 删除元素-ziplistDelete</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-5-%E6%9F%A5%E8%AF%A2-ziplistFind"><span class="nav-number">1.2.5.</span> <span class="nav-text">(1.2.5) 查询-ziplistFind</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">2.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8-ziplist-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) 压缩列表(ziplist)是什么</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 压缩列表结构</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E4%BD%BF%E7%94%A8%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要使用压缩列表</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E7%89%B9%E7%82%B9"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 压缩列表特点</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) 压缩列表原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%88%9B%E5%BB%BA%E6%96%B0%E7%9A%84ziplist"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 创建新的ziplist</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E5%B0%86%E8%8A%82%E7%82%B9%E6%B7%BB%E5%8A%A0%E5%88%B0%E6%9C%AB%E7%AB%AF"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 将节点添加到末端</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">4.</span> <span class="nav-text">(4) 压缩列表源码解析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 压缩列表结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 压缩列表提供的功能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E5%88%9B%E5%BB%BA%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8"><span class="nav-number">4.3.</span> <span class="nav-text">(4.3) 创建压缩列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E8%B0%83%E6%95%B4%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E5%86%85%E5%AD%98%E5%A4%A7%E5%B0%8F"><span class="nav-number">4.4.</span> <span class="nav-text">(4.4) 调整压缩列表内存大小</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-5-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%96%B0%E5%A2%9E%E5%85%83%E7%B4%A0-ziplistPush"><span class="nav-number">4.5.</span> <span class="nav-text">(4.5) 压缩列表新增元素-ziplistPush</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-1-%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%B0%9D%E8%AF%95%E7%BC%96%E7%A0%81%E4%B8%BA%E6%95%B4%E6%95%B0-zipTryEncoding"><span class="nav-number">4.5.1.</span> <span class="nav-text">(4.5.1) 字符串尝试编码为整数-zipTryEncoding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-2-%E5%8E%8B%E7%BC%A9%E6%95%B4%E6%95%B0%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E5%A4%A7%E5%B0%8F-zipIntSize"><span class="nav-number">4.5.2.</span> <span class="nav-text">(4.5.2) 压缩整数占用内存空间大小-zipIntSize</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-3-%E5%89%8D%E4%B8%80%E4%B8%AA%E8%8A%82%E7%82%B9%E9%95%BF%E5%BA%A6%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E5%A4%A7%E5%B0%8F-zipStorePrevEntryLength"><span class="nav-number">4.5.3.</span> <span class="nav-text">(4.5.3) 前一个节点长度占用内存大小-zipStorePrevEntryLength</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-4-%E8%8A%82%E7%82%B9%E7%BC%96%E7%A0%81%E5%8D%A0%E7%94%A8%E7%9A%84%E5%86%85%E5%AD%98%E5%A4%A7%E5%B0%8F-zipStoreEntryEncoding"><span class="nav-number">4.5.4.</span> <span class="nav-text">(4.5.4) 节点编码占用的内存大小-zipStoreEntryEncoding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-5-%E5%89%8D%E4%B8%80%E4%B8%AA%E8%8A%82%E7%82%B9%E9%95%BF%E5%BA%A6%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E4%B9%8B%E5%B7%AE-zipPrevLenByteDiff"><span class="nav-number">4.5.5.</span> <span class="nav-text">(4.5.5) 前一个节点长度内存空间之差-zipPrevLenByteDiff</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-6-%E5%89%8D%E4%B8%80%E8%8A%82%E7%82%B9%E9%95%BF%E5%BA%A6%E5%8D%A0%E7%94%A8%E7%9A%84%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4-ZIP-DECODE-PREVLENSIZE"><span class="nav-number">4.5.6.</span> <span class="nav-text">(4.5.6) 前一节点长度占用的内存空间-ZIP_DECODE_PREVLENSIZE</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-6-%E5%8F%96%E6%8C%87%E5%AE%9A%E8%8A%82%E7%82%B9%E4%BF%A1%E6%81%AF"><span class="nav-number">4.6.</span> <span class="nav-text">(4.6) 取指定节点信息</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-7-%E6%8F%92%E5%85%A5%E6%95%B0%E6%8D%AE"><span class="nav-number">4.7.</span> <span class="nav-text">(4.7) 插入数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-8-%E5%88%A0%E9%99%A4%E6%95%B0%E6%8D%AE"><span class="nav-number">4.8.</span> <span class="nav-text">(4.8) 删除数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-9-%E6%9F%A5%E6%89%BE-ziplistFind"><span class="nav-number">4.9.</span> <span class="nav-text">(4.9) 查找-ziplistFind</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%80%BB%E7%BB%93"><span class="nav-number">5.</span> <span class="nav-text">(5) 总结</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -166,7 +167,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-count">304</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -177,7 +178,7 @@
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -249,12 +250,12 @@
     </span>
 
     <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="Redis数据结构之压缩列表 | 天道酬勤">
+      <meta itemprop="name" content="Redis 数据结构 压缩列表(ziplist) | 天道酬勤">
       <meta itemprop="description" content="">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Redis数据结构之压缩列表
+          Redis 数据结构 压缩列表(ziplist)
         </h1>
 
         <div class="post-meta-container">
@@ -272,7 +273,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2023-01-27 23:20:59" itemprop="dateModified" datetime="2023-01-27T23:20:59+08:00">2023-01-27</time>
+      <time title="修改时间：2023-02-04 12:21:29" itemprop="dateModified" datetime="2023-02-04T12:21:29+08:00">2023-02-04</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -298,14 +299,14 @@
         <i class="far fa-file-word"></i>
       </span>
       <span class="post-meta-item-text">本文字数：</span>
-      <span>7.5k</span>
+      <span>20k</span>
     </span>
     <span class="post-meta-item" title="阅读时长">
       <span class="post-meta-item-icon">
         <i class="far fa-clock"></i>
       </span>
       <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>7 分钟</span>
+      <span>18 分钟</span>
     </span>
 </div>
 
@@ -316,30 +317,113 @@
     
     
     <div class="post-body" itemprop="articleBody">
-        <h1 id="1-压缩列表"><a href="#1-压缩列表" class="headerlink" title="(1) 压缩列表"></a>(1) 压缩列表</h1><p>Ziplist 是由一系列特殊编码的内存块构成的列表，一个 ziplist 可以包含多个节点（entry）， 每个节点可以保存一个长度受限的字符数组（不以 \0 结尾的 char 数组）或者整数， 包括：</p>
-<ol>
-<li>字符数组</li>
-</ol>
-<ul>
-<li>长度小于等于 63 （26−1）字节的字符数组</li>
-<li>长度小于等于 16383 （214−1） 字节的字符数组</li>
-<li>长度小于等于 4294967295 （232−1）字节的字符数组</li>
-</ul>
-<ol start="2">
-<li>整数</li>
-</ol>
-<ul>
-<li>4 位长，介于 0 至 12 之间的无符号整数</li>
-<li>1 字节长，有符号整数</li>
-<li>3 字节长，有符号整数</li>
-<li>int16_t 类型整数</li>
-<li>int32_t 类型整数</li>
-<li>int64_t 类型整数</li>
-</ul>
+        <p>  Redis是内存数据库，为了节省内存，在一些条件下使用了紧凑型数据结构，其中一个就是压缩列表(ziplist)</p>
+<h1 id="1-压缩列表-ziplist-是什么"><a href="#1-压缩列表-ziplist-是什么" class="headerlink" title="(1) 压缩列表(ziplist)是什么"></a>(1) 压缩列表(ziplist)是什么</h1><p>  ziplist是一种特殊编码的双向链表，旨在提高内存效率。<br>  它存储字符串和整数值，其中整数被编码为实际整数而不是一系列字符。<br>  它允许在O(1)时间内对列表的任一侧进行推送和弹出操作。<br>  但是，由于每个操作都需要重新分配 ziplist 使用的内存，因此实际的复杂性与 ziplist 使用的内存量有关。</p>
+<h2 id="1-1-压缩列表结构"><a href="#1-1-压缩列表结构" class="headerlink" title="(1.1) 压缩列表结构"></a>(1.1) 压缩列表结构</h2><p> <img src="/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png" alt="压缩列表结构"></p>
 <span id="more"></span>
 
-<h2 id="1-1-压缩列表结构"><a href="#1-1-压缩列表结构" class="headerlink" title="(1.1) 压缩列表结构"></a>(1.1) 压缩列表结构</h2><p> <img src="/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png" alt="压缩列表结构"></p>
-<p>  参考<code>ziplistNew()</code>函数</p>
+
+<br>
+
+
+<h1 id="2-为什么要使用压缩列表"><a href="#2-为什么要使用压缩列表" class="headerlink" title="(2) 为什么要使用压缩列表"></a>(2) 为什么要使用压缩列表</h1><p>  压缩列表可以节约内存</p>
+<p>  如果使用链表存储元素，链表节点里需要 val、next，而使用压缩列表，只需要存储val即可。</p>
+<h2 id="2-1-压缩列表特点"><a href="#2-1-压缩列表特点" class="headerlink" title="(2.1) 压缩列表特点"></a>(2.1) 压缩列表特点</h2><p>ziplist 的特点：</p>
+<ol>
+<li>连续内存存储：每个元素紧凑排列，内存利用率高</li>
+<li>变长编码：存储数据时，采用变长编码（满足数据长度的前提下，尽可能少分配内存）<br>3）寻找元素需遍历：存放太多元素，性能会下降（适合少量数据存储）</li>
+<li>级联更新：更新、删除元素，会引发级联更新（因为内存连续，前面数据膨胀/删除了，后面要跟着一起动）</li>
+</ol>
+<br>
+
+
+<h1 id="3-压缩列表原理"><a href="#3-压缩列表原理" class="headerlink" title="(3) 压缩列表原理"></a>(3) 压缩列表原理</h1><pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">----</span> ziplist header <span class="token separator comment">----</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-----------</span> entries <span class="token separator comment">-------------</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token operator">-</span>end<span class="token operator">-</span><span class="token operator">></span><span class="token operator">|</span>
+
+size          <span class="token number">4</span> bytes  <span class="token number">4</span> bytes  <span class="token number">2</span> bytes    <span class="token operator">?</span>        <span class="token operator">?</span>        <span class="token operator">?</span>        <span class="token operator">?</span>     <span class="token number">1</span> byte
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> zlbytes <span class="token operator">|</span> zltail <span class="token operator">|</span> zllen <span class="token operator">|</span> entry1 <span class="token operator">|</span> entry2 <span class="token operator">|</span>  <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>   <span class="token operator">|</span> entryN <span class="token operator">|</span> zlend <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+                                       <span class="token operator">^</span>                          <span class="token operator">^</span>        <span class="token operator">^</span>
+address                                <span class="token operator">|</span>                          <span class="token operator">|</span>        <span class="token operator">|</span>
+                                ZIPLIST_ENTRY_HEAD                <span class="token operator">|</span>   ZIPLIST_ENTRY_END
+                                                                  <span class="token operator">|</span>
+                                                         ZIPLIST_ENTRY_TAIL<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  压缩列表是一块连续的内存空间。<br>  为了方便查询，在头部记录了压缩列表占用的总字节数、entry尾部的地址 以及 压缩列表的元素个数。</p>
+<table>
+<thead>
+<tr>
+<th align="left">字段</th>
+<th align="left">长度</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">zlbytes</td>
+<td align="left">4字节</td>
+<td align="left">整个ziplist占用的内存字节数，对ziplist进行内存重分配，或者计算末端时使用。</td>
+</tr>
+<tr>
+<td align="left">zltail</td>
+<td align="left">4字节</td>
+<td align="left">ziplist尾节点的偏移量。通过这个偏移量，可以快速获取尾部节点。</td>
+</tr>
+<tr>
+<td align="left">zllen</td>
+<td align="left">2字节</td>
+<td align="left">快速获取ziplist长度</td>
+</tr>
+<tr>
+<td align="left">zlend</td>
+<td align="left">1字节</td>
+<td align="left">结束符</td>
+</tr>
+</tbody></table>
+<h2 id="3-1-创建新的ziplist"><a href="#3-1-创建新的ziplist" class="headerlink" title="(3.1) 创建新的ziplist"></a>(3.1) 创建新的ziplist</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">----</span> ziplist header <span class="token separator comment">----</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token operator">-</span><span class="token operator">-</span> end <span class="token operator">-</span><span class="token operator">-</span><span class="token operator">></span><span class="token operator">|</span>
+
+size          <span class="token number">4</span> bytes   <span class="token number">4</span> bytes <span class="token number">2</span> bytes  <span class="token number">1</span> byte
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> zlbytes <span class="token operator">|</span> zltail <span class="token operator">|</span> zllen <span class="token operator">|</span> zlend     <span class="token operator">|</span>
+            <span class="token operator">|</span>         <span class="token operator">|</span>        <span class="token operator">|</span>       <span class="token operator">|</span>           <span class="token operator">|</span>
+value       <span class="token operator">|</span>  <span class="token number">1011</span>   <span class="token operator">|</span>  <span class="token number">1010</span>  <span class="token operator">|</span>   <span class="token number">0</span>   <span class="token operator">|</span> <span class="token number">1111</span> <span class="token number">1111</span> <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+                                       <span class="token operator">^</span>
+                                       <span class="token operator">|</span>
+                               ZIPLIST_ENTRY_HEAD
+                                       <span class="token operator">&amp;</span>
+address                        ZIPLIST_ENTRY_TAIL
+                                       <span class="token operator">&amp;</span>
+                               ZIPLIST_ENTRY_END<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-2-将节点添加到末端"><a href="#3-2-将节点添加到末端" class="headerlink" title="(3.2) 将节点添加到末端"></a>(3.2) 将节点添加到末端</h2><p>将新节点添加到 ziplist 的末端需要执行以下几个步骤：</p>
+<ol>
+<li>记录到达 ziplist 末端所需的偏移量（因为之后的内存重分配可能会改变 ziplist 的地址，因此记录偏移量而不是保存指针）</li>
+<li>根据新节点要保存的值，计算出编码这个值所需的空间大小，以及编码它前一个节点的长度所需的空间大小，然后对 ziplist 进行内存重分配。</li>
+<li>设置新节点的各项属性： pre_entry_length 、 encoding 、 length 和 content 。</li>
+<li>更新 ziplist 的各项属性，比如记录空间占用的 zlbytes ，到达表尾节点的偏移量 zltail ，以及记录节点数量的 zllen 。</li>
+</ol>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">----</span> ziplist header <span class="token separator comment">----</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">---</span> entries <span class="token operator">-</span><span class="token operator">-</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token operator">-</span><span class="token operator">-</span> end <span class="token operator">-</span><span class="token operator">-</span><span class="token operator">></span><span class="token operator">|</span>
+
+size          <span class="token number">4</span> bytes  <span class="token number">4</span> bytes  <span class="token number">2</span> bytes  <span class="token number">5</span> bytes          <span class="token number">1</span> bytes
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> zlbytes <span class="token operator">|</span> zltail <span class="token operator">|</span> zllen <span class="token operator">|</span> entry <span class="token number">1</span>        <span class="token operator">|</span> zlend     <span class="token operator">|</span>
+            <span class="token operator">|</span>         <span class="token operator">|</span>        <span class="token operator">|</span>       <span class="token operator">|</span>                <span class="token operator">|</span>           <span class="token operator">|</span>
+value       <span class="token operator">|</span>  <span class="token number">10000</span>  <span class="token operator">|</span>  <span class="token number">1010</span>  <span class="token operator">|</span>   <span class="token number">1</span>   <span class="token operator">|</span> <span class="token operator">?</span>              <span class="token operator">|</span> <span class="token number">1111</span> <span class="token number">1111</span> <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+                                       <span class="token operator">^</span>                <span class="token operator">^</span>
+                                       <span class="token operator">|</span>                <span class="token operator">|</span>
+address                         ZIPLIST_ENTRY_HEAD   ZIPLIST_ENTRY_END
+                                       <span class="token operator">&amp;</span>
+                                ZIPLIST_ENTRY_TAIL<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+
+<h1 id="4-压缩列表源码解析"><a href="#4-压缩列表源码解析" class="headerlink" title="(4) 压缩列表源码解析"></a>(4) 压缩列表源码解析</h1><p>  压缩列表</p>
+<h2 id="4-1-压缩列表结构"><a href="#4-1-压缩列表结构" class="headerlink" title="(4.1) 压缩列表结构"></a>(4.1) 压缩列表结构</h2><p> <img src="/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png" alt="压缩列表结构"></p>
 <pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">----</span> ziplist header <span class="token separator comment">----</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-----------</span> entries <span class="token separator comment">-------------</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token operator">-</span>end<span class="token operator">-</span><span class="token operator">></span><span class="token operator">|</span>
 
 size          <span class="token number">4</span> bytes  <span class="token number">4</span> bytes  <span class="token number">2</span> bytes    <span class="token operator">?</span>        <span class="token operator">?</span>        <span class="token operator">?</span>        <span class="token operator">?</span>     <span class="token number">1</span> byte
@@ -352,9 +436,40 @@ address                                <span class="token operator">|</span>    
                                                                   <span class="token operator">|</span>
                                                          ZIPLIST_ENTRY_TAIL<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
+<p>  如果没有特殊指定，所有字段存储都使用小端存储。</p>
+<p>  参考<code>ziplistNew()</code>函数</p>
+<p><strong>entry节点结构</strong></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-------------------</span> entry <span class="token separator comment">--------------------</span><span class="token operator">></span><span class="token operator">|</span>
+
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> pre_entry_length <span class="token operator">|</span> encoding <span class="token operator">|</span> length <span class="token operator">|</span> content <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  pre_entry_length 记录了前一个节点的长度，通过这个值，可以进行指针计算，从而跳转到上一个节点。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 我们使用此函数接收有关 ziplist entry的信息。
+ * 请注意，这并不是数据的实际编码方式，只是我们为了更容易操作而通过函数填充的内容。 
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">zlentry</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> prevrawlensize<span class="token punctuation">;</span> <span class="token comment">// 前一个entry长度 对应的字节数</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> prevrawlen<span class="token punctuation">;</span>     <span class="token comment">// 前一个entry长度 </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> lensize<span class="token punctuation">;</span>        <span class="token comment">// 用于编码此entry类型/长度 的字节数。  // int long 对应的字节数</span>
+                                 <span class="token comment">// 例如，字符串有一个 1、2 或 5 字节的标头。 整数总是使用一个字节。</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> len<span class="token punctuation">;</span>            <span class="token comment">// 用于表示实际entry的长度。</span>
+                                 <span class="token comment">// 对于字符串，这只是字符串长度，</span>
+                                 <span class="token comment">// 而对于整数，它是 1、2、3、4、8 或 0(for 4 bit immediate)，具体取决于数字范围。</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> headersize<span class="token punctuation">;</span>     <span class="token comment">// prevrawlensize + lensize.</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> encoding<span class="token punctuation">;</span>      <span class="token comment">// 当前节点数据编码  </span>
+                                 <span class="token comment">// 根据entry编码设置为 ZIP_STR_* 或 ZIP_INT_*。 </span>
+                                 <span class="token comment">// 然而，对于 4 bits immediate integers，这可以假定一个值范围并且必须进行范围检查。</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">;</span>            <span class="token comment">// 指向条目最开始的指针，即 this 指向 previous-entry-in 字段。</span>
+<span class="token punctuation">&#125;</span> zlentry<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h2 id="1-2-压缩列表提供的功能"><a href="#1-2-压缩列表提供的功能" class="headerlink" title="(1.2) 压缩列表提供的功能"></a>(1.2) 压缩列表提供的功能</h2><table>
+
+
+
+<h2 id="4-2-压缩列表提供的功能"><a href="#4-2-压缩列表提供的功能" class="headerlink" title="(4.2) 压缩列表提供的功能"></a>(4.2) 压缩列表提供的功能</h2><table>
 <thead>
 <tr>
 <th align="left">函数名</th>
@@ -369,17 +484,17 @@ address                                <span class="token operator">|</span>    
 </tr>
 <tr>
 <td align="left">ziplistResize</td>
-<td align="left">重新调整 ziplist 的内存大小</td>
+<td align="left">调整 ziplist 内存大小</td>
 <td align="left">O(N)</td>
 </tr>
 <tr>
 <td align="left">ziplistPush</td>
-<td align="left">将一个包含给定值的新节点推入 ziplist 的表头或者表尾</td>
+<td align="left">将一个包含给定值的新节点插入 ziplist 的表头或者表尾</td>
 <td align="left">O(N^2)</td>
 </tr>
 <tr>
 <td align="left">zipEntry</td>
-<td align="left">取出给定地址上的节点，并将它的属性保存到 zlentry 结构然后返回</td>
+<td align="left">取出给定地址上的节点信息</td>
 <td align="left">O(1)</td>
 </tr>
 <tr>
@@ -413,224 +528,642 @@ address                                <span class="token operator">|</span>    
 <td align="left">O(1)</td>
 </tr>
 </tbody></table>
-<h3 id="1-2-1-创建压缩列表"><a href="#1-2-1-创建压缩列表" class="headerlink" title="(1.2.1) 创建压缩列表"></a>(1.2.1) 创建压缩列表</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: ziplist.c
+<h2 id="4-3-创建压缩列表"><a href="#4-3-创建压缩列表" class="headerlink" title="(4.3) 创建压缩列表"></a>(4.3) 创建压缩列表</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: ziplist.c</span>
 
-&#x2F;* 创建一个空的压缩列表 *&#x2F;
-unsigned char *ziplistNew(void) &#123;
-    &#x2F;&#x2F; 计算长度
-    unsigned int bytes &#x3D; ZIPLIST_HEADER_SIZE+ZIPLIST_END_SIZE;
-    &#x2F;&#x2F; 初始分配的大小
-    unsigned char *zl &#x3D; zmalloc(bytes);
-    &#x2F;&#x2F; 
-    ZIPLIST_BYTES(zl) &#x3D; intrev32ifbe(bytes);
-    &#x2F;&#x2F; 
-    ZIPLIST_TAIL_OFFSET(zl) &#x3D; intrev32ifbe(ZIPLIST_HEADER_SIZE);
-    &#x2F;&#x2F;
-    ZIPLIST_LENGTH(zl) &#x3D; 0;
-    &#x2F;&#x2F; 最后一个字节 设置成 结束符255，标记结束
-    zl[bytes-1] &#x3D; ZIP_END;
-    return zl;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token comment">/* 创建一个空的压缩列表 */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistNew</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 计算长度  </span>
+    <span class="token comment">// ZIPLIST_HEADER_SIZE = 32bits + 32bits + 16bits</span>
+    <span class="token comment">// ZIPLIST_END_SIZE = 8bits</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> bytes <span class="token operator">=</span> ZIPLIST_HEADER_SIZE<span class="token operator">+</span>ZIPLIST_END_SIZE<span class="token punctuation">;</span>
+    <span class="token comment">// 初始分配的大小</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span>bytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 压缩列表总字节长度</span>
+    <span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>bytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 尾部节点字节距离  结尾下标</span>
+    <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>ZIPLIST_HEADER_SIZE<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 长度设置为0</span>
+    <span class="token function">ZIPLIST_LENGTH</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 最后一个字节 设置成 结束符255，标记结束</span>
+    zl<span class="token punctuation">[</span>bytes<span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_END<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<p>  <code>ziplistNew</code>函数的逻辑很简单，就是创建一块连续的内存空间，大小为 ZIPLIST_HEADER_SIZE 和 ZIPLIST_END_SIZE 的总和，然后再把该连续空间的最后一个字节赋值为 ZIP_END，表示列表结束。</p>
+<p>  <code>ziplistNew</code>函数的逻辑很简单，就是创建一块连续的内存空间，大小为 <code>ZIPLIST_HEADER_SIZE</code>(10字节) 和 <code>ZIPLIST_END_SIZE</code>(1字节) 的总和，然后再把该连续空间的最后一个字节赋值为 ZIP_END，表示列表结束。</p>
 <p>  <img src="/img/database/redis/data-structure/ziplist/empty_ziplist_structure.png" alt="空压缩列表内存结构"></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F;ziplist的列表头大小，包括2个32 bits整数和1个16bits整数，分别表示压缩列表的总字节数，列表最后一个元素的离列表头的偏移，以及列表中的元素个数
-&#x2F;* 
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">//ziplist的列表头大小，包括2个32 bits整数和1个16bits整数，</span>
+<span class="token comment">// 分别表示压缩列表的总字节数，列表最后一个元素的离列表头的偏移，以及列表中的元素个数</span>
+<span class="token comment">/* 
  * ziplist的列表头大小：2个32 bits整数，用于表示总字节数 和 最后一项偏移量。 
- * 用1个16 bits的整数表示元素字段个数
+ * 用1个16 bits的整数表示元素个数
  * 
- * The size of a ziplist header: two 32 bit integers for the total
- * bytes count and last item offset. One 16 bit integer for the number
- * of items field. 
- *&#x2F;
-#define ZIPLIST_HEADER_SIZE     (sizeof(uint32_t)*2+sizeof(uint16_t))
+ */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIPLIST_HEADER_SIZE</span>     <span class="token expression"><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token class-name">uint32_t</span><span class="token punctuation">)</span><span class="token operator">*</span><span class="token number">2</span><span class="token operator">+</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token class-name">uint16_t</span><span class="token punctuation">)</span><span class="token punctuation">)</span></span></span>
 
-&#x2F;*  
+<span class="token comment">/*  
  * ziplist的列表尾大小，只有1字节，表示列表结束。
- * Size of the &quot;end of ziplist&quot; entry. Just one byte. 
- *&#x2F;
-#define ZIPLIST_END_SIZE        (sizeof(uint8_t))
+ */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIPLIST_END_SIZE</span>        <span class="token expression"><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token class-name">uint8_t</span><span class="token punctuation">)</span><span class="token punctuation">)</span></span></span>
 
-&#x2F;&#x2F; ziplist的列表尾字节内容
-#define ZIP_END 255         &#x2F;* 特殊的 &quot;ziplist 结尾&quot; 实体。 *&#x2F;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h3 id="1-2-2-新增元素-ziplistPush"><a href="#1-2-2-新增元素-ziplistPush" class="headerlink" title="(1.2.2) 新增元素-ziplistPush"></a>(1.2.2) 新增元素-ziplistPush</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">unsigned char *ziplistPush(unsigned char *zl, unsigned char *s, unsigned int slen, int where) &#123;
-    unsigned char *p;
-    p &#x3D; (where &#x3D;&#x3D; ZIPLIST_HEAD) ? ZIPLIST_ENTRY_HEAD(zl) : ZIPLIST_ENTRY_END(zl);
-    return __ziplistInsert(zl,p,s,slen);
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token comment">// ziplist的列表尾字节内容</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_END</span> <span class="token expression"><span class="token number">255</span>         </span><span class="token comment">/* 特殊的 "ziplist 结尾" 实体。 */</span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<p>  <strong>插入数据</strong></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Insert an entry at &quot;p&quot;. *&#x2F;
-unsigned char *ziplistInsert(unsigned char *zl, unsigned char *p, unsigned char *s, unsigned int slen) &#123;
-    return __ziplistInsert(zl,p,s,slen);
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h3 id="1-2-3-修改"><a href="#1-2-3-修改" class="headerlink" title="(1.2.3) 修改"></a>(1.2.3) 修改</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Resize the ziplist. *&#x2F;
-unsigned char *ziplistResize(unsigned char *zl, size_t len) &#123;
-    assert(len &lt; UINT32_MAX);
-    &#x2F;&#x2F; 分配内存空间
-    zl &#x3D; zrealloc(zl,len);
-    &#x2F;&#x2F; 
-    ZIPLIST_BYTES(zl) &#x3D; intrev32ifbe(len);
-    &#x2F;&#x2F; 
-    zl[len-1] &#x3D; ZIP_END;
-    return zl;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  <code>intrev32ifbe</code>函数为大小端转换函数，统一转换为小端存储。 为什么要进行转换？<br>  因为压缩列表的操作中涉及到的位运算很多，后续的所有位运算都是在小端存储的基础上进行的。</p>
+<h2 id="4-4-调整压缩列表内存大小"><a href="#4-4-调整压缩列表内存大小" class="headerlink" title="(4.4) 调整压缩列表内存大小"></a>(4.4) 调整压缩列表内存大小</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 调整 ziplist 内存大小  
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistResize</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token class-name">size_t</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 校验 确保长度&lt; 2^32</span>
+    <span class="token function">assert</span><span class="token punctuation">(</span>len <span class="token operator">&lt;</span> UINT32_MAX<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 压缩列表分配内存</span>
+    zl <span class="token operator">=</span> <span class="token function">zrealloc</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 压缩列表总字节长度</span>
+    <span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 最后一个字节 设置成 结束符255，标记结束</span>
+    zl<span class="token punctuation">[</span>len<span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_END<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h3 id="1-2-4-删除元素-ziplistDelete"><a href="#1-2-4-删除元素-ziplistDelete" class="headerlink" title="(1.2.4) 删除元素-ziplistDelete"></a>(1.2.4) 删除元素-ziplistDelete</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Delete a single entry from the ziplist, pointed to by *p.
+<h2 id="4-5-压缩列表新增元素-ziplistPush"><a href="#4-5-压缩列表新增元素-ziplistPush" class="headerlink" title="(4.5) 压缩列表新增元素-ziplistPush"></a>(4.5) 压缩列表新增元素-ziplistPush</h2><p>  1.计算实际插入元素的长度</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 在压缩列表的entry头部或尾部插入元素 
+ *
+ * @param *zl 压缩列表
+ * @param *s 新增数据
+ * @param slen 长度
+ * @param where  
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistPush</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>s<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> slen<span class="token punctuation">,</span> <span class="token keyword">int</span> where<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">;</span>
+    <span class="token comment">// 判断在entry头部或尾部插入元素</span>
+    p <span class="token operator">=</span> <span class="token punctuation">(</span>where <span class="token operator">==</span> ZIPLIST_HEAD<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token function">ZIPLIST_ENTRY_HEAD</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token function">ZIPLIST_ENTRY_END</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 插入元素</span>
+    <span class="token keyword">return</span> <span class="token function">__ziplistInsert</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>p<span class="token punctuation">,</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 在entry指定位置插入元素 
+ * 
+ * @param *zl 压缩列表
+ * @param *p 插入下标的指针
+ * @param *s 要插入的数据
+ * @param slen 插入数据长度
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">__ziplistInsert</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>s<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> slen<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token class-name">size_t</span> curlen <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> reqlen<span class="token punctuation">;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> prevlensize<span class="token punctuation">,</span> prevlen <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token class-name">size_t</span> offset<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> nextdiff <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> encoding <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> value <span class="token operator">=</span> <span class="token number">123456789</span><span class="token punctuation">;</span> <span class="token comment">/* initialized to avoid warning. Using a value
+                                    that is easy to see if for some reason
+                                    we use it uninitialized. */</span>
+    zlentry tail<span class="token punctuation">;</span>
+
+    <span class="token comment">// 找出插入的entry的 prevlen。 </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 插入位置不在尾部</span>
+        <span class="token function">ZIP_DECODE_PREVLEN</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> prevlensize<span class="token punctuation">,</span> prevlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 插入位置在尾部</span>
+        <span class="token comment">// 最后一个entry的指针</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>ptail <span class="token operator">=</span> <span class="token function">ZIPLIST_ENTRY_TAIL</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>ptail<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 不是结束标识</span>
+            <span class="token comment">// 前一个entry的长度</span>
+            prevlen <span class="token operator">=</span> <span class="token function">zipRawEntryLength</span><span class="token punctuation">(</span>ptail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 查看条目是否可以编码成整数</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">zipTryEncoding</span><span class="token punctuation">(</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">,</span><span class="token operator">&amp;</span>value<span class="token punctuation">,</span><span class="token operator">&amp;</span>encoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 'encoding' 设置为适当的整数编码</span>
+        reqlen <span class="token operator">=</span> <span class="token function">zipIntSize</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 'encoding' 未受影响，zipStoreEntryEncoding 将使用字符串长度来确定如何对其进行编码。</span>
+        reqlen <span class="token operator">=</span> slen<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 需要前一个entry的长度 和 有效载荷的长度 </span>
+    reqlen <span class="token operator">+=</span> <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>prevlen<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 加上前一个entry的长度</span>
+    reqlen <span class="token operator">+=</span> <span class="token function">zipStoreEntryEncoding</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>encoding<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 加上当前entry编码长度和当前entry数据长度</span>
+
+    <span class="token comment">// 当插入位置不等于尾部时，我们需要确保下一个entry可以在其 prevlen 字段中保存本entry的长度。 </span>
+    <span class="token keyword">int</span> forcelarge <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 用来判断插入位置元素的prevlen长度和实际所需的prevlen长度是否相等</span>
+    nextdiff <span class="token operator">=</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token function">zipPrevLenByteDiff</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>reqlen<span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 这个是为了修复一个bug    ziplist源码确实不太好读呀 😭  详细分析见:https://segmentfault.com/a/1190000018878466</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>nextdiff <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">4</span> <span class="token operator">&amp;&amp;</span> reqlen <span class="token operator">&lt;</span> <span class="token number">4</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        nextdiff <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        forcelarge <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 存储下标，因为重新分配内存可能更改ziplist的地址</span>
+    offset <span class="token operator">=</span> p<span class="token operator">-</span>zl<span class="token punctuation">;</span>
+    <span class="token comment">// 调整ziplist内存大小 // 当前长度 + 需要申请的长度 + nextdiff </span>
+    zl <span class="token operator">=</span> <span class="token function">ziplistResize</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>curlen<span class="token operator">+</span>reqlen<span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    p <span class="token operator">=</span> zl<span class="token operator">+</span>offset<span class="token punctuation">;</span>
+
+    <span class="token comment">// 必要时应用内存移动并更新尾部偏移量。</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 不是结束字符</span>
+        <span class="token comment">// 由于 ZIP_END 字节减一 /* Subtract one because of the ZIP_END bytes */</span>
+        <span class="token comment">// 将p节点后移(没有移动p节点前一节点长度信息)，留出当前节点位置</span>
+        <span class="token function">memmove</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span>p<span class="token operator">-</span>nextdiff<span class="token punctuation">,</span>curlen<span class="token operator">-</span>offset<span class="token operator">-</span><span class="token number">1</span><span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Encode this entry's raw length in the next entry. */</span>
+        <span class="token comment">// 写入p节点前一节点长度信息(要插入节点的长度)</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>forcelarge<span class="token punctuation">)</span>
+            <span class="token function">zipStorePrevEntryLengthLarge</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">else</span>
+            <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 更新尾节点偏移量</span>
+        <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+            <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">+</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* When the tail contains more than one entry, we need to take
+         * "nextdiff" in account as well. Otherwise, a change in the
+         * size of prevlen doesn't have an effect on the *tail* offset. */</span>
+        <span class="token function">zipEntry</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span> <span class="token operator">&amp;</span>tail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span>reqlen<span class="token operator">+</span>tail<span class="token punctuation">.</span>headersize<span class="token operator">+</span>tail<span class="token punctuation">.</span>len<span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+                <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 是结束字符 也就是列表是空的 </span>
+        <span class="token comment">// 空列表插入，只更新尾节点偏移量 </span>
+        <span class="token comment">/* This element will be the new tail. */</span>
+        <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>p<span class="token operator">-</span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 这个类似于数组前插入元素，整体都要移动，这个复杂度 🍵  </span>
+    <span class="token comment">// 当 nextdiff != 0 时，下一个节点的prevlen需要改变，所以我们需要在整个 ziplist 中级联更新</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>nextdiff <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        offset <span class="token operator">=</span> p<span class="token operator">-</span>zl<span class="token punctuation">;</span>
+        <span class="token comment">// 连锁更新 </span>
+        zl <span class="token operator">=</span> <span class="token function">__ziplistCascadeUpdate</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        p <span class="token operator">=</span> zl<span class="token operator">+</span>offset<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 写入前一节点长度信息</span>
+    p <span class="token operator">+=</span> <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>prevlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 写入节点编码与长度信息</span>
+    p <span class="token operator">+=</span> <span class="token function">zipStoreEntryEncoding</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>encoding<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 写入数据</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">ZIP_IS_STR</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">memcpy</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">zipSaveInteger</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>value<span class="token punctuation">,</span>encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 增加压缩列表长度</span>
+    <span class="token function">ZIPLIST_INCR_LENGTH</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到，在新增节点时首先会尝试编码，如果编码成数字使用整形数字编码，否则使用字符串编码<br>  但是不同编码占用的内存空间不同，整数编码占用 1/2/3/4/8 字节，字符串编码占用 slen 字节</p>
+<p>  当在一个元素 A 前插入一个新的元素 B 时，A 的 prevlen 和 prevlensize 都要根据 B 的长度进行相应的变化。<br>  假设 A 的 prevlen 原本只占用 1 字节（也就是 prevlensize 等于 1），而能记录的前一项长度最大为 253 字节。此时，如果 B 的长度超过了 253 字节，A 的 prevlen 就需要使用 5 个字节来记录，这样就需要申请额外的 4 字节空间了。</p>
+<p>  连锁更新一旦发生，就会导致 ziplist 占用的内存空间要多次重新分配，这就会直接影响到 ziplist 的访问性能。</p>
+<h3 id="4-5-1-字符串尝试编码为整数-zipTryEncoding"><a href="#4-5-1-字符串尝试编码为整数-zipTryEncoding" class="headerlink" title="(4.5.1) 字符串尝试编码为整数-zipTryEncoding"></a>(4.5.1) 字符串尝试编码为整数-zipTryEncoding</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 检查"entry"指向的字符串是否可以编码为整数。 
+ * 将整数值存储在“v”中，并将其编码存储在“encoding”中。
+ * 
+ * @param *entry 字符串
+ * @param entrylen 节点长度
+ * @param *v 整数值
+ * @param 编码
+ */</span>
+<span class="token keyword">int</span> <span class="token function">zipTryEncoding</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>entry<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> entrylen<span class="token punctuation">,</span> <span class="token keyword">long</span> <span class="token keyword">long</span> <span class="token operator">*</span>v<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>encoding<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 字符串转换为整数后的值</span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> value<span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>entrylen <span class="token operator">>=</span> <span class="token number">32</span> <span class="token operator">||</span> entrylen <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 字符转整形数字(8字节)  转换后的值存储在&amp;value </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">string2ll</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span>entry<span class="token punctuation">,</span>entrylen<span class="token punctuation">,</span><span class="token operator">&amp;</span>value<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 可以对字符串进行编码。 检查可以容纳此值的最小编码类型。 </span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>value <span class="token operator">>=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> value <span class="token operator">&lt;=</span> <span class="token number">12</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token operator">*</span>encoding <span class="token operator">=</span> ZIP_INT_IMM_MIN<span class="token operator">+</span>value<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>value <span class="token operator">>=</span> INT8_MIN <span class="token operator">&amp;&amp;</span> value <span class="token operator">&lt;=</span> INT8_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token operator">*</span>encoding <span class="token operator">=</span> ZIP_INT_8B<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>value <span class="token operator">>=</span> INT16_MIN <span class="token operator">&amp;&amp;</span> value <span class="token operator">&lt;=</span> INT16_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token operator">*</span>encoding <span class="token operator">=</span> ZIP_INT_16B<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>value <span class="token operator">>=</span> INT24_MIN <span class="token operator">&amp;&amp;</span> value <span class="token operator">&lt;=</span> INT24_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token operator">*</span>encoding <span class="token operator">=</span> ZIP_INT_24B<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>value <span class="token operator">>=</span> INT32_MIN <span class="token operator">&amp;&amp;</span> value <span class="token operator">&lt;=</span> INT32_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token operator">*</span>encoding <span class="token operator">=</span> ZIP_INT_32B<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token operator">*</span>encoding <span class="token operator">=</span> ZIP_INT_64B<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 设置值</span>
+        <span class="token operator">*</span>v <span class="token operator">=</span> value<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 返回false</span>
+    <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  判断字符串是否可以编码为整数<br>  如果可以编码为整数，编码根据大小设置为 ZIP_INT_8B / ZIP_INT_16B / ZIP_INT_24B / ZIP_INT_32B / ZIP_INT_64B，分表占用 1/2/3/4/8 字节内存空间。</p>
+<br>
+
+
+<h3 id="4-5-2-压缩整数占用内存空间大小-zipIntSize"><a href="#4-5-2-压缩整数占用内存空间大小-zipIntSize" class="headerlink" title="(4.5.2) 压缩整数占用内存空间大小-zipIntSize"></a>(4.5.2) 压缩整数占用内存空间大小-zipIntSize</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 返回存储由'encoding'编码的整数所需的字节数。
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">int</span> <span class="token function">zipIntSize</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> encoding<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">switch</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">case</span> ZIP_INT_8B<span class="token operator">:</span>  <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_16B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_24B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_32B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">4</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_64B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">8</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>encoding <span class="token operator">>=</span> ZIP_INT_IMM_MIN <span class="token operator">&amp;&amp;</span> encoding <span class="token operator">&lt;=</span> ZIP_INT_IMM_MAX<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span> <span class="token comment">/* 4 bit immediate */</span>
+    <span class="token function">panic</span><span class="token punctuation">(</span><span class="token string">"Invalid integer encoding 0x%02X"</span><span class="token punctuation">,</span> encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  ZIP_INT_8B / ZIP_INT_16B / ZIP_INT_24B / ZIP_INT_32B / ZIP_INT_64B，分表占用 1/2/3/4/8 字节内存空间</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_16B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">0</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_32B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_64B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">2</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_24B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">3</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_8B</span> <span class="token expression"><span class="token number">0xfe</span></span></span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_IMM_MIN</span> <span class="token expression"><span class="token number">0xf1</span>    </span><span class="token comment">/* 11110001 */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_IMM_MAX</span> <span class="token expression"><span class="token number">0xfd</span>    </span><span class="token comment">/* 11111101 */</span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h3 id="4-5-3-前一个节点长度占用内存大小-zipStorePrevEntryLength"><a href="#4-5-3-前一个节点长度占用内存大小-zipStorePrevEntryLength" class="headerlink" title="(4.5.3) 前一个节点长度占用内存大小-zipStorePrevEntryLength"></a>(4.5.3) 前一个节点长度占用内存大小-zipStorePrevEntryLength</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 编码前一个entry的长度并将其写入指针"p"。
+ * 如果"p"为 NULL，则返回编码此长度所需的字节数。 
+ *
+ * @param *p 
+ * @param len 长度
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">int</span> <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>p <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// ZIP_BIG_PREVLEN = 254 </span>
+        <span class="token comment">// len &lt; 254 返回 1字节，否则返回 int占用4字节+1字节=5字节</span>
+        <span class="token keyword">return</span> <span class="token punctuation">(</span>len <span class="token operator">&lt;</span> ZIP_BIG_PREVLEN<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token number">1</span> <span class="token operator">:</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>len<span class="token punctuation">)</span><span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>len <span class="token operator">&lt;</span> ZIP_BIG_PREVLEN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// len &lt; 254 </span>
+            p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> len<span class="token punctuation">;</span>
+            <span class="token comment">// 返回1字节</span>
+            <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 返回对应的大小</span>
+            <span class="token keyword">return</span> <span class="token function">zipStorePrevEntryLengthLarge</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 编码前一个entry的长度并将其写入指针"p"。 
+ * 这仅使用较大的编码（__ziplistCascadeUpdate 中需要）。
+ */</span>
+<span class="token keyword">int</span> <span class="token function">zipStorePrevEntryLengthLarge</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>p <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 第一个字节设置成 254 </span>
+        p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_BIG_PREVLEN<span class="token punctuation">;</span>
+        <span class="token comment">// len是int类型，占用4个字节</span>
+        <span class="token comment">// 接下来4个字节保存长度len</span>
+        <span class="token function">memcpy</span><span class="token punctuation">(</span>p<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token operator">&amp;</span>len<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>len<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// </span>
+        <span class="token function">memrev32ifbe</span><span class="token punctuation">(</span>p<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 返回 1字节+int占用4字节=5字节</span>
+    <span class="token keyword">return</span> <span class="token number">1</span><span class="token operator">+</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据编码方式的不同， pre_entry_length 域可能占用 1 字节或者 5 字节：<br>1 字节：如果前一节点的长度小于 254 字节，便使用一个字节保存它的值。<br>5 字节：如果前一节点的长度大于等于 254 字节，那么将第 1 个字节的值设为 254 ，然后用接下来的4个字节保存实际长度。</p>
+<p>  253对应的entry</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-------------------</span> entry <span class="token separator comment">--------------------</span><span class="token operator">></span><span class="token operator">|</span>
+
+size          <span class="token number">1</span> byte             <span class="token operator">?</span>          <span class="token operator">?</span>        <span class="token operator">?</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> pre_entry_length <span class="token operator">|</span> encoding <span class="token operator">|</span> length <span class="token operator">|</span> content <span class="token operator">|</span>
+            <span class="token operator">|</span>                  <span class="token operator">|</span>          <span class="token operator">|</span>        <span class="token operator">|</span>         <span class="token operator">|</span>
+value       <span class="token operator">|</span> <span class="token number">1111</span> <span class="token number">1101</span>        <span class="token operator">|</span>          <span class="token operator">|</span>        <span class="token operator">|</span>         <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  1024对应的entry</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">------------------------------</span> entry <span class="token separator comment">----------------------------------</span><span class="token operator">></span><span class="token operator">|</span>
+
+size          <span class="token number">5</span> bytes                                     <span class="token operator">?</span>          <span class="token operator">?</span>        <span class="token operator">?</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> pre_entry_length                          <span class="token operator">|</span> encoding <span class="token operator">|</span> length <span class="token operator">|</span> content <span class="token operator">|</span>
+            <span class="token operator">|</span>                                           <span class="token operator">|</span>          <span class="token operator">|</span>        <span class="token operator">|</span>         <span class="token operator">|</span>
+            <span class="token operator">|</span> <span class="token number">11111110</span> <span class="token hash constant">00000000000000000000010000000000</span> <span class="token operator">|</span> <span class="token operator">?</span>        <span class="token operator">|</span> <span class="token operator">?</span>      <span class="token operator">|</span> <span class="token operator">?</span>       <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+            <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-------</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-------------------------------</span><span class="token operator">></span><span class="token operator">|</span>
+              <span class="token number">1</span> byte       <span class="token number">4</span> bytes<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+<h3 id="4-5-4-节点编码占用的内存大小-zipStoreEntryEncoding"><a href="#4-5-4-节点编码占用的内存大小-zipStoreEntryEncoding" class="headerlink" title="(4.5.4) 节点编码占用的内存大小-zipStoreEntryEncoding"></a>(4.5.4) 节点编码占用的内存大小-zipStoreEntryEncoding</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 在指针'p'中写入entry的编码头。 
+ * 如果 p 为 NULL，它只返回编码该长度所需的字节数。 
+ * 参数：
+ *  'encoding' 用于entry的编码。 对于单字节小立即整数，它可以是 ZIP_INT_* 或 ZIP_STR_* 或介于 ZIP_INT_IMM_MIN 和 ZIP_INT_IMM_MAX 之间。
+ *  'rawlen' 仅用于 ZIP_STR_* 编码并且是该条目表示的字符串的长度。
+ *
+ *  该函数返回存储在指针"p"中的编码/长度标头使用的字节数。
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">int</span> <span class="token function">zipStoreEntryEncoding</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> encoding<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> rawlen<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 长度</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> len <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">,</span> buf<span class="token punctuation">[</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">ZIP_IS_STR</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 字符串编码</span>
+        <span class="token comment">// 虽然给定了编码，但它可能没有为字符串设置，所以我们在这里使用原始长度来确定它。 </span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>rawlen <span class="token operator">&lt;=</span> <span class="token number">0x3f</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 字符串长度小于等于63字节（16进制为0x3f）</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>p<span class="token punctuation">)</span> <span class="token keyword">return</span> len<span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_STR_06B <span class="token operator">|</span> rawlen<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>rawlen <span class="token operator">&lt;=</span> <span class="token number">0x3fff</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 字符串长度小于等于16383字节（16进制为0x3fff）</span>
+            len <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token comment">// 编码结果是2字节</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>p<span class="token punctuation">)</span> <span class="token keyword">return</span> len<span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_STR_14B <span class="token operator">|</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>rawlen <span class="token operator">>></span> <span class="token number">8</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0x3f</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> rawlen <span class="token operator">&amp;</span> <span class="token number">0xff</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 字符串长度大于16383字节</span>
+            len <span class="token operator">+=</span> <span class="token number">4</span><span class="token punctuation">;</span> <span class="token comment">// 编码结果是5字节</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>p<span class="token punctuation">)</span> <span class="token keyword">return</span> len<span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_STR_32B<span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>rawlen <span class="token operator">>></span> <span class="token number">24</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0xff</span><span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>rawlen <span class="token operator">>></span> <span class="token number">16</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0xff</span><span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>rawlen <span class="token operator">>></span> <span class="token number">8</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0xff</span><span class="token punctuation">;</span>
+            buf<span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">]</span> <span class="token operator">=</span> rawlen <span class="token operator">&amp;</span> <span class="token number">0xff</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 表示整数编码，因此长度始终为 1。 </span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>p<span class="token punctuation">)</span> <span class="token keyword">return</span> len<span class="token punctuation">;</span>
+        buf<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> encoding<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 把长度存储到指针p</span>
+    <span class="token function">memcpy</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> len<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<p>  根据字符串不同的长度，分别占用 1/2/5 字节内存空间。</p>
+<p>  针对不同长度的数据，使用不同大小的元数据信息(encoding)，这种方法可以有效地节省内存开销。</p>
+<h3 id="4-5-5-前一个节点长度内存空间之差-zipPrevLenByteDiff"><a href="#4-5-5-前一个节点长度内存空间之差-zipPrevLenByteDiff" class="headerlink" title="(4.5.5) 前一个节点长度内存空间之差-zipPrevLenByteDiff"></a>(4.5.5) 前一个节点长度内存空间之差-zipPrevLenByteDiff</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 给定一个指针"p"指向 entry 前缀的 prevlen 信息，
+ * 如果前一个entry的大小发生变化，此函数将返回编码 prevlen 所需的字节数差异。
+ *
+ * 如果 A 是现在用于对"prevlen"字段进行编码的字节数。 
+ * 如果前一个元素将更新为大小为"len"，则 B 是编码"prevlen"所需的字节数。
+ * 函数返回 B - A
+ *
+ * 因此，如果需要更多空间，该函数返回一个正数，如果需要更少空间，则返回负数，如果需要相同空间，则返回零。  
+ *
+ * @param *p 
+ * @param len 占用的内存空间大小/长度
+ */</span>
+<span class="token keyword">int</span> <span class="token function">zipPrevLenByteDiff</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> prevlensize<span class="token punctuation">;</span>
+    <span class="token comment">// 前一个节点长度</span>
+    <span class="token function">ZIP_DECODE_PREVLENSIZE</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> prevlensize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// B - A </span>
+    <span class="token keyword">return</span> <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span> len<span class="token punctuation">)</span> <span class="token operator">-</span> prevlensize<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-5-6-前一节点长度占用的内存空间-ZIP-DECODE-PREVLENSIZE"><a href="#4-5-6-前一节点长度占用的内存空间-ZIP-DECODE-PREVLENSIZE" class="headerlink" title="(4.5.6) 前一节点长度占用的内存空间-ZIP_DECODE_PREVLENSIZE"></a>(4.5.6) 前一节点长度占用的内存空间-ZIP_DECODE_PREVLENSIZE</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 返回用于对前一个entry的长度进行编码的字节数。 
+ * 通过设置 'prevlensize' 返回长度。
+ */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name function">ZIP_DECODE_PREVLENSIZE</span><span class="token expression"><span class="token punctuation">(</span>ptr<span class="token punctuation">,</span> prevlensize<span class="token punctuation">)</span> <span class="token keyword">do</span> <span class="token punctuation">&#123;</span>                          </span><span class="token punctuation">\</span>
+    <span class="token expression"><span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>ptr<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> ZIP_BIG_PREVLEN<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>                                          </span><span class="token punctuation">\</span>
+        <span class="token expression"><span class="token punctuation">(</span>prevlensize<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>                                                     </span><span class="token punctuation">\</span>
+    <span class="token expression"><span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>                                                                   </span><span class="token punctuation">\</span>
+        <span class="token expression"><span class="token punctuation">(</span>prevlensize<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token number">5</span><span class="token punctuation">;</span>                                                     </span><span class="token punctuation">\</span>
+    <span class="token expression"><span class="token punctuation">&#125;</span>                                                                          </span><span class="token punctuation">\</span>
+<span class="token expression"><span class="token punctuation">&#125;</span> <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  前一节点长度小于254时，使用1个字节保存前一节点的长度信息。<br>  前一节点长度大于254时，使用5个字节保存前一节点的长度信息。</p>
+<h2 id="4-6-取指定节点信息"><a href="#4-6-取指定节点信息" class="headerlink" title="(4.6) 取指定节点信息"></a>(4.6) 取指定节点信息</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 返回包含有关entry结构的所有信息。
+ */</span>
+<span class="token keyword">void</span> <span class="token function">zipEntry</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> zlentry <span class="token operator">*</span>e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 前一哥节点长度信息解析</span>
+    <span class="token function">ZIP_DECODE_PREVLEN</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> e<span class="token operator">-></span>prevrawlensize<span class="token punctuation">,</span> e<span class="token operator">-></span>prevrawlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 当前节点 数据长度解析 与 编码信息解析</span>
+    <span class="token function">ZIP_DECODE_LENGTH</span><span class="token punctuation">(</span>p <span class="token operator">+</span> e<span class="token operator">-></span>prevrawlensize<span class="token punctuation">,</span> e<span class="token operator">-></span>encoding<span class="token punctuation">,</span> e<span class="token operator">-></span>lensize<span class="token punctuation">,</span> e<span class="token operator">-></span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置header长度</span>
+    e<span class="token operator">-></span>headersize <span class="token operator">=</span> e<span class="token operator">-></span>prevrawlensize <span class="token operator">+</span> e<span class="token operator">-></span>lensize<span class="token punctuation">;</span>
+    <span class="token comment">// 指针指向节点e</span>
+    e<span class="token operator">-></span>p <span class="token operator">=</span> p<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-7-插入数据"><a href="#4-7-插入数据" class="headerlink" title="(4.7) 插入数据"></a>(4.7) 插入数据</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 在entry指定位置插入元素 
+ * 
+ * @param *zl 压缩列表
+ * @param *p 插入下标的指针
+ * @param *s 要插入的数据
+ * @param slen 插入数据长度
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistInsert</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>s<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> slen<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">__ziplistInsert</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>p<span class="token punctuation">,</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-8-删除数据"><a href="#4-8-删除数据" class="headerlink" title="(4.8) 删除数据"></a>(4.8) 删除数据</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Delete a single entry from the ziplist, pointed to by *p.
  * Also update *p in place, to be able to iterate over the
- * ziplist, while deleting entries. *&#x2F;
-unsigned char *ziplistDelete(unsigned char *zl, unsigned char **p) &#123;
-    size_t offset &#x3D; *p-zl;
-    zl &#x3D; __ziplistDelete(zl,*p,1);
+ * ziplist, while deleting entries. */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistDelete</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>p<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">size_t</span> offset <span class="token operator">=</span> <span class="token operator">*</span>p<span class="token operator">-</span>zl<span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    zl <span class="token operator">=</span> <span class="token function">__ziplistDelete</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span><span class="token operator">*</span>p<span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 
-    &#x2F;* Store pointer to current element in p, because ziplistDelete will
-     * do a realloc which might result in a different &quot;zl&quot;-pointer.
+    <span class="token comment">/* Store pointer to current element in p, because ziplistDelete will
+     * do a realloc which might result in a different "zl"-pointer.
      * When the delete direction is back to front, we might delete the last
-     * entry and end up with &quot;p&quot; pointing to ZIP_END, so check this. *&#x2F;
-    *p &#x3D; zl+offset;
-    return zl;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+     * entry and end up with "p" pointing to ZIP_END, so check this. */</span>
+    <span class="token operator">*</span>p <span class="token operator">=</span> zl<span class="token operator">+</span>offset<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">
-&#x2F;* Delete &quot;num&quot; entries, starting at &quot;p&quot;. Returns pointer to the ziplist. *&#x2F;
-unsigned char *__ziplistDelete(unsigned char *zl, unsigned char *p, unsigned int num) &#123;
-    unsigned int i, totlen, deleted &#x3D; 0;
-    size_t offset;
-    int nextdiff &#x3D; 0;
-    zlentry first, tail;
 
-    zipEntry(p, &amp;first);
-    for (i &#x3D; 0; p[0] !&#x3D; ZIP_END &amp;&amp; i &lt; num; i++) &#123;
-        p +&#x3D; zipRawEntryLength(p);
-        deleted++;
-    &#125;
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Delete "num" entries, starting at "p". Returns pointer to the ziplist. */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">__ziplistDelete</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> num<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> i<span class="token punctuation">,</span> totlen<span class="token punctuation">,</span> deleted <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token class-name">size_t</span> offset<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> nextdiff <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    zlentry first<span class="token punctuation">,</span> tail<span class="token punctuation">;</span>
 
-    totlen &#x3D; p-first.p; &#x2F;* Bytes taken by the element(s) to delete. *&#x2F;
-    if (totlen &gt; 0) &#123;
-        if (p[0] !&#x3D; ZIP_END) &#123;
-            &#x2F;* Storing &#96;prevrawlen&#96; in this entry may increase or decrease the
-             * number of bytes required compare to the current &#96;prevrawlen&#96;.
+    <span class="token function">zipEntry</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> <span class="token operator">&amp;</span>first<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END <span class="token operator">&amp;&amp;</span> i <span class="token operator">&lt;</span> num<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        p <span class="token operator">+=</span> <span class="token function">zipRawEntryLength</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        deleted<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    totlen <span class="token operator">=</span> p<span class="token operator">-</span>first<span class="token punctuation">.</span>p<span class="token punctuation">;</span> <span class="token comment">/* Bytes taken by the element(s) to delete. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>totlen <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* Storing `prevrawlen` in this entry may increase or decrease the
+             * number of bytes required compare to the current `prevrawlen`.
              * There always is room to store this, because it was previously
-             * stored by an entry that is now being deleted. *&#x2F;
-            nextdiff &#x3D; zipPrevLenByteDiff(p,first.prevrawlen);
+             * stored by an entry that is now being deleted. */</span>
+            nextdiff <span class="token operator">=</span> <span class="token function">zipPrevLenByteDiff</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>first<span class="token punctuation">.</span>prevrawlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
 
-            &#x2F;* Note that there is always space when p jumps backward: if
+            <span class="token comment">/* Note that there is always space when p jumps backward: if
              * the new previous entry is large, one of the deleted elements
              * had a 5 bytes prevlen header, so there is for sure at least
-             * 5 bytes free and we need just 4. *&#x2F;
-            p -&#x3D; nextdiff;
-            zipStorePrevEntryLength(p,first.prevrawlen);
+             * 5 bytes free and we need just 4. */</span>
+            p <span class="token operator">-=</span> nextdiff<span class="token punctuation">;</span>
+            <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>first<span class="token punctuation">.</span>prevrawlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
 
-            &#x2F;* Update offset for tail *&#x2F;
-            ZIPLIST_TAIL_OFFSET(zl) &#x3D;
-                intrev32ifbe(intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl))-totlen);
+            <span class="token comment">/* Update offset for tail */</span>
+            <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+                <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">-</span>totlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
 
-            &#x2F;* When the tail contains more than one entry, we need to take
-             * &quot;nextdiff&quot; in account as well. Otherwise, a change in the
-             * size of prevlen doesn&#39;t have an effect on the *tail* offset. *&#x2F;
-            zipEntry(p, &amp;tail);
-            if (p[tail.headersize+tail.len] !&#x3D; ZIP_END) &#123;
-                ZIPLIST_TAIL_OFFSET(zl) &#x3D;
-                   intrev32ifbe(intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl))+nextdiff);
-            &#125;
+            <span class="token comment">/* When the tail contains more than one entry, we need to take
+             * "nextdiff" in account as well. Otherwise, a change in the
+             * size of prevlen doesn't have an effect on the *tail* offset. */</span>
+            <span class="token function">zipEntry</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> <span class="token operator">&amp;</span>tail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span>tail<span class="token punctuation">.</span>headersize<span class="token operator">+</span>tail<span class="token punctuation">.</span>len<span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+                   <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
 
-            &#x2F;* Move tail to the front of the ziplist *&#x2F;
-            memmove(first.p,p,
-                intrev32ifbe(ZIPLIST_BYTES(zl))-(p-zl)-1);
-        &#125; else &#123;
-            &#x2F;* The entire tail was deleted. No need to move memory. *&#x2F;
-            ZIPLIST_TAIL_OFFSET(zl) &#x3D;
-                intrev32ifbe((first.p-zl)-first.prevrawlen);
-        &#125;
+            <span class="token comment">/* Move tail to the front of the ziplist */</span>
+            <span class="token function">memmove</span><span class="token punctuation">(</span>first<span class="token punctuation">.</span>p<span class="token punctuation">,</span>p<span class="token punctuation">,</span>
+                <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token punctuation">(</span>p<span class="token operator">-</span>zl<span class="token punctuation">)</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* The entire tail was deleted. No need to move memory. */</span>
+            <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+                <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token punctuation">(</span>first<span class="token punctuation">.</span>p<span class="token operator">-</span>zl<span class="token punctuation">)</span><span class="token operator">-</span>first<span class="token punctuation">.</span>prevrawlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
 
-        &#x2F;* Resize and update length *&#x2F;
-        offset &#x3D; first.p-zl;
-        zl &#x3D; ziplistResize(zl, intrev32ifbe(ZIPLIST_BYTES(zl))-totlen+nextdiff);
-        ZIPLIST_INCR_LENGTH(zl,-deleted);
-        p &#x3D; zl+offset;
+        <span class="token comment">/* Resize and update length */</span>
+        offset <span class="token operator">=</span> first<span class="token punctuation">.</span>p<span class="token operator">-</span>zl<span class="token punctuation">;</span>
+        zl <span class="token operator">=</span> <span class="token function">ziplistResize</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">-</span>totlen<span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">ZIPLIST_INCR_LENGTH</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span><span class="token operator">-</span>deleted<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        p <span class="token operator">=</span> zl<span class="token operator">+</span>offset<span class="token punctuation">;</span>
 
-        &#x2F;* When nextdiff !&#x3D; 0, the raw length of the next entry has changed, so
-         * we need to cascade the update throughout the ziplist *&#x2F;
-        if (nextdiff !&#x3D; 0)
-            zl &#x3D; __ziplistCascadeUpdate(zl,p);
-    &#125;
-    return zl;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+        <span class="token comment">/* When nextdiff != 0, the raw length of the next entry has changed, so
+         * we need to cascade the update throughout the ziplist */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>nextdiff <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+            zl <span class="token operator">=</span> <span class="token function">__ziplistCascadeUpdate</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>p<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h3 id="1-2-5-查询-ziplistFind"><a href="#1-2-5-查询-ziplistFind" class="headerlink" title="(1.2.5) 查询-ziplistFind"></a>(1.2.5) 查询-ziplistFind</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Find pointer to the entry equal to the specified entry. Skip &#39;skip&#39; entries
- * between every comparison. Returns NULL when the field could not be found. *&#x2F;
-unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int vlen, unsigned int skip) &#123;
-    int skipcnt &#x3D; 0;
-    unsigned char vencoding &#x3D; 0;
-    long long vll &#x3D; 0;
+<h2 id="4-9-查找-ziplistFind"><a href="#4-9-查找-ziplistFind" class="headerlink" title="(4.9) 查找-ziplistFind"></a>(4.9) 查找-ziplistFind</h2><p>  要查找列表中间的元素时，ziplist 就得从列表头或列表尾遍历才行。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 查找指向等于指定节点的节点的指针。 
+ * 在每次比较之间跳过'skip'节点。 
+ * 找不到字段时返回 NULL。
+ * 
+ * @param *p  节点指针
+ * @param *vstr 
+ * @param vlen
+ * @param skip 
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistFind</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>vstr<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> vlen<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> skip<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> skipcnt <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> vencoding <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> vll <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
 
-    while (p[0] !&#x3D; ZIP_END) &#123;
-        unsigned int prevlensize, encoding, lensize, len;
-        unsigned char *q;
+    <span class="token comment">// 遍历压缩列表</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 不等于结束符</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">int</span> prevlensize<span class="token punctuation">,</span> encoding<span class="token punctuation">,</span> lensize<span class="token punctuation">,</span> len<span class="token punctuation">;</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>q<span class="token punctuation">;</span>
 
-        ZIP_DECODE_PREVLENSIZE(p, prevlensize);
-        ZIP_DECODE_LENGTH(p + prevlensize, encoding, lensize, len);
-        q &#x3D; p + prevlensize + lensize;
+        <span class="token function">ZIP_DECODE_PREVLENSIZE</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> prevlensize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">ZIP_DECODE_LENGTH</span><span class="token punctuation">(</span>p <span class="token operator">+</span> prevlensize<span class="token punctuation">,</span> encoding<span class="token punctuation">,</span> lensize<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        q <span class="token operator">=</span> p <span class="token operator">+</span> prevlensize <span class="token operator">+</span> lensize<span class="token punctuation">;</span>
 
-        if (skipcnt &#x3D;&#x3D; 0) &#123;
-            &#x2F;* Compare current entry with specified entry *&#x2F;
-            if (ZIP_IS_STR(encoding)) &#123;
-                if (len &#x3D;&#x3D; vlen &amp;&amp; memcmp(q, vstr, vlen) &#x3D;&#x3D; 0) &#123;
-                    return p;
-                &#125;
-            &#125; else &#123;
-                &#x2F;* Find out if the searched field can be encoded. Note that
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>skipcnt <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* Compare current entry with specified entry */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">ZIP_IS_STR</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 如果编码为字符串 </span>
+                <span class="token comment">// 判断长度相同 并且 </span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>len <span class="token operator">==</span> vlen <span class="token operator">&amp;&amp;</span> <span class="token function">memcmp</span><span class="token punctuation">(</span>q<span class="token punctuation">,</span> vstr<span class="token punctuation">,</span> vlen<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token keyword">return</span> p<span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">/* Find out if the searched field can be encoded. Note that
                  * we do it only the first time, once done vencoding is set
-                 * to non-zero and vll is set to the integer value. *&#x2F;
-                if (vencoding &#x3D;&#x3D; 0) &#123;
-                    if (!zipTryEncoding(vstr, vlen, &amp;vll, &amp;vencoding)) &#123;
-                        &#x2F;* If the entry can&#39;t be encoded we set it to
-                         * UCHAR_MAX so that we don&#39;t retry again the next
-                         * time. *&#x2F;
-                        vencoding &#x3D; UCHAR_MAX;
-                    &#125;
-                    &#x2F;* Must be non-zero by now *&#x2F;
-                    assert(vencoding);
-                &#125;
+                 * to non-zero and vll is set to the integer value. */</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>vencoding <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 首次比对时，对传入值进行解码</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">zipTryEncoding</span><span class="token punctuation">(</span>vstr<span class="token punctuation">,</span> vlen<span class="token punctuation">,</span> <span class="token operator">&amp;</span>vll<span class="token punctuation">,</span> <span class="token operator">&amp;</span>vencoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token comment">/* If the entry can't be encoded we set it to
+                         * UCHAR_MAX so that we don't retry again the next
+                         * time. */</span>
+                        vencoding <span class="token operator">=</span> UCHAR_MAX<span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                    <span class="token comment">/* Must be non-zero by now */</span>
+                    <span class="token function">assert</span><span class="token punctuation">(</span>vencoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
 
-                &#x2F;* Compare current entry with specified entry, do it only
-                 * if vencoding !&#x3D; UCHAR_MAX because if there is no encoding
-                 * possible for the field it can&#39;t be a valid integer. *&#x2F;
-                if (vencoding !&#x3D; UCHAR_MAX) &#123;
-                    long long ll &#x3D; zipLoadInteger(q, encoding);
-                    if (ll &#x3D;&#x3D; vll) &#123;
-                        return p;
-                    &#125;
-                &#125;
-            &#125;
+                <span class="token comment">/* Compare current entry with specified entry, do it only
+                 * if vencoding != UCHAR_MAX because if there is no encoding
+                 * possible for the field it can't be a valid integer. */</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>vencoding <span class="token operator">!=</span> UCHAR_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token keyword">long</span> <span class="token keyword">long</span> ll <span class="token operator">=</span> <span class="token function">zipLoadInteger</span><span class="token punctuation">(</span>q<span class="token punctuation">,</span> encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span>ll <span class="token operator">==</span> vll<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token keyword">return</span> p<span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
 
-            &#x2F;* Reset skip count *&#x2F;
-            skipcnt &#x3D; skip;
-        &#125; else &#123;
-            &#x2F;* Skip entry *&#x2F;
-            skipcnt--;
-        &#125;
+            <span class="token comment">/* Reset skip count */</span>
+            skipcnt <span class="token operator">=</span> skip<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 跳过entry</span>
+            skipcnt<span class="token operator">--</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
 
-        &#x2F;* Move to next entry *&#x2F;
-        p &#x3D; q + len;
-    &#125;
+        <span class="token comment">// 指向下一个entry </span>
+        p <span class="token operator">=</span> q <span class="token operator">+</span> len<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
 
-    return NULL;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
+    <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
 <p>当我们往 ziplist 中插入数据时，ziplist 就会根据数据是字符串还是整数，以及它们的大小进行不同的编码。</p>
 <p>ziplist 是如何进行编码呢？</p>
 <p>ziplist 列表项包括三部分内容，分别是前一项的长度（prevlen）、当前项长度信息的编码结果（encoding），以及当前项的实际数据（data）。<br>下面的图展示了列表项的结构</p>
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/compress-datastruct/ziplist.html">Redis设计与实现-压缩列表</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/402223">Redis源码剖析与实战 - 04 内存友好的数据结构该如何细化设计？</a><br>[3] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/ziplist.c">redis-ziplist源码-github</a></p>
+<h1 id="5-总结"><a href="#5-总结" class="headerlink" title="(5) 总结"></a>(5) 总结</h1><p>1、ziplist 设计的初衷就是「节省内存」，在存储数据时，把内存利用率发挥到了极致：</p>
+<ul>
+<li>数字按「整型」编码存储，比直接当字符串存内存占用少</li>
+<li>数据「长度」字段，会根据内容的大小选择最小的长度编码</li>
+<li>甚至对于极小的数据，干脆把内容直接放到了「长度」字段中（前几个位表示长度，后几个位存数据）</li>
+</ul>
+<p>2、但 ziplist 的劣势也很明显：</p>
+<ul>
+<li>寻找元素只能挨个遍历，存储过长数据，查询性能很低</li>
+<li>每个元素中保存了「上一个」元素的长度（为了方便反向遍历），这会导致上一个元素内容发生修改，长度超过了原来的编码长度，下一个元素的内容也要跟着变，重新分配内存，进而就有可能再次引起下一级的变化，一级级更新下去，频繁申请内存</li>
+</ul>
+<p>3、想要缓解 ziplist 的问题，比较简单直接的方案就是，多个数据项，不再用一个 ziplist 来存，而是分拆到多个 ziplist 中，每个 ziplist 用指针串起来，这样修改其中一个数据项，即便发生级联更新，也只会影响这一个 ziplist，其它 ziplist 不受影响，这种方案就是 quicklist：</p>
+<p>qucklist: ziplist1(也叫quicklistNode) &lt;-&gt; ziplist2 &lt;-&gt; ziplist3 &lt;-&gt; …</p>
+<p>4、List 数据类型底层实现，就是用的 quicklist，因为它是一个链表，所以 LPUSH/LPOP/RPUSH/RPOP 的复杂度是 O(1)</p>
+<p>5、List 中每个 ziplist 节点可以存的元素个数/总大小，可以通过 list-max-ziplist-size 配置：</p>
+<ul>
+<li>正数：ziplist 最多包含几个数据项</li>
+<li>负数：取值 -1 ~ -5，表示每个 ziplist 存储最大的字节数，默认 -2，每个ziplist 8KB</li>
+</ul>
+<p>ziplist 超过上述任一配置，添加新元素就会新建 ziplist 插入到链表中。</p>
+<p>6、List 因为更多是两头操作，为了节省内存，还可以把中间的 ziplist「压缩」，具体可看 list-compress-depth 配置项，默认配置不压缩</p>
+<p>7、要想彻底解决 ziplist 级联更新问题，本质上要修改 ziplist 的存储结构，也就是不要让每个元素保存「上一个」元素的长度即可，所以才有了 listpack</p>
+<p>8、listpack 每个元素项不再保存上一个元素的长度，而是优化元素内字段的顺序，来保证既可以从前也可以向后遍历</p>
+<p>9、listpack 是为了替代 ziplist 为设计的，但因为 List/Hash/ZSet 都严重依赖 ziplist，所以这个替换之路很漫长，目前只有 Stream 数据类型用到了 listpack</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/compress-datastruct/ziplist.html">Redis设计与实现-压缩列表</a><br>[2] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/402223">Redis源码剖析与实战 - 04 内存友好的数据结构该如何细化设计？</a><br>[3] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/405387">Redis源码剖析与实战 - 06 | 从ziplist到quicklist，再到listpack的启发</a><br>[4] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/ziplist.c">redis-ziplist源码-github</a></p>
 
     </div>
 
@@ -658,21 +1191,21 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
 </div>
 
           <div class="post-tags">
-              <a href="/tags/database/" rel="tag"># database</a>
               <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
           </div>
 
         
 
           <div class="post-nav">
             <div class="post-nav-item">
-                <a href="/2023/01/08/redis-datatype-object/" rel="prev" title="Redis对象处理机制">
-                  <i class="fa fa-chevron-left"></i> Redis对象处理机制
+                <a href="/2023/01/08/redis-datatype-object/" rel="prev" title="Redis 对象处理机制 redisObject">
+                  <i class="fa fa-chevron-left"></i> Redis 对象处理机制 redisObject
                 </a>
             </div>
             <div class="post-nav-item">
-                <a href="/2023/01/15/rocksdb-index-model/" rel="next" title="RocksDB索引模型">
-                  RocksDB索引模型 <i class="fa fa-chevron-right"></i>
+                <a href="/2023/01/15/redis-data-structure-intset/" rel="next" title="Redis 数据结构 整数集合(intset)">
+                  Redis 数据结构 整数集合(intset) <i class="fa fa-chevron-right"></i>
                 </a>
             </div>
           </div>

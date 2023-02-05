@@ -19,17 +19,18 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
 
-    <meta name="description" content="整体流程  acceptTcpHandler -&gt; anetTcpAccept -&gt; acceptCommonHandler  acceptCommonHandler-&gt; createClient -&gt; readQueryFromClient">
+    <meta name="description" content="(1) Redis实现分布式锁  通过Redis SET key value NX 可以简单地实现分布式锁。 127.0.0.1:6379&gt;  SET key_lock value1 NX OK 127.0.0.1:6379&gt; 127.0.0.1:6379&gt;  SET key_lock value1 NX (nil) 127.0.0.1:6379&gt;   在解锁时可以先判断key是否存在，然后对比值">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis命令执行流程">
 <meta property="og:url" content="http://weikeqin.com/2022/02/26/redis-command-execution-process/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="整体流程  acceptTcpHandler -&gt; anetTcpAccept -&gt; acceptCommonHandler  acceptCommonHandler-&gt; createClient -&gt; readQueryFromClient">
+<meta property="og:description" content="(1) Redis实现分布式锁  通过Redis SET key value NX 可以简单地实现分布式锁。 127.0.0.1:6379&gt;  SET key_lock value1 NX OK 127.0.0.1:6379&gt; 127.0.0.1:6379&gt;  SET key_lock value1 NX (nil) 127.0.0.1:6379&gt;   在解锁时可以先判断key是否存在，然后对比值">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2022-02-26T11:22:27.000Z">
-<meta property="article:modified_time" content="2022-12-02T15:10:16.592Z">
+<meta property="article:modified_time" content="2023-01-30T15:09:30.800Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
+<meta property="article:tag" content="databases">
 <meta name="twitter:card" content="summary">
 
 
@@ -149,7 +150,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">整体流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RedisServer%E5%A4%84%E7%90%86Get%E5%91%BD%E4%BB%A4%E6%B5%81%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">RedisServer处理Get命令流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RedisServer%E5%A4%84%E7%90%86Set%E5%91%BD%E4%BB%A4%E6%B5%81%E7%A8%8B"><span class="nav-number">3.</span> <span class="nav-text">RedisServer处理Set命令流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RedisClient%E5%8F%91%E8%B5%B7%E8%AF%B7%E6%B1%82%E6%B5%81%E7%A8%8B"><span class="nav-number">4.</span> <span class="nav-text">RedisClient发起请求流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Client-Server%E5%A4%84%E7%90%86%E6%B5%81%E7%A8%8B"><span class="nav-number">5.</span> <span class="nav-text">Client-Server处理流程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis实现分布式锁</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis%E5%91%BD%E4%BB%A4%E7%9A%84%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis命令的处理过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E6%8E%A5%E6%94%B6%E8%AF%B7%E6%B1%82%E9%98%B6%E6%AE%B5-acceptTcpHandler"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 接收请求阶段-acceptTcpHandler()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E5%91%BD%E4%BB%A4%E8%AF%BB%E5%8F%96%E9%98%B6%E6%AE%B5-readQueryFromClient"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 命令读取阶段-readQueryFromClient()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E5%91%BD%E4%BB%A4%E8%A7%A3%E6%9E%90-processInputBuffer"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) 命令解析-processInputBuffer()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C-processCommand"><span class="nav-number">2.4.</span> <span class="nav-text">(2.4) 命令执行-processCommand()</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-1-%E6%9F%A5%E6%89%BE%E5%AF%B9%E5%BA%94%E5%91%BD%E4%BB%A4-lookupCommand"><span class="nav-number">2.4.1.</span> <span class="nav-text">(2.4.1) 查找对应命令-lookupCommand</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-2-%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4-call"><span class="nav-number">2.4.2.</span> <span class="nav-text">(2.4.2) 执行命令-call</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-5-%E7%BB%93%E6%9E%9C%E8%BF%94%E5%9B%9E-addReply"><span class="nav-number">2.5.</span> <span class="nav-text">(2.5) 结果返回-addReply()</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E5%AF%B9%E5%91%BD%E4%BB%A4%E5%8E%9F%E5%AD%90%E6%80%A7%E7%9A%84%E5%BD%B1%E5%93%8D"><span class="nav-number">3.</span> <span class="nav-text">(3) IO多路复用对命令原子性的影响</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -162,7 +163,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-count">304</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -173,7 +174,7 @@
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -268,7 +269,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-12-02 23:10:16" itemprop="dateModified" datetime="2022-12-02T23:10:16+08:00">2022-12-02</time>
+      <time title="修改时间：2023-01-30 23:09:30" itemprop="dateModified" datetime="2023-01-30T23:09:30+08:00">2023-01-30</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -276,7 +277,7 @@
       </span>
       <span class="post-meta-item-text">分类于</span>
         <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
         </span>
     </span>
 
@@ -294,14 +295,14 @@
         <i class="far fa-file-word"></i>
       </span>
       <span class="post-meta-item-text">本文字数：</span>
-      <span>1k</span>
+      <span>9.2k</span>
     </span>
     <span class="post-meta-item" title="阅读时长">
       <span class="post-meta-item-icon">
         <i class="far fa-clock"></i>
       </span>
       <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
+      <span>8 分钟</span>
     </span>
 </div>
 
@@ -312,61 +313,444 @@
     
     
     <div class="post-body" itemprop="articleBody">
-        <h1 id="整体流程"><a href="#整体流程" class="headerlink" title="整体流程"></a>整体流程</h1><p> <img src="" alt="redis命令执行流程图"></p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log">acceptTcpHandler <span class="token operator">-</span><span class="token operator">></span> anetTcpAccept <span class="token operator">-</span><span class="token operator">></span> acceptCommonHandler<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+        <h1 id="1-Redis实现分布式锁"><a href="#1-Redis实现分布式锁" class="headerlink" title="(1) Redis实现分布式锁"></a>(1) Redis实现分布式锁</h1><p>  通过Redis <code>SET key value NX</code> 可以简单地实现分布式锁。</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  SET key_lock value1 NX
+OK
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span>  SET key_lock value1 NX
+<span class="token operator">(</span>nil<span class="token operator">)</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<pre class="line-numbers language-log" data-language="log"><code class="language-log">acceptCommonHandler<span class="token operator">-</span><span class="token operator">></span> createClient <span class="token operator">-</span><span class="token operator">></span> readQueryFromClient<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
+<p> 在解锁时可以先判断key是否存在，然后对比值是否相等，相等后再删除key，释放锁。</p>
 <span id="more"></span>
 
-<h1 id="RedisServer处理Get命令流程"><a href="#RedisServer处理Get命令流程" class="headerlink" title="RedisServer处理Get命令流程"></a>RedisServer处理Get命令流程</h1><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">/</span><span class="token operator">/</span> <span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>  有没有想过一个问题，Redis <code>SET key value NX</code> 是怎么保证分布式锁的原子性的？</p>
+<br>
 
 
-<h1 id="RedisServer处理Set命令流程"><a href="#RedisServer处理Set命令流程" class="headerlink" title="RedisServer处理Set命令流程"></a>RedisServer处理Set命令流程</h1><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">/</span><span class="token operator">/</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h1 id="2-Redis命令的处理过程"><a href="#2-Redis命令的处理过程" class="headerlink" title="(2) Redis命令的处理过程"></a>(2) Redis命令的处理过程</h1><p>Redis Server 和客户端建立连接后，就会在事件驱动框架中注册可读事件，这就对应了客户端的命令请求。<br>而对于整个命令处理的过程来说，我认为主要可以分成五个阶段，它们分别对应了 Redis 源码中的不同函数。</p>
+<ol>
+<li>接收请求，对应 acceptTcpHandler 函数</li>
+<li>命令读取，对应 readQueryFromClient 函数；</li>
+<li>命令解析，对应 processInputBuffer 函数；</li>
+<li>命令执行，对应 processCommand 函数；</li>
+<li>结果返回，对应 addReply 函数；</li>
+</ol>
+<h2 id="2-1-接收请求阶段-acceptTcpHandler"><a href="#2-1-接收请求阶段-acceptTcpHandler" class="headerlink" title="(2.1) 接收请求阶段-acceptTcpHandler()"></a>(2.1) 接收请求阶段-acceptTcpHandler()</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/networking.c </span>
+
+<span class="token comment">/*
+ * 接收tcp处理器
+ * 
+ * @param *el
+ * @param fd
+ * @param *privdata
+ * @param mask
+ */</span>
+<span class="token keyword">void</span> <span class="token function">acceptTcpHandler</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>el<span class="token punctuation">,</span> <span class="token keyword">int</span> fd<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>privdata<span class="token punctuation">,</span> <span class="token keyword">int</span> mask<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token comment">// ... </span>
+
+        <span class="token comment">// 接收tcp请求</span>
+        cfd <span class="token operator">=</span> <span class="token function">anetTcpAccept</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>neterr<span class="token punctuation">,</span> fd<span class="token punctuation">,</span> cip<span class="token punctuation">,</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>cip<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>cport<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// ... </span>
+
+        <span class="token comment">// 接收通用处理</span>
+        <span class="token function">acceptCommonHandler</span><span class="token punctuation">(</span><span class="token function">connCreateAcceptedSocket</span><span class="token punctuation">(</span>cfd<span class="token punctuation">)</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span>cip<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">acceptTcpHandler <span class="token operator">-</span><span class="token operator">></span> anetTcpAccept <span class="token operator">-</span><span class="token operator">></span> acceptCommonHandler <span class="token operator">-</span><span class="token operator">></span> createClient <span class="token operator">-</span><span class="token operator">></span> readQueryFromClient<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+<h2 id="2-2-命令读取阶段-readQueryFromClient"><a href="#2-2-命令读取阶段-readQueryFromClient" class="headerlink" title="(2.2) 命令读取阶段-readQueryFromClient()"></a>(2.2) 命令读取阶段-readQueryFromClient()</h2><p>  <code>readQueryFromClient</code> 函数会从客户端连接的 socket 中，读取最大为 readlen 长度的数据，readlen 值大小是宏定义 PROTO_IOBUF_LEN。该宏定义是在server.h文件中定义的，默认值为 16KB。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/networking.c</span>
+
+<span class="token comment">/*
+ * @param *conn
+ */</span> 
+<span class="token keyword">void</span> <span class="token function">readQueryFromClient</span><span class="token punctuation">(</span>connection <span class="token operator">*</span>conn<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 从连接的私有数据获取client  </span>
+    <span class="token comment">// 在创建连接时把client放到了connection的private_data字段</span>
+    client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">connGetPrivateData</span><span class="token punctuation">(</span>conn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 1024*16 = 16KB</span>
+    readlen <span class="token operator">=</span> PROTO_IOBUF_LEN<span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    qblen <span class="token operator">=</span> <span class="token function">sdslen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 为查询缓冲区分配空间</span>
+    c<span class="token operator">-></span>querybuf <span class="token operator">=</span> <span class="token function">sdsMakeRoomFor</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">,</span> readlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 调用read从描述符为fd的客户端socket中读取数据</span>
+    nread <span class="token operator">=</span> <span class="token function">connRead</span><span class="token punctuation">(</span>c<span class="token operator">-></span>conn<span class="token punctuation">,</span> c<span class="token operator">-></span>querybuf<span class="token operator">+</span>qblen<span class="token punctuation">,</span> readlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 客户端输入缓冲区中有更多的数据，请继续解析它，以防检查是否有要执行的完整命令。 </span>
+    <span class="token function">processInputBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>    
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="2-3-命令解析-processInputBuffer"><a href="#2-3-命令解析-processInputBuffer" class="headerlink" title="(2.3) 命令解析-processInputBuffer()"></a>(2.3) 命令解析-processInputBuffer()</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/networking.c</span>
+
+<span class="token comment">/* 
+ * 这个函数每次都被调用，在客户端结构'c'中，有更多的查询缓冲区需要处理，
+ * 因为我们从socket中读取了更多的数据，或者因为客户端被阻塞并稍后重新激活，
+ * 所以可能有待处理的查询缓冲区，已经 表示要处理的完整命令。
+ * 
+ * @param *c 客户端 
+ */</span>
+<span class="token keyword">void</span> <span class="token function">processInputBuffer</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 输入缓冲区中有内容时继续处理 </span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span>c<span class="token operator">-></span>qb_pos <span class="token operator">&lt;</span> <span class="token function">sdslen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        
+        <span class="token comment">// 省略部分代码</span>
+
+        <span class="token comment">// 判断请求类型</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>c<span class="token operator">-></span>reqtype<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 根据客户端输入缓冲区的命令开头字符判断命令类型</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">[</span>c<span class="token operator">-></span>qb_pos<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token char">'*'</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 符合RESP协议的命令</span>
+                c<span class="token operator">-></span>reqtype <span class="token operator">=</span> PROTO_REQ_MULTIBULK<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 管道类型命令</span>
+                c<span class="token operator">-></span>reqtype <span class="token operator">=</span> PROTO_REQ_INLINE<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>reqtype <span class="token operator">==</span> PROTO_REQ_INLINE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 管道类型命令</span>
+            <span class="token comment">// 调用processInlineBuffer函数解析</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">processInlineBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span> <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token comment">// 如果 Gopher 模式并且我们得到零个或一个参数，则以 Gopher 模式处理请求。 </span>
+            <span class="token comment">// 为避免数据竞争，如果启用 io 线程读取查询，Redis 将不支持 Gopher。 </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>gopher_enabled <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>server<span class="token punctuation">.</span>io_threads_do_reads <span class="token operator">&amp;&amp;</span>
+                <span class="token punctuation">(</span><span class="token punctuation">(</span>c<span class="token operator">-></span>argc <span class="token operator">==</span> <span class="token number">1</span> <span class="token operator">&amp;&amp;</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">(</span>c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token char">'/'</span><span class="token punctuation">)</span> <span class="token operator">||</span>
+                  c<span class="token operator">-></span>argc <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token punctuation">&#123;</span>
+                <span class="token function">processGopherRequest</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token function">resetClient</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                c<span class="token operator">-></span>flags <span class="token operator">|=</span> CLIENT_CLOSE_AFTER_REPLY<span class="token punctuation">;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>reqtype <span class="token operator">==</span> PROTO_REQ_MULTIBULK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// RESP协议命令</span>
+            <span class="token comment">// 调用processMultibulkBuffer函数解析</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">processMultibulkBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span> <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverPanic</span><span class="token punctuation">(</span><span class="token string">"Unknown request type"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// 批量处理可以看 &lt;= 0 长度。</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>argc <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">resetClient</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 重置客户端</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 如果我们处于 I/O 线程的上下文中，我们无法真正执行此处的命令。 </span>
+            <span class="token comment">// 我们所能做的就是将客户端标记为需要处理命令的客户端。 </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_PENDING_READ<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                c<span class="token operator">-></span>flags <span class="token operator">|=</span> CLIENT_PENDING_COMMAND<span class="token punctuation">;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// 执行命令并重置客户端 </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">processCommandAndResetClient</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">==</span> C_ERR<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 如果客户端不再有效，我们将避免退出此循环并稍后修剪客户端缓冲区。 </span>
+                <span class="token comment">// 所以在这种情况下我们会尽快返回。 </span>
+                <span class="token keyword">return</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span>    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
 
-<h1 id="RedisClient发起请求流程"><a href="#RedisClient发起请求流程" class="headerlink" title="RedisClient发起请求流程"></a>RedisClient发起请求流程</h1><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: src&#x2F;hiredis.h 
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/networking.c</span>
 
-&#x2F;**
- * Redis连接上下文
- * Context for a connection to Redis
- *&#x2F; 
-typedef struct redisContext &#123;
-    const redisContextFuncs *funcs;   &#x2F;* Function table *&#x2F;
+<span class="token comment">/* 
+ * 此函数调用 processCommand()，但也为客户端执行一些在该上下文中有用的子任务：
+ *   1. 它将当前客户端设置为客户端“c”。
+ *   2. 如果处理了命令，则调用 commandProcessed()。
+ *
+ * 如果客户端因处理命令的副作用而被释放，则该函数返回 C_ERR，否则返回 C_OK。
+ *
+ * @param *c 客户端 
+ */</span>
+<span class="token keyword">int</span> <span class="token function">processCommandAndResetClient</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> deadclient <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>current_client <span class="token operator">=</span> c<span class="token punctuation">;</span>
 
-    int err; &#x2F;* Error flags, 0 when there is no error *&#x2F;
-    char errstr[128]; &#x2F;* String representation of error when applicable *&#x2F;
-    redisFD fd;
-    int flags;
-    char *obuf; &#x2F;* Write buffer *&#x2F;
-    redisReader *reader; &#x2F;* Protocol reader *&#x2F;
+    <span class="token comment">// 处理命令</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">processCommand</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">==</span> C_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">commandProcessed</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    
+    <span class="token keyword">return</span> deadclient <span class="token operator">?</span> C_ERR <span class="token operator">:</span> C_OK<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-    enum redisConnectionType connection_type;
-    struct timeval *timeout;
-
-    struct &#123;
-        char *host;
-        char *source_addr;
-        int port;
-    &#125; tcp;
-
-    struct &#123;
-        char *path;
-    &#125; unix_sock;
-
-    &#x2F;* For non-blocking connect *&#x2F;
-    struct sockadr *saddr;
-    size_t addrlen;
-
-    &#x2F;* Additional private data for hiredis addons such as SSL *&#x2F;
-    void *privdata;
-&#125; redisContext;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<br>
 
 
-<h1 id="Client-Server处理流程"><a href="#Client-Server处理流程" class="headerlink" title="Client-Server处理流程"></a>Client-Server处理流程</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// </span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h2 id="2-4-命令执行-processCommand"><a href="#2-4-命令执行-processCommand" class="headerlink" title="(2.4) 命令执行-processCommand()"></a>(2.4) 命令执行-processCommand()</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.c</span>
 
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6844903618890432526">［Redis源码阅读］当你输入get/set命令的时候，Redis做了什么</a><br>[2] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/yougewe/p/12229023.html">Redis（三）：set/get 命令源码解析</a><br>[3] <a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_43113679/article/details/122911669">Redis 6.2当发送set String时，redis是如何处理的(源码)</a></p>
+<span class="token comment">/*
+ * 处理各种命令 get set del exits quit lpush sadd  等
+ *
+ * @param *c  
+ */</span>
+<span class="token keyword">int</span> <span class="token function">processCommand</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 查找命令，并进行命令合法性检查，以及命令参数个数检查</span>
+    c<span class="token operator">-></span>cmd <span class="token operator">=</span> c<span class="token operator">-></span>lastcmd <span class="token operator">=</span> <span class="token function">lookupCommand</span><span class="token punctuation">(</span>c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// ... 省略其他命令处理逻辑 </span>
+
+    <span class="token comment">// 处理命令</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_MULTI <span class="token operator">&amp;&amp;</span>
+        c<span class="token operator">-></span>cmd<span class="token operator">-></span>proc <span class="token operator">!=</span> execCommand <span class="token operator">&amp;&amp;</span> c<span class="token operator">-></span>cmd<span class="token operator">-></span>proc <span class="token operator">!=</span> discardCommand <span class="token operator">&amp;&amp;</span>
+        c<span class="token operator">-></span>cmd<span class="token operator">-></span>proc <span class="token operator">!=</span> multiCommand <span class="token operator">&amp;&amp;</span> c<span class="token operator">-></span>cmd<span class="token operator">-></span>proc <span class="token operator">!=</span> watchCommand<span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>   <span class="token comment">// 如果是 MULTI 事务，则入队</span>
+        <span class="token function">queueMultiCommand</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">addReply</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>shared<span class="token punctuation">.</span>queued<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span> 
+        <span class="token comment">// 调用 call 直接处理</span>
+        <span class="token function">call</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>CMD_CALL_FULL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        c<span class="token operator">-></span>woff <span class="token operator">=</span> server<span class="token punctuation">.</span>master_repl_offset<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>ready_keys<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token function">handleClientsBlockedOnKeys</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-4-1-查找对应命令-lookupCommand"><a href="#2-4-1-查找对应命令-lookupCommand" class="headerlink" title="(2.4.1) 查找对应命令-lookupCommand"></a>(2.4.1) 查找对应命令-lookupCommand</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 查找命令
+ */</span>
+<span class="token keyword">struct</span> <span class="token class-name">redisCommand</span> <span class="token operator">*</span><span class="token function">lookupCommand</span><span class="token punctuation">(</span>sds name<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">return</span> <span class="token function">dictFetchValue</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>commands<span class="token punctuation">,</span> name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  <code>server.commands</code>对应的<code>redisCommandTable</code>如下</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">struct</span> <span class="token class-name">redisCommand</span> redisCommandTable<span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token punctuation">&#123;</span><span class="token string">"get"</span><span class="token punctuation">,</span>getCommand<span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">,</span>
+     <span class="token string">"read-only fast @string"</span><span class="token punctuation">,</span>
+     <span class="token number">0</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+
+    <span class="token comment">/* Note that we can't flag set as fast, since it may perform an
+     * implicit DEL of a large key. */</span>
+    <span class="token punctuation">&#123;</span><span class="token string">"set"</span><span class="token punctuation">,</span>setCommand<span class="token punctuation">,</span><span class="token operator">-</span><span class="token number">3</span><span class="token punctuation">,</span>
+     <span class="token string">"write use-memory @string"</span><span class="token punctuation">,</span>
+     <span class="token number">0</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">&#125;</span><span class="token punctuation">,</span>
+
+     <span class="token comment">// 省略部分内容</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  <code>server.commands</code>是在<code>populateCommandTable</code>函数里赋值的</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Populates the Redis Command Table starting from the hard coded list
+ * we have on top of server.c file. */</span>
+<span class="token keyword">void</span> <span class="token function">populateCommandTable</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> j<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> numcommands <span class="token operator">=</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>redisCommandTable<span class="token punctuation">)</span><span class="token operator">/</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token keyword">struct</span> <span class="token class-name">redisCommand</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> numcommands<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">struct</span> <span class="token class-name">redisCommand</span> <span class="token operator">*</span>c <span class="token operator">=</span> redisCommandTable<span class="token operator">+</span>j<span class="token punctuation">;</span>
+        <span class="token keyword">int</span> retval1<span class="token punctuation">,</span> retval2<span class="token punctuation">;</span>
+
+        <span class="token comment">/* Translate the command string flags description into an actual
+         * set of flags. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">populateCommandTableParseFlags</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>c<span class="token operator">-></span>sflags<span class="token punctuation">)</span> <span class="token operator">==</span> C_ERR<span class="token punctuation">)</span>
+            <span class="token function">serverPanic</span><span class="token punctuation">(</span><span class="token string">"Unsupported command flag"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        c<span class="token operator">-></span>id <span class="token operator">=</span> <span class="token function">ACLGetCommandID</span><span class="token punctuation">(</span>c<span class="token operator">-></span>name<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Assign the ID used for ACL. */</span>
+        retval1 <span class="token operator">=</span> <span class="token function">dictAdd</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>commands<span class="token punctuation">,</span> <span class="token function">sdsnew</span><span class="token punctuation">(</span>c<span class="token operator">-></span>name<span class="token punctuation">)</span><span class="token punctuation">,</span> c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">/* Populate an additional dictionary that will be unaffected
+         * by rename-command statements in redis.conf. */</span>
+        retval2 <span class="token operator">=</span> <span class="token function">dictAdd</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>orig_commands<span class="token punctuation">,</span> <span class="token function">sdsnew</span><span class="token punctuation">(</span>c<span class="token operator">-></span>name<span class="token punctuation">)</span><span class="token punctuation">,</span> c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">serverAssert</span><span class="token punctuation">(</span>retval1 <span class="token operator">==</span> DICT_OK <span class="token operator">&amp;&amp;</span> retval2 <span class="token operator">==</span> DICT_OK<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-4-2-执行命令-call"><a href="#2-4-2-执行命令-call" class="headerlink" title="(2.4.2) 执行命令-call"></a>(2.4.2) 执行命令-call</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c">
+<span class="token comment">/*
+ * call() 是 Redis 执行命令的核心。
+ *
+ * @param *c
+ * @param flags 
+ */</span>
+<span class="token keyword">void</span> <span class="token function">call</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 要执行的redis命令</span>
+    <span class="token keyword">struct</span> <span class="token class-name">redisCommand</span> <span class="token operator">*</span>real_cmd <span class="token operator">=</span> c<span class="token operator">-></span>cmd<span class="token punctuation">;</span>
+
+    <span class="token comment">// 调用命令处理函数   </span>
+    c<span class="token operator">-></span>cmd<span class="token operator">-></span><span class="token function">proc</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/t_string.c</span>
+
+<span class="token comment">/*
+ * 
+ * @param *c
+ * @param flags
+ * @param *key
+ * @param *val
+ * @param *expire
+ * @param unit
+ * @param *ok_reply
+ * @param *abort_reply
+ */</span>
+<span class="token keyword">void</span> <span class="token function">setGenericCommand</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">,</span> robj <span class="token operator">*</span>key<span class="token punctuation">,</span> robj <span class="token operator">*</span>val<span class="token punctuation">,</span> robj <span class="token operator">*</span>expire<span class="token punctuation">,</span> <span class="token keyword">int</span> unit<span class="token punctuation">,</span> robj <span class="token operator">*</span>ok_reply<span class="token punctuation">,</span> robj <span class="token operator">*</span>abort_reply<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 64位精度整数 </span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> milliseconds <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> <span class="token comment">/* initialized to avoid any harmness warning */</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>expire<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">getLongLongFromObjectOrReply</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span> expire<span class="token punctuation">,</span> <span class="token operator">&amp;</span>milliseconds<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>milliseconds <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">addReplyErrorFormat</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token string">"invalid expire time in %s"</span><span class="token punctuation">,</span>c<span class="token operator">-></span>cmd<span class="token operator">-></span>name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>unit <span class="token operator">==</span> UNIT_SECONDS<span class="token punctuation">)</span> milliseconds <span class="token operator">*=</span> <span class="token number">1000</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 如果有NX选项，那么查找key是否已经存在</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>flags <span class="token operator">&amp;</span> OBJ_SET_NX <span class="token operator">&amp;&amp;</span> <span class="token function">lookupKeyWrite</span><span class="token punctuation">(</span>c<span class="token operator">-></span>db<span class="token punctuation">,</span>key<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token operator">||</span>
+        <span class="token punctuation">(</span>flags <span class="token operator">&amp;</span> OBJ_SET_XX <span class="token operator">&amp;&amp;</span> <span class="token function">lookupKeyWrite</span><span class="token punctuation">(</span>c<span class="token operator">-></span>db<span class="token punctuation">,</span>key<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 如果已存在，返回空值</span>
+        <span class="token function">addReply</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span> abort_reply <span class="token operator">?</span> abort_reply <span class="token operator">:</span> shared<span class="token punctuation">.</span>null<span class="token punctuation">[</span>c<span class="token operator">-></span>resp<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// </span>
+    <span class="token function">genericSetKey</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>c<span class="token operator">-></span>db<span class="token punctuation">,</span>key<span class="token punctuation">,</span>val<span class="token punctuation">,</span>flags <span class="token operator">&amp;</span> OBJ_SET_KEEPTTL<span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>dirty<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置过期</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>expire<span class="token punctuation">)</span> <span class="token function">setExpire</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>c<span class="token operator">-></span>db<span class="token punctuation">,</span>key<span class="token punctuation">,</span><span class="token function">mstime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">+</span>milliseconds<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 发布key事件</span>
+    <span class="token function">notifyKeyspaceEvent</span><span class="token punctuation">(</span>NOTIFY_STRING<span class="token punctuation">,</span><span class="token string">"set"</span><span class="token punctuation">,</span>key<span class="token punctuation">,</span>c<span class="token operator">-></span>db<span class="token operator">-></span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>expire<span class="token punctuation">)</span> <span class="token function">notifyKeyspaceEvent</span><span class="token punctuation">(</span>NOTIFY_GENERIC<span class="token punctuation">,</span>
+        <span class="token string">"expire"</span><span class="token punctuation">,</span>key<span class="token punctuation">,</span>c<span class="token operator">-></span>db<span class="token operator">-></span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">addReply</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span> ok_reply <span class="token operator">?</span> ok_reply <span class="token operator">:</span> shared<span class="token punctuation">.</span>ok<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="2-5-结果返回-addReply"><a href="#2-5-结果返回-addReply" class="headerlink" title="(2.5) 结果返回-addReply()"></a>(2.5) 结果返回-addReply()</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/networking.c </span>
+
+
+<span class="token comment">/* -----------------------------------------------------------------------------
+ * 更高级别的函数用于在客户端输出缓冲区上对数据进行排队。
+ * 以下函数是命令实现将调用的函数。
+ * -------------------------------------------------------------------------- */</span>
+
+<span class="token comment">/* 
+ * 将对象“obj”字符串表示添加到客户端输出缓冲区。 
+ * 
+ * @param *c  redis client  
+ * @param *obj  命令执行的结果   类型是redisObject
+ */</span>
+<span class="token keyword">void</span> <span class="token function">addReply</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">,</span> robj <span class="token operator">*</span>obj<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 判断client是否可以接收新数据 (假客户端不能接收)</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">prepareClientToWrite</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 根据redisobject格式把数据写入缓存</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">sdsEncodedObject</span><span class="token punctuation">(</span>obj<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// obj如果是row或者embstr格式</span>
+
+        <span class="token comment">// 尝试将应答添加到客户端结构中的静态缓冲区。</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">_addReplyToBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span>
+            <span class="token comment">// 将回复添加到回复列表中。</span>
+            <span class="token function">_addReplyProtoToList</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>encoding <span class="token operator">==</span> OBJ_ENCODING_INT<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// obj 是数字格式</span>
+
+        <span class="token comment">// 对于整数编码字符串，我们只需使用优化函数将其转换为字符串，并将结果字符串附加到输出缓冲区。</span>
+        <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token number">32</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 数字转为字符串</span>
+        <span class="token class-name">size_t</span> len <span class="token operator">=</span> <span class="token function">ll2string</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>buf<span class="token punctuation">)</span><span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">long</span><span class="token punctuation">)</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">_addReplyToBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>len<span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span>
+            <span class="token function">_addReplyProtoToList</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverPanic</span><span class="token punctuation">(</span><span class="token string">"Wrong obj->encoding in addReply()"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="3-IO多路复用对命令原子性的影响"><a href="#3-IO多路复用对命令原子性的影响" class="headerlink" title="(3) IO多路复用对命令原子性的影响"></a>(3) IO多路复用对命令原子性的影响</h1><p>  IO 多路复用机制是在 readQueryFromClient 函数执行前发挥作用的。它实际是在事件驱动框架中调用 aeApiPoll 函数，获取一批已经就绪的 socket 描述符。然后执行一个循环，针对每个就绪描述符上的读事件，触发执行 readQueryFromClient 函数。</p>
+<p>  在实际处理时，Redis 的主线程仍然是针对每个事件逐一调用回调函数进行处理的。而且对于写事件来说，IO 多路复用机制也是针对每个事件逐一处理的。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 处理事件   返回处理完的事件个数
+ *
+ * 0 不做任何处理
+ * 1 AE_FILE_EVENTS  处理文件事件
+ * 2 AE_TIME_EVENTS  处理时间事件 
+ * 3 AE_ALL_EVENTS   所有事件 
+ * 4 AE_DONT_WAIT 
+ * 8 AE_CALL_BEFORE_SLEEP 
+ * 16 AE_CALL_AFTER_SLEEP 
+ */</span>
+
+<span class="token keyword">int</span> <span class="token function">aeProcessEvents</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span>
+<span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> processed <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> numevents<span class="token punctuation">;</span>
+
+        <span class="token keyword">struct</span> <span class="token class-name">timeval</span> tv<span class="token punctuation">,</span> <span class="token operator">*</span>tvp<span class="token punctuation">;</span>
+
+        <span class="token comment">// 如果eventLoop处理前的函数不为空，就执行</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>eventLoop<span class="token operator">-></span>beforesleep <span class="token operator">!=</span> <span class="token constant">NULL</span> <span class="token operator">&amp;&amp;</span> flags <span class="token operator">&amp;</span> AE_CALL_BEFORE_SLEEP<span class="token punctuation">)</span>
+            eventLoop<span class="token operator">-></span><span class="token function">beforesleep</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 调用多路复用 API，仅在超时或某些事件触发时返回   </span>
+        <span class="token comment">// 处理文件事件，阻塞时间由tvp决定 </span>
+        numevents <span class="token operator">=</span> <span class="token function">aeApiPoll</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span> tvp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 处理后的函数不为空</span>
+        <span class="token comment">/* After sleep callback. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>eventLoop<span class="token operator">-></span>aftersleep <span class="token operator">!=</span> <span class="token constant">NULL</span> <span class="token operator">&amp;&amp;</span> flags <span class="token operator">&amp;</span> AE_CALL_AFTER_SLEEP<span class="token punctuation">)</span>
+            eventLoop<span class="token operator">-></span><span class="token function">aftersleep</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> numevents<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+            <span class="token comment">// 先从eventLoop->fired[j]获取已就绪事件结构体(aeFiredEvent) 获取fd后 再从eventLoop->events注册事件里获取对应的事件结构体(aeFileEvent) </span>
+            aeFileEvent <span class="token operator">*</span>fe <span class="token operator">=</span> <span class="token operator">&amp;</span>eventLoop<span class="token operator">-></span>events<span class="token punctuation">[</span>eventLoop<span class="token operator">-></span>fired<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>fd<span class="token punctuation">]</span><span class="token punctuation">;</span>
+            
+            <span class="token comment">// ...</span>
+
+            <span class="token comment">// 如果可读</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>invert <span class="token operator">&amp;&amp;</span> fe<span class="token operator">-></span>mask <span class="token operator">&amp;</span> mask <span class="token operator">&amp;</span> AE_READABLE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 调用读事件回调函数 对应 acceptTcpHandler </span>
+                fe<span class="token operator">-></span><span class="token function">rfileProc</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span>fd<span class="token punctuation">,</span>fe<span class="token operator">-></span>clientData<span class="token punctuation">,</span>mask<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                fired<span class="token operator">++</span><span class="token punctuation">;</span>
+                fe <span class="token operator">=</span> <span class="token operator">&amp;</span>eventLoop<span class="token operator">-></span>events<span class="token punctuation">[</span>fd<span class="token punctuation">]</span><span class="token punctuation">;</span> <span class="token comment">/* Refresh in case of resize. */</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// 如果可写 触发写事件</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>fe<span class="token operator">-></span>mask <span class="token operator">&amp;</span> mask <span class="token operator">&amp;</span> AE_WRITABLE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>fired <span class="token operator">||</span> fe<span class="token operator">-></span>wfileProc <span class="token operator">!=</span> fe<span class="token operator">-></span>rfileProc<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">// 调用写事件回调函数 对应 acceptTcpHandler </span>
+                    fe<span class="token operator">-></span><span class="token function">wfileProc</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span>fd<span class="token punctuation">,</span>fe<span class="token operator">-></span>clientData<span class="token punctuation">,</span>mask<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    fired<span class="token operator">++</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+
+            processed<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    
+    <span class="token keyword">return</span> processed<span class="token punctuation">;</span> <span class="token comment">/* return the number of processed file/time events */</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>   即使使用了 IO 多路复用机制，命令的整个处理过程仍然可以由 IO 主线程来完成，也仍然可以保证命令执行的原子性。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/411558">Redis源码剖析与实战 - 14 | 从代码实现看分布式锁的原子性保证</a><br>[2] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6844903618890432526">［Redis源码阅读］当你输入get/set命令的时候，Redis做了什么</a><br>[3] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/yougewe/p/12229023.html">Redis（三）：set/get 命令源码解析</a><br>[4] <a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_43113679/article/details/122911669">Redis 6.2当发送set String时，redis是如何处理的(源码)</a></p>
 
     </div>
 
@@ -395,6 +779,7 @@ typedef struct redisContext &#123;
 
           <div class="post-tags">
               <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/databases/" rel="tag"># databases</a>
           </div>
 
         
@@ -406,8 +791,8 @@ typedef struct redisContext &#123;
                 </a>
             </div>
             <div class="post-nav-item">
-                <a href="/2022/04/17/blog-speed-optimization/" rel="next" title="博客访问速度优化">
-                  博客访问速度优化 <i class="fa fa-chevron-right"></i>
+                <a href="/2022/03/06/redis-cache-eviction-strategy/" rel="next" title="Redis 缓存淘汰策略">
+                  Redis 缓存淘汰策略 <i class="fa fa-chevron-right"></i>
                 </a>
             </div>
           </div>

@@ -159,7 +159,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-count">304</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -170,7 +170,7 @@
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -219,6 +219,1136 @@
 
 
     <div class="main-inner index posts-expand">
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/08/12/jvm-memory-area/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/08/12/jvm-memory-area/" class="post-title-link" itemprop="url">JVM运行时内存区域</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-08-12 10:48:21" itemprop="dateCreated datePublished" datetime="2018-08-12T10:48:21+08:00">2018-08-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-03 23:20:57" itemprop="dateModified" datetime="2022-07-03T23:20:57+08:00">2022-07-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/jvm/" itemprop="url" rel="index"><span itemprop="name">jvm</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>10k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>10 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <blockquote>
+<p> JVM 内置了自动内存分配管理机制。这个机制可以大大降低手动分配回收机制可能带来的内存泄露和内存溢出风险，使 Java 开发人员不需要关注每个对象的内存分配以及回收，从而更专注于业务本身。</p>
+</blockquote>
+<blockquote>
+<p> JVM 自动内存分配管理机制的好处很多，但实则是把双刃剑。这个机制在提升 Java 开发效率的同时，也容易使 Java 开发人员过度依赖于自动化，弱化对内存的管理能力，这样系统就很容易发生 JVM 的堆内存异常，垃圾回收（GC）的方式不合适以及 GC 次数过于频繁等问题，这些都将直接影响到应用服务的性能。</p>
+</blockquote>
+<blockquote>
+<p> JVM的内存划分中，有部分区域是线程私有的，有部分是属于整个JVM进程；有些区域会抛出OOM异常，有些则不会，了解JVM的内存区域划分以及特征，是定位线上内存问题的基础。那么JVM内存区域是怎么划分的呢？</p>
+</blockquote>
+<p>  <img src="/img/java/JVM/Memory/java-process-memory-use.png" alt="运行中的Java进程内存占用情况"></p>
+<p>  <img src="/img/java/JVM/Memory/Java-Runtime-data-area-jdk7.jpg" alt=" Java虚拟机运行时数据区 - 大小和实际内存大小有差距"><br>  Java虚拟机运行时数据区 (仅参考模型)</p>
+<p>  <img src="/img/java/JVM/Memory/Java-Runtime-data-area-jdk7.png" alt=" Java虚拟机运行时数据区-大概比例 "><br>  Java虚拟机运行时数据区-大概比例</p>
+<h1 id="1-Java内存区域"><a href="#1-Java内存区域" class="headerlink" title="1.　Java内存区域"></a>1.　Java内存区域</h1><blockquote>
+<p>   Java虚拟机在执行Java程序的过程中会把它管理的内存划分为若干个不同的数据区域，这些区域都有各自的用途，以及创建和销毁的时间，有的随着虚拟机进程启动而存在，有的区域则依赖于用户线程的启动和结束而建立和销毁。</p>
+</blockquote>
+<blockquote>
+<p> 根据《Java 虚拟机规范》的规定，Java 虚拟机所管理的内存一共分为 Program Counter Register（程序计数器）、VM Stack（虚拟机栈）、Native Method Stack（本地方法栈）、Heap（堆）、Method Area（方法区）五个区域。</p>
+</blockquote>
+<h2 id="1-1-程序计数器-Program-Counter-Register"><a href="#1-1-程序计数器-Program-Counter-Register" class="headerlink" title="1.1　程序计数器(Program Counter Register)"></a>1.1　程序计数器(Program Counter Register)</h2><blockquote>
+<p> <code>程序计数器</code>(Program Counter Register)，简称PC，在JVM规范中，每个线程都有自己的程序计数器。</p>
+</blockquote>
+<blockquote>
+<p> 这是一块比较小的内存空间，存储当前线程正在执行的Java方法的JVM指令(或操作码)地址，即字节码的行号。如果当前方法是 native 方法，那么程序计数器的值为 undefined。</p>
+</blockquote>
+<blockquote>
+<p> 举个例子，下面是一段输出 Hello World 的代码，代码和反编译后的文件如下: </p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">HelloWorld</span><span class="token punctuation">&#123;</span>
+	<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+		<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"Hello, World!"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">Classfile <span class="token file-path string">/home/wkq/workspaces/java_test/HelloWorld.class</span>
+  Last modified <span class="token date number">Jun 21</span><span class="token punctuation">,</span> <span class="token number">2020</span><span class="token operator">;</span> size <span class="token number">427</span> bytes
+  SHA<span class="token operator">-</span><span class="token number">256</span> checksum <span class="token hash constant">cc0de3eb12561fe81dfb95961d817665276587839bdf652b6f4070c1b9942f10</span>
+  Compiled from <span class="token string">"HelloWorld.java"</span>
+public class HelloWorld
+  <span class="token property">minor version:</span> <span class="token number">0</span>
+  <span class="token property">major version:</span> <span class="token number">58</span>
+  <span class="token property">flags:</span> <span class="token operator">(</span><span class="token number">0x0021</span><span class="token operator">)</span> ACC_PUBLIC<span class="token punctuation">,</span> ACC_SUPER
+  <span class="token property">this_class:</span> <span class="token operator">#</span><span class="token number">21</span>                         <span class="token operator">/</span><span class="token operator">/</span> HelloWorld
+  <span class="token property">super_class:</span> <span class="token operator">#</span><span class="token number">2</span>                         <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>Object
+  <span class="token property">interfaces:</span> <span class="token number">0</span><span class="token punctuation">,</span> fields<span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> methods<span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> attributes<span class="token operator">:</span> <span class="token number">1</span>
+<span class="token property">Constant pool:</span>
+   <span class="token operator">#</span><span class="token number">1</span> <span class="token operator">=</span> Methodref          <span class="token operator">#</span><span class="token number">2</span><span class="token punctuation">.</span><span class="token operator">#</span><span class="token number">3</span>          <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>Object<span class="token punctuation">.</span><span class="token string">"&lt;init>"</span><span class="token operator">:</span><span class="token operator">(</span><span class="token operator">)</span>V
+   <span class="token operator">#</span><span class="token number">2</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">4</span>             <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>Object
+   <span class="token operator">#</span><span class="token number">3</span> <span class="token operator">=</span> NameAndType        <span class="token operator">#</span><span class="token number">5</span><span class="token operator">:</span><span class="token operator">#</span><span class="token number">6</span>          <span class="token operator">/</span><span class="token operator">/</span> <span class="token string">"&lt;init>"</span><span class="token operator">:</span><span class="token operator">(</span><span class="token operator">)</span>V
+   <span class="token operator">#</span><span class="token number">4</span> <span class="token operator">=</span> Utf8               java<span class="token operator">/</span>lang<span class="token operator">/</span>Object
+   <span class="token operator">#</span><span class="token number">5</span> <span class="token operator">=</span> Utf8               <span class="token operator">&lt;</span>init<span class="token operator">></span>
+   <span class="token operator">#</span><span class="token number">6</span> <span class="token operator">=</span> Utf8               <span class="token operator">(</span><span class="token operator">)</span>V
+   <span class="token operator">#</span><span class="token number">7</span> <span class="token operator">=</span> Fieldref           <span class="token operator">#</span><span class="token number">8</span><span class="token punctuation">.</span><span class="token operator">#</span><span class="token number">9</span>          <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>System<span class="token punctuation">.</span>out<span class="token operator">:</span>Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+   <span class="token operator">#</span><span class="token number">8</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">10</span>            <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>lang<span class="token operator">/</span>System
+   <span class="token operator">#</span><span class="token number">9</span> <span class="token operator">=</span> NameAndType        <span class="token operator">#</span><span class="token number">11</span><span class="token operator">:</span><span class="token operator">#</span><span class="token number">12</span>        <span class="token operator">/</span><span class="token operator">/</span> out<span class="token operator">:</span>Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+  <span class="token operator">#</span><span class="token number">10</span> <span class="token operator">=</span> Utf8               java<span class="token operator">/</span>lang<span class="token operator">/</span>System
+  <span class="token operator">#</span><span class="token number">11</span> <span class="token operator">=</span> Utf8               out
+  <span class="token operator">#</span><span class="token number">12</span> <span class="token operator">=</span> Utf8               Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+  <span class="token operator">#</span><span class="token number">13</span> <span class="token operator">=</span> String             <span class="token operator">#</span><span class="token number">14</span>            <span class="token operator">/</span><span class="token operator">/</span> Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+  <span class="token operator">#</span><span class="token number">14</span> <span class="token operator">=</span> Utf8               Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+  <span class="token operator">#</span><span class="token number">15</span> <span class="token operator">=</span> Methodref          <span class="token operator">#</span><span class="token number">16</span><span class="token punctuation">.</span><span class="token operator">#</span><span class="token number">17</span>        <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token punctuation">.</span>println<span class="token operator">:</span><span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">16</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">18</span>            <span class="token operator">/</span><span class="token operator">/</span> java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream
+  <span class="token operator">#</span><span class="token number">17</span> <span class="token operator">=</span> NameAndType        <span class="token operator">#</span><span class="token number">19</span><span class="token operator">:</span><span class="token operator">#</span><span class="token number">20</span>        <span class="token operator">/</span><span class="token operator">/</span> println<span class="token operator">:</span><span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">18</span> <span class="token operator">=</span> Utf8               java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream
+  <span class="token operator">#</span><span class="token number">19</span> <span class="token operator">=</span> Utf8               println
+  <span class="token operator">#</span><span class="token number">20</span> <span class="token operator">=</span> Utf8               <span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">21</span> <span class="token operator">=</span> Class              <span class="token operator">#</span><span class="token number">22</span>            <span class="token operator">/</span><span class="token operator">/</span> HelloWorld
+  <span class="token operator">#</span><span class="token number">22</span> <span class="token operator">=</span> Utf8               HelloWorld
+  <span class="token operator">#</span><span class="token number">23</span> <span class="token operator">=</span> Utf8               Code
+  <span class="token operator">#</span><span class="token number">24</span> <span class="token operator">=</span> Utf8               LineNumberTable
+  <span class="token operator">#</span><span class="token number">25</span> <span class="token operator">=</span> Utf8               main
+  <span class="token operator">#</span><span class="token number">26</span> <span class="token operator">=</span> Utf8               <span class="token operator">(</span><span class="token punctuation">[</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+  <span class="token operator">#</span><span class="token number">27</span> <span class="token operator">=</span> Utf8               SourceFile
+  <span class="token operator">#</span><span class="token number">28</span> <span class="token operator">=</span> Utf8               HelloWorld<span class="token punctuation">.</span>java
+<span class="token operator">&#123;</span>
+  public HelloWorld<span class="token operator">(</span><span class="token operator">)</span><span class="token operator">;</span>
+    <span class="token property">descriptor:</span> <span class="token operator">(</span><span class="token operator">)</span>V
+    <span class="token property">flags:</span> <span class="token operator">(</span><span class="token number">0x0001</span><span class="token operator">)</span> ACC_PUBLIC
+    <span class="token property">Code:</span>
+      stack<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> locals<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> args_size<span class="token operator">=</span><span class="token number">1</span>
+         <span class="token number">0</span><span class="token operator">:</span> aload_0
+         <span class="token number">1</span><span class="token operator">:</span> invokespecial <span class="token operator">#</span><span class="token number">1</span>                  <span class="token operator">/</span><span class="token operator">/</span> Method java<span class="token operator">/</span>lang<span class="token operator">/</span>Object<span class="token punctuation">.</span><span class="token string">"&lt;init>"</span><span class="token operator">:</span><span class="token operator">(</span><span class="token operator">)</span>V
+         <span class="token number">4</span><span class="token operator">:</span> return
+      <span class="token property">LineNumberTable:</span>
+        <span class="token property">line 1:</span> <span class="token number">0</span>
+
+  public static void main<span class="token operator">(</span>java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>String<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token operator">)</span><span class="token operator">;</span>
+    <span class="token property">descriptor:</span> <span class="token operator">(</span><span class="token punctuation">[</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+    <span class="token property">flags:</span> <span class="token operator">(</span><span class="token number">0x0009</span><span class="token operator">)</span> ACC_PUBLIC<span class="token punctuation">,</span> ACC_STATIC
+    <span class="token property">Code:</span>
+      stack<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">,</span> locals<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> args_size<span class="token operator">=</span><span class="token number">1</span>
+         <span class="token number">0</span><span class="token operator">:</span> getstatic     <span class="token operator">#</span><span class="token number">7</span>                  <span class="token operator">/</span><span class="token operator">/</span> Field java<span class="token operator">/</span>lang<span class="token operator">/</span>System<span class="token punctuation">.</span>out<span class="token operator">:</span>Ljava<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token operator">;</span>
+         <span class="token number">3</span><span class="token operator">:</span> ldc           <span class="token operator">#</span><span class="token number">13</span>                 <span class="token operator">/</span><span class="token operator">/</span> String Hello<span class="token punctuation">,</span> World<span class="token operator">!</span>
+         <span class="token number">5</span><span class="token operator">:</span> invokevirtual <span class="token operator">#</span><span class="token number">15</span>                 <span class="token operator">/</span><span class="token operator">/</span> Method java<span class="token operator">/</span>io<span class="token operator">/</span>PrintStream<span class="token punctuation">.</span>println<span class="token operator">:</span><span class="token operator">(</span>Ljava<span class="token operator">/</span>lang<span class="token operator">/</span>String<span class="token operator">;</span><span class="token operator">)</span>V
+         <span class="token number">8</span><span class="token operator">:</span> return
+      <span class="token property">LineNumberTable:</span>
+        <span class="token property">line 3:</span> <span class="token number">0</span>
+        <span class="token property">line 4:</span> <span class="token number">8</span>
+<span class="token operator">&#125;</span>
+<span class="token property">SourceFile:</span> <span class="token string">"HelloWorld.java"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> LineNumberTable，是指每一个java字节码指令对应java代码文件中的第几行，以方便定位。</p>
+</blockquote>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token property">LineNumberTable:</span>
+  <span class="token property">line 3:</span> <span class="token number">0</span>
+  <span class="token property">line 4:</span> <span class="token number">8</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p> 其中 line 3  line 4 指的的代码中的行号， 0 8 指的是 java字节码的指令 </p>
+</blockquote>
+<p>  该内存区域是唯一一个在Java虚拟机规范中没有规定任何 OutOfMemoryError 情况的内存区域。</p>
+<h2 id="1-2-Java虚拟机栈-Java-Virtal-Machine-Stack"><a href="#1-2-Java虚拟机栈-Java-Virtal-Machine-Stack" class="headerlink" title="1.2　Java虚拟机栈(Java Virtal Machine Stack)"></a>1.2　Java虚拟机栈(Java Virtal Machine Stack)</h2><p>  Java虚拟机栈(Java Virtal Machine Stack)，同样也是属于线程私有区域，该区域存储着局部变量表，编译时期可知的各种基本类型数据、对象引用、方法出口等信息。</p>
+<blockquote>
+<p> 局部变量表存放了编译期可知的各种基本数据类型(boolean、byte、char、short、int、float、long、double)、对象引用和returnAddress类型（指向了一条字节码指令的地址）。<br>  其中64位长度的long和double类型的数据会占用2个局部变量空间（slot），其余的数据类型占1个。</p>
+</blockquote>
+<p>  局部变量表所需的内存空间在编译期间分配完成，当进入一个方法时，这个方法需要在帧中分配多大的局部变量空间是完全确定的，在方法运行期间不会改变局部变量表的大小。</p>
+<p>  在这个java栈中又会包含多个栈帧，每运行一个方法就创建一个栈帧，用于存储局部变量表、操作栈、方法返回值等。每一个方法从调用直至执行完成的过程，就对应一个栈帧在java栈中入栈到出栈的过程。<br>  每次方法调用时，一个新的栈帧创建并压栈到栈顶。当方法正常返回或抛出未捕获的异常时，栈帧就会出栈。除了栈帧的压栈和出栈，栈不能被直接操作。所以可以在堆上分配栈帧，并且不需要连续内存。</p>
+<p>  栈可以是动态分配也可以固定大小。<br>  如果线程请求一个超过允许范围的空间，就会抛出一个StackOverflowError。<br>  如果线程需要一个新的栈帧，但是没有足够的内存可以分配，就会抛出一个 OutOfMemoryError。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/08/12/jvm-memory-area/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/08/11/orientdb-download-install/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/08/11/orientdb-download-install/" class="post-title-link" itemprop="url">OrientDB 下载 安装</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-08-11 12:57:24" itemprop="dateCreated datePublished" datetime="2018-08-11T12:57:24+08:00">2018-08-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>9.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>8 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <ol>
+<li>下载解压orientdb压缩包</li>
+<li>通过 server.sh 或者 server.bat 启动orieintdb</li>
+<li>访问 <a target="_blank" rel="noopener" href="http://localhost:2480/">http://localhost:2480</a> 查看orientdb</li>
+</ol>
+<h1 id="1-下载解压"><a href="#1-下载解压" class="headerlink" title="1　下载解压"></a>1　下载解压</h1><p>  orientdb 所有版本<br>      <a target="_blank" rel="noopener" href="https://orientdb.com/releases/">https://orientdb.com/releases/</a><br>      <a target="_blank" rel="noopener" href="https://orientdb.com/downloads/">https://orientdb.com/downloads/</a><br>      <a target="_blank" rel="noopener" href="https://orientdb.com/download-2/">https://orientdb.com/download-2/</a><br>      <a target="_blank" rel="noopener" href="https://orientdb.org/download">https://orientdb.org/download</a> </p>
+<p>  orientdb-3.0.8.zip   <a target="_blank" rel="noopener" href="https://orientdb3.s3.us-east-2.amazonaws.com/releases/3.0.8/orientdb-3.0.8.zip">https://orientdb3.s3.us-east-2.amazonaws.com/releases/3.0.8/orientdb-3.0.8.zip</a><br>  orientdb-3.0.8.tar.gz   <a target="_blank" rel="noopener" href="https://orientdb3.s3.us-east-2.amazonaws.com/releases/3.0.8/orientdb-3.0.8.tar.gz">https://orientdb3.s3.us-east-2.amazonaws.com/releases/3.0.8/orientdb-3.0.8.tar.gz</a><br>  agent-3.0.8.jar   <a target="_blank" rel="noopener" href="https://orientdb3.s3.us-east-2.amazonaws.com/releases/3.0.8/agent-3.0.8.jar">https://orientdb3.s3.us-east-2.amazonaws.com/releases/3.0.8/agent-3.0.8.jar</a>  </p>
+<!--
+  https://s3.us-east-2.amazonaws.com/orientdb3/releases/3.0.20/orientdb-3.0.20.zip
+  https://s3.us-east-2.amazonaws.com/orientdb3/releases/3.0.20/orientdb-3.0.20.tar.gz
+-->
+
+
+<p>  无论是zip包还是tar.gz包，解压完进入bin目录，执行 <code>./server.sh</code> (linux) 或 <code>server.bat</code>(windows) 即可运行OrientDB数据库。<br>  第一次使用需要设置密码，设置完密码启动后在浏览器输入 <a target="_blank" rel="noopener" href="http://127.0.0.1:2480/">http://127.0.0.1:2480</a> 访问 图形化界面。  </p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/08/11/orientdb-download-install/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/08/03/elasticsearch-cluster/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/08/03/elasticsearch-cluster/" class="post-title-link" itemprop="url">elasticsearch 集群</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-08-03 17:32:09" itemprop="dateCreated datePublished" datetime="2018-08-03T17:32:09+08:00">2018-08-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>48k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>44 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p> 集群内的原理 </p>
+<p>  介绍 cluster 、 node 、 shard 等常用术语，Elastisearch 的扩容机制， 以及如何处理硬件故障的内容。</p>
+<p>  ElasticSearch 的主旨是随时可用和按需扩容。 而扩容可以通过购买性能更强大（ 垂直扩容 ，或 纵向扩容 ） 或者数量更多的服务器（ 水平扩容 ，或 横向扩容 ）来实现。</p>
+<p>  虽然 Elasticsearch 可以获益于更强大的硬件设备，但是垂直扩容是有极限的。 真正的扩容能力是来自于水平扩容–为集群添加更多的节点，并且将负载压力和稳定性分散到这些节点中。</p>
+<h1 id="1-空集群"><a href="#1-空集群" class="headerlink" title="(1) 空集群"></a>(1) 空集群</h1><p>  一个运行中的 Elasticsearch 实例称为一个 节点，而集群是由一个或者多个拥有相同 cluster.name 配置的节点组成， 它们共同承担数据和负载的压力。当有节点加入集群中或者从集群中移除节点时，集群将会重新平均分布所有的数据。</p>
+<h1 id="2-集群健康"><a href="#2-集群健康" class="headerlink" title="(2) 集群健康"></a>(2) 集群健康</h1><p>  查看集群健康状态</p>
+<p>  <code>http://localhost:9200/_cluster/health?pretty</code></p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">$ curl -X GET "localhost:9200/_cluster/health?pretty"
+&#123;
+  "cluster_name" : "my-application",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 5,
+  "active_shards" : 5,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 5,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 50.0
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>status 字段指示着当前集群在总体上是否工作正常。它的三种颜色含义如下：<br>  green  所有的主分片和副本分片都正常运行。<br>  yellow 所有的主分片都正常运行，但不是所有的副本分片都正常运行。<br>  red    有主分片没能正常运行。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/08/03/elasticsearch-cluster/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/08/03/neo4j-practice/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/08/03/neo4j-practice/" class="post-title-link" itemprop="url">neo4j</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-08-03 17:32:09" itemprop="dateCreated datePublished" datetime="2018-08-03T17:32:09+08:00">2018-08-03</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/neo4j/" itemprop="url" rel="index"><span itemprop="name">neo4j</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>983</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>1 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <h1 id="查看正在执行的cypher语句"><a href="#查看正在执行的cypher语句" class="headerlink" title="查看正在执行的cypher语句"></a>查看正在执行的cypher语句</h1><p>1、查看自己当前正在运行的所有查询。语法为： <code>CALL dbms.listQueries()</code><br>2. 找到正在运行的语句的id<br>3. 调用 <code>CALL dbms.killQueries([‘query-1’,‘query-2’])</code> 根据id杀掉 语句执行的进程</p>
+<h1 id="Neo4j备份"><a href="#Neo4j备份" class="headerlink" title="Neo4j备份"></a>Neo4j备份</h1><p>  Neo4j备份的内容是某一时刻的完整数据库</p>
+<p>  <code>CALL apoc.export.csv.all(&#39;/data/neo4j/export/graph_all.csv&#39;, null);</code>  全量export</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/08/03/neo4j-practice/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/07/13/java-basic-interview-questions/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/07/13/java-basic-interview-questions/" class="post-title-link" itemprop="url">Java 基础 题</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-07-13 23:20:22" itemprop="dateCreated datePublished" datetime="2018-07-13T23:20:22+08:00">2018-07-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-06-04 12:58:32" itemprop="dateModified" datetime="2022-06-04T12:58:32+08:00">2022-06-04</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>4.8k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>4 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  转自 <a target="_blank" rel="noopener" href="https://blog.csdn.net/sufu1065/article/details/88051083">Java 最常见的 200+ 面试题：面试必备</a></p>
+<p>一、Java 基础</p>
+<p>1.JDK 和 JRE 有什么区别？</p>
+<p>2.== 和 equals 的区别是什么？</p>
+<p>3.两个对象的 hashCode()相同，则 equals()也一定为 true，对吗？</p>
+<p>4.final 在 java 中有什么作用？</p>
+<p>5.java 中的 Math.round(-1.5) 等于多少？</p>
+<p>6.String 属于基础的数据类型吗？</p>
+<p>7.java 中操作字符串都有哪些类？它们之间有什么区别？</p>
+<p>8.String str=”i”与 String str=new String(“i”)一样吗？</p>
+<p>9.如何将字符串反转？</p>
+<p>10.String 类的常用方法都有那些？</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/07/13/java-basic-interview-questions/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/07/12/universal-curd-interface/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/07/12/universal-curd-interface/" class="post-title-link" itemprop="url">万能 CURD 接口</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-07-12 15:59:24" itemprop="dateCreated datePublished" datetime="2018-07-12T15:59:24+08:00">2018-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>4.1k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>4 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  在实际的使用时，经常遇到这么一个问题，我要从某种数据库中查询出数据，但是不告诉你字段/属性。<br>  乍一看，这个怎么可能，不告诉我字段/属性，要把数据查出来，后来在github上看见一段代码，读了这段代码后恍然大悟。还是 too young to simple</p>
+<p>  原理是通过JDBC的getMetaData()方法来获取表结构，里面用到了反射 (进行了处理，高并发下还是不建议使用)<br>  比较重要的一点是查询的时候数据库有数据字典，可以根据数据字典获取所有字段/属性</p>
+<p>  实测，MySQL 可用<br>  代码如下</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>sql<span class="token punctuation">.</span></span><span class="token class-name">Connection</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>sql<span class="token punctuation">.</span></span><span class="token class-name">SQLException</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span></span><span class="token class-name">Iterator</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span></span><span class="token class-name">List</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token namespace">java<span class="token punctuation">.</span>util<span class="token punctuation">.</span></span><span class="token class-name">Map</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * 通用接口&lt;br>
+ *
+ * @author weikeqin.cn@gmail.com
+ * @version V1.0
+ * @date 2017-07-11 15:12
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">Executor</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * 查询接口
+     *
+     * @param sql    查询语句
+     * @param params 占位符对应的参数
+     * @param conn   连接
+     * @return Iterator&lt;LinkedHashMap&lt;String, Object>>
+     * @throws SQLException
+     */</span>
+    <span class="token class-name">Iterator</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Map</span><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token function">query</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">,</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> params<span class="token punctuation">,</span> <span class="token class-name">Connection</span> conn<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * (单条)增删改接口
+     *
+     * @param sql    增删改语句
+     * @param params 占位符对应的参数
+     * @param conn   连接
+     * @return 操作的条数
+     * @throws SQLException
+     */</span>
+    <span class="token keyword">int</span> <span class="token function">operat</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">,</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> params<span class="token punctuation">,</span> <span class="token class-name">Connection</span> conn<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 批量操作&lt;br>
+     * 大于等于0是成功处理的
+     *
+     * @param sql  增删改语句
+     * @param list 占位符对应的参数
+     * @param conn 连接
+     * @return
+     * @throws SQLException
+     * @author : weikeqin.cn@gmail.com
+     * @date : 2017-09-08 14:47:15
+     */</span>
+    <span class="token keyword">int</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token function">betchOperat</span><span class="token punctuation">(</span><span class="token class-name">String</span> sql<span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Map</span><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span><span class="token punctuation">></span></span> list<span class="token punctuation">,</span> <span class="token class-name">Connection</span> conn<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SQLException</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/07/12/universal-curd-interface/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/06/04/tf-idf/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/06/04/tf-idf/" class="post-title-link" itemprop="url">tf-idf</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-06-04 22:21:16" itemprop="dateCreated datePublished" datetime="2018-06-04T22:21:16+08:00">2018-06-04</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/algorithm/" itemprop="url" rel="index"><span itemprop="name">algorithm</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>4.5k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>4 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  tf-idf的具体实现，代码稍后上传到github</p>
+<p>  在进行文本特征选择的时候，有很多种方法，tf-idf是比较简单常用的一种。<br>  tf-idf选择出的是有区分度的词，对选特征词有很大的帮助。</p>
+<p>  TF-IDF（term frequency–inverse document frequency）是一种用于资讯检索与资讯探勘的常用加权技术。</p>
+<p>　TFIDF的主要思想是：如果某个词或短语在一篇文章中出现的频率TF高，并且在其他文章中很少出现，则认为此词或者短语具有很好的类别区分能力，适合用来分类。</p>
+<p>  假如一篇文件的总词语数是100个，而词语”蜜蜂”出现了3次，那么”蜜蜂”一词在该文件中的词频就是3/100=0.03。<br>  一个计算文件频率 (DF) 的方法是测定有多少份文件出现过”蜜蜂”一词，然后除以文件集里包含的文件总数。<br>  所以，如果”蜜蜂”一词在2份文件出现过，而文件总数是8份的话，其逆向文件频率就是 lg(8/2)=2。最后的TF-IDF的分数为 0.03 * 2 = 0.06。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/06/04/tf-idf/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/06/01/sort-algorithm-comparison/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="undefined | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2018/06/01/sort-algorithm-comparison/" class="post-title-link" itemprop="url">常用排序算法比较</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2018-06-01 17:24:19" itemprop="dateCreated datePublished" datetime="2018-06-01T17:24:19+08:00">2018-06-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/algorithm/" itemprop="url" rel="index"><span itemprop="name">algorithm</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>21k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>19 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>  在比较排序算法时，得先找一个标准比较，一般都使用时间复杂度和空间复杂度来衡量。</p>
+<p>  排序算法<br>　根据排序过程中使用的存储器不同，排序算法分为 内部排序 和 外部排序 两大类。<br>　　内部排序指的是待排序记录存放在计算机随机存储器中进行的排序过程<br>　　外部排序指的在排序过程中尚需对外村进行访问的排序过程</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">
+<span class="token comment">/**
+ * 交换数组元素
+ *
+ * @param array
+ * @param i
+ * @param j
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">swap</span><span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">[</span><span class="token punctuation">]</span> array<span class="token punctuation">,</span> <span class="token keyword">int</span> i<span class="token punctuation">,</span> <span class="token keyword">int</span> j<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">int</span> tmp <span class="token operator">=</span> array<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+	array<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> array<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">;</span>
+	array<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">=</span> tmp<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+
+<span class="token comment">/**
+ * 交换数组元素
+ *    用了一个巧妙的方法，不需要临时变量
+ *    不足之处，就是当数组中的arr[a]+arr[b]的值大于int的最大值时，计算结果会溢出。导致arr[a]和arr[b]的值错误。
+ * @param arr
+ * @param a
+ * @param b
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">swap</span><span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">[</span><span class="token punctuation">]</span> arr<span class="token punctuation">,</span> <span class="token keyword">int</span> a<span class="token punctuation">,</span> <span class="token keyword">int</span> b<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+	arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">=</span> arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">+</span> arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span><span class="token punctuation">;</span>
+	arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span> <span class="token operator">=</span> arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">-</span> arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span><span class="token punctuation">;</span>
+	arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">=</span> arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">-</span> arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+
+<span class="token comment">/**
+ * 交换数组元素
+ * 
+ * @param arr
+ * @param a
+ * @param b
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">swap</span><span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">[</span><span class="token punctuation">]</span> arr<span class="token punctuation">,</span> <span class="token keyword">int</span> a<span class="token punctuation">,</span> <span class="token keyword">int</span> b<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">^=</span> arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span> <span class="token operator">^=</span> arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    arr<span class="token punctuation">[</span>a<span class="token punctuation">]</span> <span class="token operator">^=</span> arr<span class="token punctuation">[</span>b<span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/06/01/sort-algorithm-comparison/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
 
     
 
@@ -539,901 +1669,8 @@ FLUSH <span class="token keyword">PRIVILEGES</span><span class="token punctuatio
 
 
 
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/05/16/springboot-error-note/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/05/16/springboot-error-note/" class="post-title-link" itemprop="url">springboot error</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-05-16 10:28:03" itemprop="dateCreated datePublished" datetime="2018-05-16T10:28:03+08:00">2018-05-16</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>13k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>11 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <h1 id="1-maven-plugins-maven-compiler-plugin-3-8-0-compile-failed-missing-org-objectweb-asm-ClassVisitor"><a href="#1-maven-plugins-maven-compiler-plugin-3-8-0-compile-failed-missing-org-objectweb-asm-ClassVisitor" class="headerlink" title="(1)  maven.plugins:maven-compiler-plugin:3.8.0:compile failed   missing: org/objectweb/asm/ClassVisitor"></a>(1)  maven.plugins:maven-compiler-plugin:3.8.0:compile failed   missing: org/objectweb/asm/ClassVisitor</h1><p>  在使用 springboot 2.1.3 后，开始出现这个问题</p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span><span class="token level error important">ERROR</span><span class="token punctuation">]</span> Failed to execute goal org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>maven<span class="token punctuation">.</span>plugins<span class="token operator">:</span>maven<span class="token operator">-</span>compiler<span class="token operator">-</span>plugin<span class="token operator">:</span><span class="token number">3.8.0</span><span class="token operator">:</span>compile <span class="token operator">(</span>default<span class="token operator">-</span>compile<span class="token operator">)</span> on project model<span class="token operator">:</span> Execution default<span class="token operator">-</span>compile of goal org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>
-maven<span class="token punctuation">.</span>plugins<span class="token operator">:</span>maven<span class="token operator">-</span>compiler<span class="token operator">-</span>plugin<span class="token operator">:</span><span class="token number">3.8.0</span><span class="token operator">:</span>compile failed<span class="token operator">:</span> Unable to load the mojo <span class="token string">'compile'</span> in the plugin <span class="token string">'org.apache.maven.plugins:maven-compiler-plugin:3.8.0'</span><span class="token punctuation">.</span> A required class is
-<span class="token property">missing:</span> org<span class="token operator">/</span>objectweb<span class="token operator">/</span>asm<span class="token operator">/</span>ClassVisitor<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
-<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span><span class="token level info keyword">INFO</span><span class="token punctuation">]</span> <span class="token separator comment">---</span> maven<span class="token operator">-</span>compiler<span class="token operator">-</span>plugin<span class="token operator">:</span><span class="token number">3.8.0</span><span class="token operator">:</span>compile <span class="token operator">(</span>default<span class="token operator">-</span>compile<span class="token operator">)</span> <span class="token operator">@</span>  <span class="token separator comment">---</span>
-<span class="token punctuation">[</span><span class="token level warning important">WARNING</span><span class="token punctuation">]</span> <span class="token property">Error injecting:</span> org<span class="token punctuation">.</span>apache<span class="token punctuation">.</span>maven<span class="token punctuation">.</span>plugin<span class="token punctuation">.</span>compiler<span class="token punctuation">.</span>CompilerMojo
-<span class="token property">com.google.inject.ProvisionException:</span> Unable to provision<span class="token punctuation">,</span> see the following errors<span class="token operator">:</span>
-
-<span class="token number">1</span><span class="token operator">)</span> Error injecting constructor<span class="token punctuation">,</span> <span class="token exception javastacktrace language-javastacktrace">java<span class="token punctuation">.</span>lang<span class="token punctuation">.</span>NoClassDefFoundError<span class="token punctuation">:</span> org/objectweb/asm/ClassVisitor
-  <span class="token keyword">at</span> org<span class="token punctuation">.</span>codehaus<span class="token punctuation">.</span>plexus<span class="token punctuation">.</span>languages<span class="token punctuation">.</span>java<span class="token punctuation">.</span>jpms<span class="token punctuation">.</span>LocationManager<span class="token punctuation">.</span>&lt;init><span class="token punctuation">(</span>Unknown Source<span class="token punctuation">)</span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<p>  maven-compiler-plugin 版本问题，指定版本</p>
-<p>  方法一，在pluginManagement指定</p>
-<pre class="line-numbers language-xml" data-language="xml"><code class="language-xml"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>build</span><span class="token punctuation">></span></span>
-    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>pluginManagement</span><span class="token punctuation">></span></span>
-        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>plugins</span><span class="token punctuation">></span></span>
-            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>plugin</span><span class="token punctuation">></span></span>
-                <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>groupId</span><span class="token punctuation">></span></span>org.apache.maven.plugins<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>groupId</span><span class="token punctuation">></span></span>
-                <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>artifactId</span><span class="token punctuation">></span></span>maven-compiler-plugin<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>artifactId</span><span class="token punctuation">></span></span>
-                <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>version</span><span class="token punctuation">></span></span>3.7.0<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>version</span><span class="token punctuation">></span></span>
-                <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>configuration</span><span class="token punctuation">></span></span>
-                    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>source</span><span class="token punctuation">></span></span>1.8<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>source</span><span class="token punctuation">></span></span>
-                    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>target</span><span class="token punctuation">></span></span>1.8<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>target</span><span class="token punctuation">></span></span>
-                <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>configuration</span><span class="token punctuation">></span></span>
-            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>plugin</span><span class="token punctuation">></span></span>
-        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>plugins</span><span class="token punctuation">></span></span>
-    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>pluginManagement</span><span class="token punctuation">></span></span>
-<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>build</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  方法二，在每个模块里手动指定 </p>
-<pre class="line-numbers language-xml" data-language="xml"><code class="language-xml"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>build</span><span class="token punctuation">></span></span>
-    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>plugins</span><span class="token punctuation">></span></span>
-        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>plugin</span><span class="token punctuation">></span></span>
-            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>groupId</span><span class="token punctuation">></span></span>org.springframework.boot<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>groupId</span><span class="token punctuation">></span></span>
-            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>artifactId</span><span class="token punctuation">></span></span>spring-boot-maven-plugin<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>artifactId</span><span class="token punctuation">></span></span>
-            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>configuration</span><span class="token punctuation">></span></span>
-                <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>classifier</span><span class="token punctuation">></span></span>exec<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>classifier</span><span class="token punctuation">></span></span>
-            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>configuration</span><span class="token punctuation">></span></span>
-        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>plugin</span><span class="token punctuation">></span></span>
-    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>plugins</span><span class="token punctuation">></span></span>
-<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>build</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/05/16/springboot-error-note/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/05/10/elasticsearch-notes/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/05/10/elasticsearch-notes/" class="post-title-link" itemprop="url">ElasticSearch 笔记</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-05-10 14:37:45" itemprop="dateCreated datePublished" datetime="2018-05-10T14:37:45+08:00">2018-05-10</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>16k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>14 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <blockquote>
-<p> Elasticsearch 是一个分布式的开源搜索和分析引擎，适用于所有类型的数据，包括文本、数字、地理空间、结构化和非结构化数据。<br> Elasticsearch 是一个实时的分布式搜索分析引擎，它被用作全文检索、结构化搜索、分析以及这三个功能的组合。</p>
-</blockquote>
-<blockquote>
-<p> Elasticsearch 的用途是什么？<br> Elasticsearch 在速度和可扩展性方面都表现出色，而且还能够索引多种类型的内容，这意味着其可用于多种用例：<br> 应用程序搜索<br> 网站搜索<br> 企业搜索<br> 日志处理和分析<br> 基础设施指标和容器监测<br> 应用程序性能监测<br> 地理空间数据分析和可视化<br> 安全分析<br> 业务分析</p>
-</blockquote>
-<h1 id="基础入门"><a href="#基础入门" class="headerlink" title="基础入门"></a>基础入门</h1><h2 id="下载安装"><a href="#下载安装" class="headerlink" title="下载安装"></a>下载安装</h2><p>  ElasticSearch下载完解压就可以使用，很方便。</p>
-<h3 id="官网下载地址"><a href="#官网下载地址" class="headerlink" title="官网下载地址"></a>官网下载地址</h3><p>  <a target="_blank" rel="noopener" href="https://www.elastic.co/downloads/">https://www.elastic.co/downloads/</a><br>  <a target="_blank" rel="noopener" href="https://www.elastic.co/downloads/elasticsearch">https://www.elastic.co/downloads/elasticsearch</a><br>  <a target="_blank" rel="noopener" href="https://www.elastic.co/cn/downloads/elasticsearch">https://www.elastic.co/cn/downloads/elasticsearch</a></p>
-<p>  <a target="_blank" rel="noopener" href="https://www.elastic.co/downloads/past-releases/elasticsearch-5-6-3">https://www.elastic.co/downloads/past-releases/elasticsearch-5-6-3</a><br>  <a target="_blank" rel="noopener" href="https://www.elastic.co/downloads/past-releases/elasticsearch-6-6-2">https://www.elastic.co/downloads/past-releases/elasticsearch-6-6-2</a><br>  <a target="_blank" rel="noopener" href="https://www.elastic.co/downloads/past-releases#elasticsearch">https://www.elastic.co/downloads/past-releases#elasticsearch</a></p>
-<p>  <a target="_blank" rel="noopener" href="https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-linux-x86_64.tar.gz">https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-linux-x86_64.tar.gz</a></p>
-<p>  <a target="_blank" rel="noopener" href="https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-darwin-x86_64.tar.gz">https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-darwin-x86_64.tar.gz</a></p>
-<p>  <a target="_blank" rel="noopener" href="https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-windows-x86_64.zip">https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-windows-x86_64.zip</a></p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/05/10/elasticsearch-notes/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/distributed-question/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/04/20/distributed-question/" class="post-title-link" itemprop="url">分布式 常见面试题</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-04-20 09:33:23" itemprop="dateCreated datePublished" datetime="2018-04-20T09:33:23+08:00">2018-04-20</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-11-26 16:03:28" itemprop="dateModified" datetime="2022-11-26T16:03:28+08:00">2022-11-26</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>421</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>什么是CAP定理？<br>说说CAP理论和BASE理论？<br>什么是最终一致性？最终一致性实现方式？<br>什么是一致性Hash？<br>讲讲分布式事务？<br>如何实现分布式锁？<br>如何实现分布式 Session?<br>如何保证消息的一致性?<br>负载均衡的理解？<br>正向代理和反向代理？<br>CDN实现原理？<br>怎么提升系统的QPS和吞吐？<br>Dubbo的底层实现原理和机制？<br>描述一个服务从发布到被消费的详细过程？<br>分布式系统怎么做服务治理？<br>消息中间件如何解决消息丢失问题？<br>Dubbo的服务请求失败怎么处理？<br>对分布式事务的理解？<br>如何实现负载均衡,有哪些算法可以实现?<br>Zookeeper的用途,选举的原理是什么?<br>讲讲数据的垂直拆分水平拆分？<br>zookeeper原理和适用场景？<br>zookeeper watch机制？<br>redis/zk节点宕机如何处理？<br>分布式集群下如何做到唯一序列号？<br>用过哪些MQ,怎么用的,和其他mq比较有什么优缺点,MQ的连接是线程安全的吗？<br>MQ系统的数据如何保证不丢失？<br>列举出能想到的数据库分库分表策略？</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/network-question/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/04/20/network-question/" class="post-title-link" itemprop="url">网络编程 常见面试题</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-04-20 09:32:29" itemprop="dateCreated datePublished" datetime="2018-04-20T09:32:29+08:00">2018-04-20</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-29 16:28:50" itemprop="dateModified" datetime="2022-05-29T16:28:50+08:00">2022-05-29</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/basic/" itemprop="url" rel="index"><span itemprop="name">basic</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>215</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>TCP建立连接和断开连接的过程？<br>HTTP协议的交互流程，HTTP和HTTPS的差异，SSL的交互流程？<br>TCP的滑动窗口协议有什么用？<br>HTTP协议都有哪些方法？<br>Socket交互的基本流程？<br>讲讲tcp协议（建连过程，慢启动，滑动窗口，七层模型）？<br>webservice协议（wsdl/soap格式，与restt办议的区别）？<br>说说Netty线程模型，什么是零拷贝？<br>TCP三次握手、四次挥手？<br>DNS解析过程？<br>TCP如何保证数据的可靠传输的？</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/redis-question/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/04/20/redis-question/" class="post-title-link" itemprop="url">redis 常见面试题</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-04-20 09:32:09" itemprop="dateCreated datePublished" datetime="2018-04-20T09:32:09+08:00">2018-04-20</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-11-13 21:04:43" itemprop="dateModified" datetime="2022-11-13T21:04:43+08:00">2022-11-13</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>171</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>redis数据结构有哪些？<br>Redis缓存穿透，缓存雪崩？<br>如何使用Redis来实现分布式锁？<br>Redis的并发竞争问题如何解决？<br>Redis持久化的几种方式，优缺点是什么，怎么实现的？<br>Redis的缓存失效策略？<br>Redis集群，高可用，原理？<br>Redis缓存分片？<br>Redis的数据淘汰策略？<br>redis队列应用场景？<br>分布式使用场景（储存session）？</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/mysql-question/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/04/20/mysql-question/" class="post-title-link" itemprop="url">mysql 常见面试题</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-04-20 09:32:00" itemprop="dateCreated datePublished" datetime="2018-04-20T09:32:00+08:00">2018-04-20</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/mysql/" itemprop="url" rel="index"><span itemprop="name">mysql</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>550</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>MySQL 有哪些存储引擎啊？都有什么区别？<br>Float、Decimal 存储金额的区别？<br>Datetime、Timestamp 存储时间的区别？<br>Char、Varchar、Varbinary 存储字符的区别？<br>对比一下B+树索引和 Hash索引？<br>MySQL索引类型有？<br>如何管理 MySQL索引？<br>对Explain参数及重要参数的理解？<br>索引利弊是什么及索引分类？<br>聚簇索引和非聚簇索引的区别？<br>B+tree 如何进行优化？索引遵循哪些原则？<br>索引与锁有什么关系？<br>还有什么其他的索引类型，各自索引有哪些优缺点？<br>谈谈对Innodb事务的理解？<br>说说数据库事务特点及潜在问题？<br>什么是MySQL隔离级别？<br>有多少种事务失效的场景，如何解决？<br>一致性非锁定读和一致性锁定读是什么？<br>Innodb如何解决幻读？<br>讲讲Innodb行锁？<br>死锁及监控是什么？<br>自增长与锁 ，锁的算法，锁问题，锁升级是什么？<br>乐观锁的线程如何做失败补偿？<br>高并发场景（领红包）如何防止死锁，保证数据一致性？<br>谈谈MySQL的锁并发？<br>查询优化的基本思路是什么？<br>说说MySQL读写分离、分库分表？<br>表结构对性能有什么影响?<br>浅谈索引优化？<br>说说Sql优化的几点原则？<br>MySQL表设计及规范？<br>说说MySQL几种存储引擎应用场景？<br>MySQL常用优化方式有哪些？<br>MySQL常用监控？<br>MySQL瓶颈分析？</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/spring-question/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/04/20/spring-question/" class="post-title-link" itemprop="url">spring 常见面试题</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-04-20 09:31:39" itemprop="dateCreated datePublished" datetime="2018-04-20T09:31:39+08:00">2018-04-20</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>431</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>为什么需要代理模式？<br>讲讲静态代理模式的优点及其瓶颈？<br>对Java 接口代理模式的实现原理的理解？<br>如何使用 Java 反射实现动态代理？<br>Java 接口代理模式的指定增强？<br>谈谈对Cglib 类增强动态代理的实现？<br>怎么理解面向切面编程的切面？<br>讲解OOP与AOP的简单对比？<br>讲解JDK 动态代理和 CGLIB 代理原理以及区别？<br>讲解Spring 框架中基于 Schema 的 AOP 实现原理？<br>讲解Spring 框架中如何基于 AOP 实现的事务管理？<br>谈谈对控制反转的设计思想的理解？<br>怎么理解 Spring IOC 容器？<br>Spring IOC 怎么管理 Bean 之间的依赖关系，怎么避免循环依赖？<br>对Spring IOC 容器的依赖注入的理解？<br>说说对Spring IOC 的单例模式和高级特性？<br>BeanFactory 和 FactoryBean 有什么区别？<br>BeanFactory 和 ApplicationContext 又有什么不同？<br>Spring 在 Bean 创建过程中是如何解决循环依赖的？<br>谈谈Spring Bean 创建过程中的设计模式？</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2018/04/20/jvm-question/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="undefined | 天道酬勤">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2018/04/20/jvm-question/" class="post-title-link" itemprop="url">jvm 常见面试题</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2018-04-20 09:31:31" itemprop="dateCreated datePublished" datetime="2018-04-20T09:31:31+08:00">2018-04-20</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar-check"></i>
-      </span>
-      <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/java/" itemprop="url" rel="index"><span itemprop="name">java</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="本文字数">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">本文字数：</span>
-      <span>1.4k</span>
-    </span>
-    <span class="post-meta-item" title="阅读时长">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <h1 id="1-Java-内存分配？"><a href="#1-Java-内存分配？" class="headerlink" title="(1) Java 内存分配？"></a>(1) Java 内存分配？</h1><ol>
-<li>Java虚拟机在执行Java的过程中会把管理的内存划分为若干个不同的数据区域。这些区域有各自的用途，以及创建和销毁的时间，有的区域随着虚拟机进程的启动而存在，而有的区域则依赖线程的启动和结束而创建和销毁。<br>程序计数器、java虚拟机栈、本地方法栈、堆、方法区、常量池<br><a target="_blank" rel="noopener" href="https://blog.csdn.net/OyangYujun/article/details/41173747">Java内存区域划分、内存分配原理</a>  </li>
-<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/shimiso/article/details/8595564">Java 内存分配全面浅析</a>  </li>
-</ol>
-<h1 id="2-Java-堆的结构是什么样子的？"><a href="#2-Java-堆的结构是什么样子的？" class="headerlink" title="(2) Java 堆的结构是什么样子的？"></a>(2) Java 堆的结构是什么样子的？</h1><p>  站在垃圾收集器的角度来看，可以把内存分为新生代与老年代。</p>
-<h1 id="什么是堆中的永久代（Perm-Gen-space）"><a href="#什么是堆中的永久代（Perm-Gen-space）" class="headerlink" title="什么是堆中的永久代（Perm Gen space）?"></a>什么是堆中的永久代（Perm Gen space）?</h1><h1 id="说说各个区域的作用？"><a href="#说说各个区域的作用？" class="headerlink" title="说说各个区域的作用？"></a>说说各个区域的作用？</h1><p>  程序计数器<br>  java虚拟机栈<br>  本地方法栈<br>  堆<br>  方法区<br>  常量池</p>
-<h1 id="Java-中会存在内存泄漏吗，简述一下？"><a href="#Java-中会存在内存泄漏吗，简述一下？" class="headerlink" title="Java 中会存在内存泄漏吗，简述一下？"></a>Java 中会存在内存泄漏吗，简述一下？</h1><p>  在 Java 中，内存泄漏就是存在一些被分配的对象，这些对象有下面两个特点，首先，这些对象是可达的，即在有向图中，存在通路可以与其相连（也就是说仍存在该内存对象的引用）；其次，这些对象是无用的，即程序以后不会再使用这些对象。如果对象满足这两个条件，这些对象就可以判定为 Java 中的内存泄漏，这些对象不会被 GC 所回收，然而它却占用内存。</p>
-<h1 id="Java-类加载过程？"><a href="#Java-类加载过程？" class="headerlink" title="Java 类加载过程？"></a>Java 类加载过程？</h1><h1 id="描述一下-JVM-加载-Class-文件的原理机制"><a href="#描述一下-JVM-加载-Class-文件的原理机制" class="headerlink" title="描述一下 JVM 加载 Class 文件的原理机制?"></a>描述一下 JVM 加载 Class 文件的原理机制?</h1><h1 id="什么是类加载器？"><a href="#什么是类加载器？" class="headerlink" title="什么是类加载器？"></a>什么是类加载器？</h1><h1 id="类加载器有哪些？"><a href="#类加载器有哪些？" class="headerlink" title="类加载器有哪些？"></a>类加载器有哪些？</h1><h1 id="什么是tomcat类加载机制？"><a href="#什么是tomcat类加载机制？" class="headerlink" title="什么是tomcat类加载机制？"></a>什么是tomcat类加载机制？</h1><h1 id="类加载器双亲委派模型机制？"><a href="#类加载器双亲委派模型机制？" class="headerlink" title="类加载器双亲委派模型机制？"></a>类加载器双亲委派模型机制？</h1><h1 id="什么是GC-为什么要有-GC？"><a href="#什么是GC-为什么要有-GC？" class="headerlink" title="什么是GC? 为什么要有 GC？"></a>什么是GC? 为什么要有 GC？</h1><h1 id="简述一下Java-垃圾回收机制？"><a href="#简述一下Java-垃圾回收机制？" class="headerlink" title="简述一下Java 垃圾回收机制？"></a>简述一下Java 垃圾回收机制？</h1><h1 id="如何判断一个对象是否存活？"><a href="#如何判断一个对象是否存活？" class="headerlink" title="如何判断一个对象是否存活？"></a>如何判断一个对象是否存活？</h1><h1 id="垃圾回收的优点和原理，并考虑-2-种回收机制？"><a href="#垃圾回收的优点和原理，并考虑-2-种回收机制？" class="headerlink" title="垃圾回收的优点和原理，并考虑 2 种回收机制？"></a>垃圾回收的优点和原理，并考虑 2 种回收机制？</h1><h1 id="垃圾回收器的基本原理是什么？"><a href="#垃圾回收器的基本原理是什么？" class="headerlink" title="垃圾回收器的基本原理是什么？"></a>垃圾回收器的基本原理是什么？</h1><h1 id="垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？"><a href="#垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？" class="headerlink" title="垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？"></a>垃圾回收器可以马上回收内存吗？有什么办法主动通知虚拟机进行垃圾回收？</h1><h1 id="深拷贝和浅拷贝？"><a href="#深拷贝和浅拷贝？" class="headerlink" title="深拷贝和浅拷贝？"></a>深拷贝和浅拷贝？</h1><h1 id="System-gc-和-Runtime-gc-会做些什么？"><a href="#System-gc-和-Runtime-gc-会做些什么？" class="headerlink" title="System.gc() 和 Runtime.gc() 会做些什么？"></a>System.gc() 和 Runtime.gc() 会做些什么？</h1><h1 id="什么是分布式垃圾回收（DGC）？它是如何工作的？"><a href="#什么是分布式垃圾回收（DGC）？它是如何工作的？" class="headerlink" title="什么是分布式垃圾回收（DGC）？它是如何工作的？"></a>什么是分布式垃圾回收（DGC）？它是如何工作的？</h1><h1 id="串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？"><a href="#串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？" class="headerlink" title="串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？"></a>串行（serial）收集器和吞吐量（throughput）收集器的区别是什么？</h1><h1 id="在-Java-中，对象什么时候可以被垃圾回收？"><a href="#在-Java-中，对象什么时候可以被垃圾回收？" class="headerlink" title="在 Java 中，对象什么时候可以被垃圾回收？"></a>在 Java 中，对象什么时候可以被垃圾回收？</h1><h1 id="简述Minor-GC-和-Major-GC？"><a href="#简述Minor-GC-和-Major-GC？" class="headerlink" title="简述Minor GC 和 Major GC？"></a>简述Minor GC 和 Major GC？</h1><h1 id="Java-中垃圾收集的方法有哪些？"><a href="#Java-中垃圾收集的方法有哪些？" class="headerlink" title="Java 中垃圾收集的方法有哪些？"></a>Java 中垃圾收集的方法有哪些？</h1><h1 id="讲讲你理解的性能评价及测试指标？"><a href="#讲讲你理解的性能评价及测试指标？" class="headerlink" title="讲讲你理解的性能评价及测试指标？"></a>讲讲你理解的性能评价及测试指标？</h1><h1 id="常用的性能优化方式有哪些？"><a href="#常用的性能优化方式有哪些？" class="headerlink" title="常用的性能优化方式有哪些？"></a>常用的性能优化方式有哪些？</h1><h1 id="说说分布式缓存和一致性哈希？"><a href="#说说分布式缓存和一致性哈希？" class="headerlink" title="说说分布式缓存和一致性哈希？"></a>说说分布式缓存和一致性哈希？</h1><h1 id="同步与异步？阻塞与非阻塞？"><a href="#同步与异步？阻塞与非阻塞？" class="headerlink" title="同步与异步？阻塞与非阻塞？"></a>同步与异步？阻塞与非阻塞？</h1><h1 id="什么是GC调优？"><a href="#什么是GC调优？" class="headerlink" title="什么是GC调优？"></a>什么是GC调优？</h1><h1 id="常见异步的手段有哪些？"><a href="#常见异步的手段有哪些？" class="headerlink" title="常见异步的手段有哪些？"></a>常见异步的手段有哪些？</h1><p>内存模型以及分区，每个区放什么<br>一个对象从创建到销毁都是怎么在这些部分里存活和转移的<br>内存的哪些部分会参与GC的回收，回收策略是什么<br>Java的内存模型是怎么设计的，为什么要这么设计<br>结合内存模型的设计谈谈volatile关键字的作用</p>
-<p>深入Java虚拟机的内存结构<br>Java底层字节码分析<br>类加载机制详细讲解<br>个内存区域垃圾回收机制<br>深入讲解垃圾收集器<br>JDK调优工具</p>
-<p>1、什么是Java虚拟机？为什么Java被称作是“平台无关的编程语言”？</p>
-<p>2、Java代码是怎么运行的？</p>
-<p>3、Java虚拟机是如何加载Java类的?</p>
-<p>4、JVM运行内存的分类</p>
-<p>5、如何监控和诊断JVM堆内和堆外内存使用？</p>
-<p>6、Java四引用是什么？</p>
-<p>7、如何理解JVM内置的编译或GC日志？</p>
-<p>8、JVM的永久代中会发生垃圾回收么？</p>
-<p>9、Java中的两种异常类型是什么？他们有什么区别？</p>
-<p>10、JVM是如何实现同步的？</p>
-<p>11、Java内存模型是什么？</p>
-<p>12、即时编译器有哪些优化？</p>
-<p>13、在什么情况下重复读写操作会被优化？</p>
-<p>14、什么样的垃圾才被回收？</p>
-<p>15、什么时候会导致垃圾回收？</p>
-<p>16、如何利用JFR和JMC监控Java程序？</p>
-<p>17、如何利用Unsafe API 绕开 JVM的控制？</p>
-<p>18、如何利用字节码注入为已有代码加料？</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/20/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><span class="page-number current">21</span><a class="page-number" href="/page/22/">22</a><span class="space">&hellip;</span><a class="page-number" href="/page/30/">30</a><a class="extend next" rel="next" href="/page/22/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/20/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/20/">20</a><span class="page-number current">21</span><a class="page-number" href="/page/22/">22</a><span class="space">&hellip;</span><a class="page-number" href="/page/31/">31</a><a class="extend next" rel="next" href="/page/22/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 </div>

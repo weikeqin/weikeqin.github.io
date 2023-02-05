@@ -19,18 +19,22 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
 
-    <meta name="description" content="不积跬步无以至千里">
+    <meta name="description" content="Redis 数据持久化的实现，其中包括 Redis 内存快照 RDB 文件的生成方法，以及 AOF 日志的记录与重写。 (1) 什么是RDB  RDB是Redis DataBase 的缩写，中文名为快照&#x2F;内存快照。  RDB持久化是把当前进程数据生成快照保存到磁盘上的过程。    (2) 为什么要用RDB  Redis是个基于内存的数据库。那服务一旦宕机，内存中的数据将全部丢失。为了保存数据，">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis RDB">
 <meta property="og:url" content="http://weikeqin.com/2022/01/15/redis-rdb/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="不积跬步无以至千里">
+<meta property="og:description" content="Redis 数据持久化的实现，其中包括 Redis 内存快照 RDB 文件的生成方法，以及 AOF 日志的记录与重写。 (1) 什么是RDB  RDB是Redis DataBase 的缩写，中文名为快照&#x2F;内存快照。  RDB持久化是把当前进程数据生成快照保存到磁盘上的过程。    (2) 为什么要用RDB  Redis是个基于内存的数据库。那服务一旦宕机，内存中的数据将全部丢失。为了保存数据，">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/persistence/rdb/redis-rdb-overview.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/persistence/rdb/redis-rdb-overview.png">
 <meta property="article:published_time" content="2022-01-15T13:33:23.000Z">
-<meta property="article:modified_time" content="2022-12-04T13:41:43.959Z">
+<meta property="article:modified_time" content="2023-02-04T04:21:29.954Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/persistence/rdb/redis-rdb-overview.png">
 
 
 <link rel="canonical" href="http://weikeqin.com/2022/01/15/redis-rdb/">
@@ -136,7 +140,7 @@
 
   <aside class="sidebar">
 
-    <div class="sidebar-inner sidebar-overview-active">
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
       <ul class="sidebar-nav">
         <li class="sidebar-nav-toc">
           文章目录
@@ -149,6 +153,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%BB%80%E4%B9%88%E6%98%AFRDB"><span class="nav-number">1.</span> <span class="nav-text">(1) 什么是RDB</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8RDB"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用RDB</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-RDB%E4%BC%98%E7%BC%BA%E7%82%B9"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) RDB优缺点</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-RDB%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) RDB的原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) 源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-RDB%E5%88%9B%E5%BB%BA%E7%9A%84%E5%85%A5%E5%8F%A3%E5%87%BD%E6%95%B0%E5%92%8C%E8%A7%A6%E5%8F%91%E6%97%B6%E6%9C%BA"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) RDB创建的入口函数和触发时机</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-1-%E5%90%8C%E6%AD%A5%E9%98%BB%E5%A1%9E%E4%BF%9D%E5%AD%98-rdbSave"><span class="nav-number">4.1.1.</span> <span class="nav-text">(4.1.1) 同步阻塞保存-rdbSave</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-2-%E5%BC%82%E6%AD%A5%E4%BF%9D%E5%AD%98-rdbSaveBackground"><span class="nav-number">4.1.2.</span> <span class="nav-text">(4.1.2) 异步保存-rdbSaveBackground</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-3-%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5%E7%94%9F%E6%88%90RDB-rdbSaveToSlavesSockets"><span class="nav-number">4.1.3.</span> <span class="nav-text">(4.1.3) 主从同步生成RDB-rdbSaveToSlavesSockets</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-RDB%E6%96%87%E4%BB%B6%E5%A6%82%E4%BD%95%E7%94%9F%E6%88%90"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) RDB文件如何生成</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-1-%E5%86%99%E5%85%A5%E6%95%B0%E6%8D%AE-rdbWriteRaw"><span class="nav-number">4.2.1.</span> <span class="nav-text">(4.2.1) 写入数据-rdbWriteRaw</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -161,7 +166,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-count">304</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -172,7 +177,7 @@
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -267,7 +272,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2022-12-04 21:41:43" itemprop="dateModified" datetime="2022-12-04T21:41:43+08:00">2022-12-04</time>
+      <time title="修改时间：2023-02-04 12:21:29" itemprop="dateModified" datetime="2023-02-04T12:21:29+08:00">2023-02-04</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -275,7 +280,7 @@
       </span>
       <span class="post-meta-item-text">分类于</span>
         <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
         </span>
     </span>
 
@@ -293,14 +298,14 @@
         <i class="far fa-file-word"></i>
       </span>
       <span class="post-meta-item-text">本文字数：</span>
-      <span>0</span>
+      <span>17k</span>
     </span>
     <span class="post-meta-item" title="阅读时长">
       <span class="post-meta-item-icon">
         <i class="far fa-clock"></i>
       </span>
       <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>1 分钟</span>
+      <span>15 分钟</span>
     </span>
 </div>
 
@@ -311,7 +316,679 @@
     
     
     <div class="post-body" itemprop="articleBody">
-        
+        <p>  Redis 数据持久化的实现，其中包括 Redis 内存快照 RDB 文件的生成方法，以及 AOF 日志的记录与重写。</p>
+<h1 id="1-什么是RDB"><a href="#1-什么是RDB" class="headerlink" title="(1) 什么是RDB"></a>(1) 什么是RDB</h1><p>  RDB是Redis DataBase 的缩写，中文名为快照/内存快照。<br>  RDB持久化是把当前进程数据生成快照保存到磁盘上的过程。</p>
+<br>
+
+
+<h1 id="2-为什么要用RDB"><a href="#2-为什么要用RDB" class="headerlink" title="(2) 为什么要用RDB"></a>(2) 为什么要用RDB</h1><p>  Redis是个基于内存的数据库。那服务一旦宕机，内存中的数据将全部丢失。为了保存数据，需要有一个持久化方式，RDB就是其中一种。</p>
+<p>  主从复制是分布式数据系统保证可靠性的一个重要机制。RDB为Redis主从提供了数据同步机制。</p>
+<h2 id="2-1-RDB优缺点"><a href="#2-1-RDB优缺点" class="headerlink" title="(2.1) RDB优缺点"></a>(2.1) RDB优缺点</h2><p>优点<br>  RDB文件是某个时间节点的快照，默认使用LZF算法进行压缩，压缩后的文件体积远远小于内存大小，适用于备份、全量复制等场景；<br>  Redis加载RDB文件恢复数据要远远快于AOF方式；</p>
+<p>缺点<br>  RDB方式实时性不够，无法做到秒级的持久化；<br>  每次调用bgsave都需要fork子进程，fork子进程属于重量级操作，频繁执行成本较高；<br>  RDB文件是二进制的，没有可读性，AOF文件在了解其结构的情况下可以手动修改或者补全；<br>  版本兼容RDB文件问题；</p>
+<br>
+
+
+<h1 id="3-RDB的原理"><a href="#3-RDB的原理" class="headerlink" title="(3) RDB的原理"></a>(3) RDB的原理</h1><p>  <img src="/img/database/redis/persistence/rdb/redis-rdb-overview.png" alt="Redis RDB数据格式"></p>
+<br>
+
+
+
+<h1 id="4-源码解读"><a href="#4-源码解读" class="headerlink" title="(4) 源码解读"></a>(4) 源码解读</h1><h2 id="4-1-RDB创建的入口函数和触发时机"><a href="#4-1-RDB创建的入口函数和触发时机" class="headerlink" title="(4.1) RDB创建的入口函数和触发时机"></a>(4.1) RDB创建的入口函数和触发时机</h2><p>  RDB 文件创建的三个时机，分别是 <code>save命令执行</code>、<code>bgsave命令执行</code> 以及 <code>主从复制</code>。<br>  对应源码<code>rdb.c</code>文件中的3个函数 </p>
+<table>
+<thead>
+<tr>
+<th align="left">函数</th>
+<th align="left">作用</th>
+<th align="left">备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">rdbSave</td>
+<td align="left">Redis Server在本地磁盘创建RDB文件。</td>
+<td align="left">对应save命令</td>
+</tr>
+<tr>
+<td align="left">rdbSaveBackground</td>
+<td align="left">Redis Server 使用后台子进程方式，在本地磁盘创建 RDB文件</td>
+<td align="left">对应bgsaveCommand</td>
+</tr>
+<tr>
+<td align="left">rdbSaveToSlavesSockets</td>
+<td align="left">Redis Server 在采用不落盘方式传输RDB文件进行主从复制时，创建RDB文件</td>
+<td align="left">对应了Redis Server 执行主从复制命令，以及周期性检测主从复制状态时触发RDB生成</td>
+</tr>
+</tbody></table>
+<h3 id="4-1-1-同步阻塞保存-rdbSave"><a href="#4-1-1-同步阻塞保存-rdbSave" class="headerlink" title="(4.1.1) 同步阻塞保存-rdbSave"></a>(4.1.1) 同步阻塞保存-rdbSave</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;*
+ * 把数据库的数据保存到磁盘上
+ *
+ * 失败时返回 C_ERR
+ * 成功时返回 C_OK 
+ *
+ * @param *filename 文件名
+ * @param *rsi 
+ *&#x2F;
+int rdbSave(char *filename, rdbSaveInfo *rsi) &#123;
+    char tmpfile[256];
+    char cwd[MAXPATHLEN]; &#x2F;* Current working dir path for error messages. *&#x2F;
+    FILE *fp &#x3D; NULL;
+    rio rdb;
+    int error &#x3D; 0;
+
+    snprintf(tmpfile,256,&quot;temp-%d.rdb&quot;, (int) getpid());
+
+    &#x2F;&#x2F; 打开文件
+    fp &#x3D; fopen(tmpfile,&quot;w&quot;);
+    &#x2F;&#x2F; 文件不存在，为空
+    if (!fp) &#123;
+        &#x2F;&#x2F;  
+        char *cwdp &#x3D; getcwd(cwd,MAXPATHLEN);
+
+        &#x2F;&#x2F; 提示 打开文件失败
+        serverLog(LL_WARNING,
+            &quot;Failed opening the RDB file %s (in server root dir %s) &quot;
+            &quot;for saving: %s&quot;,
+            filename,
+            cwdp ? cwdp : &quot;unknown&quot;,
+            strerror(errno));
+        return C_ERR;
+    &#125;
+
+    &#x2F;&#x2F; rio初始化
+    rioInitWithFile(&amp;rdb,fp);
+
+    &#x2F;&#x2F; 标记开始保存
+    startSaving(RDBFLAGS_NONE);
+
+    &#x2F;&#x2F; fsync 在 rdb 保存时递增 
+    if (server.rdb_save_incremental_fsync)
+        &#x2F;&#x2F; todo 自动同步？
+        rioSetAutoSync(&amp;rdb,REDIS_AUTOSYNC_BYTES);
+
+    &#x2F;&#x2F; 真正把Redis数据库里的数据保存到文件 
+    if (rdbSaveRio(&amp;rdb,&amp;error,RDBFLAGS_NONE,rsi) &#x3D;&#x3D; C_ERR) &#123;
+        errno &#x3D; error;
+        goto werr;
+    &#125;
+
+    &#x2F;&#x2F; 确保数据不会保留在操作系统的输出缓冲区中
+
+    &#x2F;&#x2F; fflush 把缓冲区的数据写到文件里
+    if (fflush(fp)) goto werr;
+
+    &#x2F;&#x2F; fsync 确保一直到写磁盘操作结束才会返回
+    if (fsync(fileno(fp))) goto werr;
+
+    &#x2F;&#x2F; 关闭文件
+    if (fclose(fp)) &#123; fp &#x3D; NULL; goto werr; &#125;
+    fp &#x3D; NULL;
+    
+
+    &#x2F;&#x2F; 使用 文件重命名 确保仅当生成的数据库文件正常时才自动更改数据库文件。 
+
+    &#x2F;&#x2F; 把缓存文件重命名正式文件时，可能没权限，会重命名失败  
+    if (rename(tmpfile,filename) &#x3D;&#x3D; -1) &#123;  &#x2F;&#x2F; 重命名失败
+        char *cwdp &#x3D; getcwd(cwd,MAXPATHLEN);
+
+        &#x2F;&#x2F; 打印日志 
+        serverLog(LL_WARNING,
+            &quot;Error moving temp DB file %s on the final &quot;
+            &quot;destination %s (in server root dir %s): %s&quot;,
+            tmpfile,
+            filename,
+            cwdp ? cwdp : &quot;unknown&quot;,
+            strerror(errno));
+        unlink(tmpfile);
+        stopSaving(0);
+        return C_ERR;
+    &#125;
+
+    &#x2F;&#x2F; 打印日志  数据库数据已经保存到磁盘 
+    serverLog(LL_NOTICE,&quot;DB saved on disk&quot;);
+    &#x2F;&#x2F; 更新
+    server.dirty &#x3D; 0;
+    &#x2F;&#x2F; 更新上次保存时间
+    server.lastsave &#x3D; time(NULL);
+    &#x2F;&#x2F; 更新上次保存状态
+    server.lastbgsave_status &#x3D; C_OK;
+    &#x2F;&#x2F; 停止保存 发布事件
+    stopSaving(1);
+    return C_OK;
+
+werr:
+    serverLog(LL_WARNING,&quot;Write error saving DB on disk: %s&quot;, strerror(errno));
+    &#x2F;&#x2F; 关闭文件
+    if (fp) fclose(fp);
+    &#x2F;&#x2F; 删除缓存文件
+    unlink(tmpfile);
+    &#x2F;&#x2F; 停止保存 发布事件
+    stopSaving(0);
+    return C_ERR;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  Redis保存RDB文件的代码确实不错，在使用资源前校验资源的合法性，使用后确保数据都保存到磁盘，还通过重命名确认保存成功，并且在完后后货失败后释放对应资源。  </p>
+<p>  虽然很细节很简单，但是很健壮。</p>
+<br>
+
+
+<h3 id="4-1-2-异步保存-rdbSaveBackground"><a href="#4-1-2-异步保存-rdbSaveBackground" class="headerlink" title="(4.1.2) 异步保存-rdbSaveBackground"></a>(4.1.2) 异步保存-rdbSaveBackground</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;*
+ * 
+ * @param *filename 文件名
+ * @param *rsi 
+ *&#x2F;
+int rdbSaveBackground(char *filename, rdbSaveInfo *rsi) &#123;
+    pid_t childpid;
+
+    &#x2F;&#x2F; 有活跃的子进程 
+    if (hasActiveChildProcess()) return C_ERR;
+
+    &#x2F;&#x2F;  
+    server.dirty_before_bgsave &#x3D; server.dirty;
+    &#x2F;&#x2F;
+    server.lastbgsave_try &#x3D; time(NULL);
+    &#x2F;&#x2F; 打开子
+    openChildInfoPipe();
+
+    &#x2F;&#x2F; 复制进程
+    if ((childpid &#x3D; redisFork(CHILD_TYPE_RDB)) &#x3D;&#x3D; 0) &#123;  &#x2F;&#x2F; 
+        int retval;
+
+        &#x2F;&#x2F; 子进程设置调用名称
+        redisSetProcTitle(&quot;redis-rdb-bgsave&quot;);
+        &#x2F;&#x2F; 设置 bgsave子进程的cpu关联列表
+        redisSetCpuAffinity(server.bgsave_cpulist);
+        &#x2F;&#x2F; 在子进程里调用 rdbSave() 同步保存 
+        retval &#x3D; rdbSave(filename,rsi);
+        if (retval &#x3D;&#x3D; C_OK) &#123;
+            &#x2F;&#x2F; 发送子进程写时复制(Copy On Write)信息 
+            sendChildCOWInfo(CHILD_TYPE_RDB, &quot;RDB&quot;);
+        &#125;
+        &#x2F;&#x2F; 退出子进程
+        exitFromChild((retval &#x3D;&#x3D; C_OK) ? 0 : 1);
+    &#125; else &#123;
+        &#x2F;* Parent *&#x2F;
+        if (childpid &#x3D;&#x3D; -1) &#123;
+            &#x2F;&#x2F; 关闭 
+            closeChildInfoPipe();
+            &#x2F;&#x2F; 后台保存状态错误
+            server.lastbgsave_status &#x3D; C_ERR;
+            &#x2F;&#x2F; 不能后台保存  子进程复制出错
+            serverLog(LL_WARNING,&quot;Can&#39;t save in background: fork: %s&quot;,
+                strerror(errno));
+            return C_ERR;
+        &#125;
+
+        &#x2F;&#x2F; 
+        serverLog(LL_NOTICE,&quot;Background saving started by pid %d&quot;,childpid);
+        server.rdb_save_time_start &#x3D; time(NULL);
+        server.rdb_child_pid &#x3D; childpid;
+        server.rdb_child_type &#x3D; RDB_CHILD_TYPE_DISK;
+        updateDictResizePolicy();
+        return C_OK;
+    &#125;
+    return C_OK; &#x2F;* unreached *&#x2F;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-1-3-主从同步生成RDB-rdbSaveToSlavesSockets"><a href="#4-1-3-主从同步生成RDB-rdbSaveToSlavesSockets" class="headerlink" title="(4.1.3) 主从同步生成RDB-rdbSaveToSlavesSockets"></a>(4.1.3) 主从同步生成RDB-rdbSaveToSlavesSockets</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 生成一个 RDB 子进程，它将 RDB 写入当前处于 SLAVE_STATE_WAIT_BGSAVE_START 状态的从属 sockets。
+ *&#x2F;
+int rdbSaveToSlavesSockets(rdbSaveInfo *rsi) &#123;
+
+    listNode *ln;
+    listIter li;
+    pid_t childpid;
+    int pipefds[2], rdb_pipe_write, safe_to_exit_pipe;
+
+    &#x2F;&#x2F; 有活跃子进程 
+    if (hasActiveChildProcess()) return C_ERR;
+
+    &#x2F;&#x2F; 即使之前的fork子进程退出了，在我们排干管道之前不要开一个新的。
+    if (server.rdb_pipe_conns) return C_ERR;
+
+    &#x2F;* Before to fork, create a pipe that is used to transfer the rdb bytes to
+     * the parent, we can&#39;t let it write directly to the sockets, since in case
+     * of TLS we must let the parent handle a continuous TLS state when the
+     * child terminates and parent takes over. *&#x2F;
+    if (pipe(pipefds) &#x3D;&#x3D; -1) return C_ERR;
+    &#x2F;&#x2F; 
+    server.rdb_pipe_read &#x3D; pipefds[0]; &#x2F;* read end *&#x2F;
+    &#x2F;&#x2F; 
+    rdb_pipe_write &#x3D; pipefds[1]; &#x2F;* write end *&#x2F;
+    &#x2F;&#x2F; 
+    anetNonBlock(NULL, server.rdb_pipe_read);
+
+    &#x2F;&#x2F; 创建另一个管道，父进程使用该管道向子进程发出可以退出的信号。 
+    if (pipe(pipefds) &#x3D;&#x3D; -1) &#123;
+        &#x2F;&#x2F; 关闭rdb管道写操作 
+        close(rdb_pipe_write);
+        &#x2F;&#x2F; 关闭rdb管道读
+        close(server.rdb_pipe_read);
+        return C_ERR;
+    &#125;
+    safe_to_exit_pipe &#x3D; pipefds[0]; &#x2F;* read end *&#x2F;
+    server.rdb_child_exit_pipe &#x3D; pipefds[1]; &#x2F;* write end *&#x2F;
+
+    &#x2F;&#x2F; 收集我们要将 RDB 传输到的 从节点 的连接，这些从节点处于 WAIT_BGSAVE_START 状态。 
+    &#x2F;&#x2F; 创建 connection数组  长度&#x3D;从节点个数
+    server.rdb_pipe_conns &#x3D; zmalloc(sizeof(connection *)*listLength(server.slaves));
+    server.rdb_pipe_numconns &#x3D; 0;
+    server.rdb_pipe_numconns_writing &#x3D; 0;
+    &#x2F;&#x2F; 链表迭代器 
+    listRewind(server.slaves,&amp;li);
+    &#x2F;&#x2F; 遍历链表
+    while((ln &#x3D; listNext(&amp;li))) &#123;
+        &#x2F;&#x2F; 从节点 
+        client *slave &#x3D; ln-&gt;value;
+        if (slave-&gt;replstate &#x3D;&#x3D; SLAVE_STATE_WAIT_BGSAVE_START) &#123; &#x2F;&#x2F; 
+            &#x2F;&#x2F; 连接赋值
+            server.rdb_pipe_conns[server.rdb_pipe_numconns++] &#x3D; slave-&gt;conn;
+            &#x2F;&#x2F; 发送 FULLRESYNC 回复
+            replicationSetupSlaveForFullResync(slave,getPsyncInitialOffset());
+        &#125;
+    &#125;
+
+    &#x2F;&#x2F; 创建父子进程通信管道
+    openChildInfoPipe();
+    &#x2F;&#x2F; 创建子进程
+    if ((childpid &#x3D; redisFork(CHILD_TYPE_RDB)) &#x3D;&#x3D; 0) &#123;
+        &#x2F;* Child *&#x2F;
+        int retval, dummy;
+        rio rdb;
+
+        rioInitWithFd(&amp;rdb,rdb_pipe_write);
+
+        &#x2F;&#x2F; 设置进程名称  
+        redisSetProcTitle(&quot;redis-rdb-to-slaves&quot;);
+        &#x2F;&#x2F; 设置 子进程的cpu关联列表
+        redisSetCpuAffinity(server.bgsave_cpulist);
+
+        &#x2F;&#x2F; 写RDB数据
+        retval &#x3D; rdbSaveRioWithEOFMark(&amp;rdb,NULL,rsi);
+        if (retval &#x3D;&#x3D; C_OK &amp;&amp; rioFlush(&amp;rdb) &#x3D;&#x3D; 0)
+            retval &#x3D; C_ERR;
+
+        if (retval &#x3D;&#x3D; C_OK) &#123;
+            &#x2F;&#x2F; 发送子进程写时复制信息 
+            sendChildCOWInfo(CHILD_TYPE_RDB, &quot;RDB&quot;);
+        &#125;
+
+        &#x2F;&#x2F;   
+        rioFreeFd(&amp;rdb);
+        &#x2F;&#x2F; 关闭rdb写管道    &#x2F;&#x2F; 唤醒读取着，告诉他们我们已经完成 
+        close(rdb_pipe_write);
+        &#x2F;&#x2F; 关闭rdb子进程退出管道    &#x2F;&#x2F; 关闭写结束，以便我们可以检测到父级的关闭。
+        close(server.rdb_child_exit_pipe); 
+        &#x2F;&#x2F; 等待退出直到父进程告诉我们它是安全的。 我们不期望读取任何内容，只是在管道关闭时收到错误。 
+        dummy &#x3D; read(safe_to_exit_pipe, pipefds, 1);
+        &#x2F;&#x2F; 
+        UNUSED(dummy);
+        &#x2F;&#x2F; 退出子进程
+        exitFromChild((retval &#x3D;&#x3D; C_OK) ? 0 : 1);
+    &#125; else &#123;
+        &#x2F;* Parent *&#x2F;
+        close(safe_to_exit_pipe);
+        if (childpid &#x3D;&#x3D; -1) &#123;
+            &#x2F;&#x2F; 打日志  不能后台保存 fork错误 
+            serverLog(LL_WARNING,&quot;Can&#39;t save in background: fork: %s&quot;,
+                strerror(errno));
+
+            &#x2F;* Undo the state change. The caller will perform cleanup on
+             * all the slaves in BGSAVE_START state, but an early call to
+             * replicationSetupSlaveForFullResync() turned it into BGSAVE_END *&#x2F;
+            &#x2F;&#x2F;  
+            listRewind(server.slaves,&amp;li);
+            while((ln &#x3D; listNext(&amp;li))) &#123;
+                client *slave &#x3D; ln-&gt;value;
+                if (slave-&gt;replstate &#x3D;&#x3D; SLAVE_STATE_WAIT_BGSAVE_END) &#123;
+                    slave-&gt;replstate &#x3D; SLAVE_STATE_WAIT_BGSAVE_START;
+                &#125;
+            &#125;
+            &#x2F;&#x2F; 关闭 rdb写管道
+            close(rdb_pipe_write);
+            &#x2F;&#x2F; 
+            close(server.rdb_pipe_read);
+            &#x2F;&#x2F; 释放内存
+            zfree(server.rdb_pipe_conns);
+            server.rdb_pipe_conns &#x3D; NULL;
+            server.rdb_pipe_numconns &#x3D; 0;
+            server.rdb_pipe_numconns_writing &#x3D; 0;
+            &#x2F;&#x2F; 
+            closeChildInfoPipe();
+        &#125; else &#123;
+            serverLog(LL_NOTICE,&quot;Background RDB transfer started by pid %d&quot;,
+                childpid);
+            server.rdb_save_time_start &#x3D; time(NULL);
+            server.rdb_child_pid &#x3D; childpid;
+            server.rdb_child_type &#x3D; RDB_CHILD_TYPE_SOCKET;
+            updateDictResizePolicy();
+            &#x2F;&#x2F; 在父进程关闭rdb写管道，以便它可以检测到孩子的关闭。
+            close(rdb_pipe_write);
+            &#x2F;&#x2F; 创建文件事件  设置回调函数 rdbPipeReadHandler
+            if (aeCreateFileEvent(server.el, server.rdb_pipe_read, AE_READABLE, rdbPipeReadHandler,NULL) &#x3D;&#x3D; AE_ERR) &#123;
+                serverPanic(&quot;Unrecoverable error creating server.rdb_pipe_read file event.&quot;);
+            &#125;
+        &#125;
+        return (childpid &#x3D;&#x3D; -1) ? C_ERR : C_OK;
+    &#125;
+    return C_OK; &#x2F;* Unreached. *&#x2F;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+
+<h2 id="4-2-RDB文件如何生成"><a href="#4-2-RDB文件如何生成" class="headerlink" title="(4.2) RDB文件如何生成"></a>(4.2) RDB文件如何生成</h2><p>  生成RDB文件的主要逻辑在<code>rdbSaveRio</code>函数</p>
+<p>  <img src="/img/database/redis/persistence/rdb/redis-rdb-overview.png" alt="Redis RDB数据格式"></p>
+<p>  主要步骤如下：</p>
+<ol>
+<li>保存元数据信息，比如<code>魔数</code>、<code>属性信息</code> (类似RPC序列化里的)</li>
+<li>保存所有数据库字典里的<code>键值对</code>(包括内存淘汰策略、过期时间)</li>
+<li>保存<code>结束符</code>、<code>校验和</code> 等。</li>
+</ol>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 生成 RDB 格式的数据库转储，将其发送到指定的 Redis I&#x2F;O 通道。 
+ * 成功时返回 C_OK，否则返回 C_ERR，并且由于I&#x2F;O错误可能会丢失部分输出或全部输出。
+ *
+ * 当函数返回 C_ERR 并且如果 &#39;error&#39; 不为 NULL 时，
+ * &#39;error&#39; 指向的整数将设置为紧接在 I&#x2F;O 错误之后的 errno 的值。
+ *
+ * @param *rdb
+ * @param *error
+ * @param rdbflags
+ * @param *rsi
+ *&#x2F;
+int rdbSaveRio(rio *rdb, int *error, int rdbflags, rdbSaveInfo *rsi) &#123;
+    dictIterator *di &#x3D; NULL;
+    dictEntry *de;
+    char magic[10];
+    int j;
+    uint64_t cksum;
+    size_t processed &#x3D; 0;
+
+    if (server.rdb_checksum)
+        rdb-&gt;update_cksum &#x3D; rioGenericUpdateChecksum;
+
+    &#x2F;&#x2F; 生成魔数magic    
+    snprintf(magic,sizeof(magic),&quot;REDIS%04d&quot;,RDB_VERSION);
+    &#x2F;&#x2F; 将magic写入RDB文件
+    if (rdbWriteRaw(rdb,magic,9) &#x3D;&#x3D; -1) goto werr;
+
+    &#x2F;&#x2F; 写入属性信息
+    if (rdbSaveInfoAuxFields(rdb,rdbflags,rsi) &#x3D;&#x3D; -1) goto werr;
+
+    &#x2F;&#x2F; 写入 信息
+    if (rdbSaveModulesAux(rdb, REDISMODULE_AUX_BEFORE_RDB) &#x3D;&#x3D; -1) goto werr;
+
+    &#x2F;&#x2F;  
+    for (j &#x3D; 0; j &lt; server.dbnum; j++) &#123;
+        &#x2F;&#x2F; 获取redisDb 
+        redisDb *db &#x3D; server.db+j;
+        &#x2F;&#x2F; 字典
+        dict *d &#x3D; db-&gt;dict;
+        &#x2F;&#x2F; 字典为空 跳过
+        if (dictSize(d) &#x3D;&#x3D; 0) continue;
+        &#x2F;&#x2F; 迭代器
+        di &#x3D; dictGetSafeIterator(d);
+
+
+        &#x2F;&#x2F; 写 SELECT DB 操作符  &#x2F;&#x2F; 解决数据一致性问题  避免从节点写到其它库里
+        if (rdbSaveType(rdb,RDB_OPCODE_SELECTDB) &#x3D;&#x3D; -1) goto werr;
+        &#x2F;&#x2F; 保存编码长度 
+        if (rdbSaveLen(rdb,j) &#x3D;&#x3D; -1) goto werr;
+
+        &#x2F;* Write the RESIZE DB opcode. *&#x2F;
+        uint64_t db_size, expires_size;
+        &#x2F;&#x2F; 数据个数
+        db_size &#x3D; dictSize(db-&gt;dict);
+        &#x2F;&#x2F; 过期数据个数
+        expires_size &#x3D; dictSize(db-&gt;expires);
+        &#x2F;&#x2F; 
+        if (rdbSaveType(rdb,RDB_OPCODE_RESIZEDB) &#x3D;&#x3D; -1) goto werr;
+        &#x2F;&#x2F; 
+        if (rdbSaveLen(rdb,db_size) &#x3D;&#x3D; -1) goto werr;
+        &#x2F;&#x2F; 
+        if (rdbSaveLen(rdb,expires_size) &#x3D;&#x3D; -1) goto werr;
+
+        &#x2F;&#x2F; 遍历DB里的每个entry 
+        while((de &#x3D; dictNext(di)) !&#x3D; NULL) &#123;
+            &#x2F;&#x2F; 获取key  二进制安全的key
+            sds keystr &#x3D; dictGetKey(de);
+            &#x2F;&#x2F; 
+            robj key, *o &#x3D; dictGetVal(de);
+            long long expire;
+
+            &#x2F;&#x2F; 初始化key的状态
+            initStaticStringObject(key,keystr);
+            &#x2F;&#x2F; 获取key的过期时间
+            expire &#x3D; getExpire(db,&amp;key);
+            &#x2F;&#x2F; 保存键值对
+            if (rdbSaveKeyValuePair(rdb,&amp;key,o,expire) &#x3D;&#x3D; -1) goto werr;
+
+
+            &#x2F;&#x2F; 当此RDB作为AOF重写的一部分生成时，在重写时将累积的差异从父级移动到子级，以便最终写入更小。 
+
+            if (rdbflags &amp; RDBFLAGS_AOF_PREAMBLE &amp;&amp;
+                rdb-&gt;processed_bytes &gt; processed+AOF_READ_DIFF_INTERVAL_BYTES)
+            &#123;
+                &#x2F;&#x2F;  
+                processed &#x3D; rdb-&gt;processed_bytes;
+                &#x2F;&#x2F; 
+                aofReadDiffFromParent();
+            &#125;
+        &#125;
+        &#x2F;&#x2F; 
+        dictReleaseIterator(di);
+        di &#x3D; NULL;  &#x2F;&#x2F; 这样我们就不会因为错误而再次发布它。 
+    &#125;
+
+    &#x2F;* If we are storing the replication information on disk, persist
+     * the script cache as well: on successful PSYNC after a restart, we need
+     * to be able to process any EVALSHA inside the replication backlog the
+     * master will send us. *&#x2F;
+    if (rsi &amp;&amp; dictSize(server.lua_scripts)) &#123;
+        &#x2F;&#x2F; 
+        di &#x3D; dictGetIterator(server.lua_scripts);
+        &#x2F;&#x2F; 遍历
+        while((de &#x3D; dictNext(di)) !&#x3D; NULL) &#123;
+            &#x2F;&#x2F;  
+            robj *body &#x3D; dictGetVal(de);
+            &#x2F;&#x2F; 
+            if (rdbSaveAuxField(rdb,&quot;lua&quot;,3,body-&gt;ptr,sdslen(body-&gt;ptr)) &#x3D;&#x3D; -1)
+                goto werr;
+        &#125;
+        &#x2F;&#x2F; 
+        dictReleaseIterator(di);
+        di &#x3D; NULL;  &#x2F;&#x2F; 这样我们就不会因为错误而再次发布它。 
+    &#125;
+
+    &#x2F;&#x2F;  
+    if (rdbSaveModulesAux(rdb, REDISMODULE_AUX_AFTER_RDB) &#x3D;&#x3D; -1) goto werr;
+
+    &#x2F;&#x2F; 保存RDB文件结束符
+    if (rdbSaveType(rdb,RDB_OPCODE_EOF) &#x3D;&#x3D; -1) goto werr;
+
+    &#x2F;&#x2F; CRC64 校验和。 如果禁用校验和计算，它将为零，在这种情况下加载代码会跳过检查。
+    cksum &#x3D; rdb-&gt;cksum;
+    &#x2F;&#x2F; 小端编码
+    memrev64ifbe(&amp;cksum);
+    &#x2F;&#x2F; 写入校验和
+    if (rioWrite(rdb,&amp;cksum,8) &#x3D;&#x3D; 0) goto werr;
+    return C_OK;
+
+werr:
+    if (error) *error &#x3D; errno;
+    if (di) dictReleaseIterator(di);
+    return C_ERR;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/rdb.h</span>
+
+<span class="token comment">/* Special RDB opcodes (saved/loaded with rdbSaveType/rdbLoadType). */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_MODULE_AUX</span> <span class="token expression"><span class="token number">247</span>   </span><span class="token comment">/* Module auxiliary data. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_IDLE</span>       <span class="token expression"><span class="token number">248</span>   </span><span class="token comment">/* LRU idle time. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_FREQ</span>       <span class="token expression"><span class="token number">249</span>   </span><span class="token comment">/* LFU frequency. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_AUX</span>        <span class="token expression"><span class="token number">250</span>   </span><span class="token comment">/* RDB aux field. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_RESIZEDB</span>   <span class="token expression"><span class="token number">251</span>   </span><span class="token comment">/* Hash table resize hint. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_EXPIRETIME_MS</span> <span class="token expression"><span class="token number">252</span>    </span><span class="token comment">/* Expire time in milliseconds. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_EXPIRETIME</span> <span class="token expression"><span class="token number">253</span>       </span><span class="token comment">/* Old expire time in seconds. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_SELECTDB</span>   <span class="token expression"><span class="token number">254</span>   </span><span class="token comment">/* DB number of the following keys. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RDB_OPCODE_EOF</span>        <span class="token expression"><span class="token number">255</span>   </span><span class="token comment">/* End of the RDB file. */</span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 
+ * 保存一些默认的 AUX 字段，其中包含有关生成的 RDB 的信息。
+ *&#x2F;
+int rdbSaveInfoAuxFields(rio *rdb, int rdbflags, rdbSaveInfo *rsi) &#123;
+    &#x2F;&#x2F;  
+    int redis_bits &#x3D; (sizeof(void*) &#x3D;&#x3D; 8) ? 64 : 32;
+    &#x2F;&#x2F; 
+    int aof_preamble &#x3D; (rdbflags &amp; RDBFLAGS_AOF_PREAMBLE) !&#x3D; 0;
+
+    &#x2F;&#x2F; 在创建 RDB 时添加一些关于状态的字段。
+
+    &#x2F;&#x2F; 保存 Redis版本信息
+    if (rdbSaveAuxFieldStrStr(rdb,&quot;redis-ver&quot;,REDIS_VERSION) &#x3D;&#x3D; -1) return -1;
+    &#x2F;&#x2F; 保存 Redis运行平台的架构信息 (32位还是64位) 
+    if (rdbSaveAuxFieldStrInt(rdb,&quot;redis-bits&quot;,redis_bits) &#x3D;&#x3D; -1) return -1;
+    &#x2F;&#x2F; 保存 RDB文件的创建时间
+    if (rdbSaveAuxFieldStrInt(rdb,&quot;ctime&quot;,time(NULL)) &#x3D;&#x3D; -1) return -1;
+    &#x2F;&#x2F; 保存 Redis Server已使用的内存空间大小
+    if (rdbSaveAuxFieldStrInt(rdb,&quot;used-mem&quot;,zmalloc_used_memory()) &#x3D;&#x3D; -1) return -1;
+
+    &#x2F;* Handle saving options that generate aux fields. *&#x2F;
+    if (rsi) &#123;
+        &#x2F;&#x2F; 保存  
+        if (rdbSaveAuxFieldStrInt(rdb,&quot;repl-stream-db&quot;,rsi-&gt;repl_stream_db)
+            &#x3D;&#x3D; -1) return -1;
+
+        &#x2F;&#x2F; 保存 复制id &#x3D; Redis Server 的 server.replid
+        if (rdbSaveAuxFieldStrStr(rdb,&quot;repl-id&quot;,server.replid)
+            &#x3D;&#x3D; -1) return -1;
+
+        &#x2F;&#x2F; 保存 复制偏移量 &#x3D; 主节点的复制偏移量  
+        if (rdbSaveAuxFieldStrInt(rdb,&quot;repl-offset&quot;,server.master_repl_offset)
+            &#x3D;&#x3D; -1) return -1;
+    &#125;
+
+    &#x2F;&#x2F; 保存 aof-preamble
+    if (rdbSaveAuxFieldStrInt(rdb,&quot;aof-preamble&quot;,aof_preamble) &#x3D;&#x3D; -1) return -1;
+    return 1;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: src&#x2F;rdb.c
+
+&#x2F;* 
+ * 保存键值对
+ * 
+ * 保存键值对，带过期时间、类型、键、值 
+ * 错误时返回-1
+ * 如果key实际保存成功，则返回1，否则返回0(key已过期)。
+ * 
+ * @param *rdb 
+ * @param *key 
+ * @param *val
+ * @param expiretime
+ *&#x2F;
+int rdbSaveKeyValuePair(rio *rdb, robj *key, robj *val, long long expiretime) &#123;
+    &#x2F;&#x2F; 内存淘汰策略
+    int savelru &#x3D; server.maxmemory_policy &amp; MAXMEMORY_FLAG_LRU;
+    int savelfu &#x3D; server.maxmemory_policy &amp; MAXMEMORY_FLAG_LFU;
+
+    &#x2F;&#x2F; 过期时间
+    if (expiretime !&#x3D; -1) &#123;  &#x2F;&#x2F; key是会过期的
+        &#x2F;&#x2F; 保存过期时间类型(ms)
+        if (rdbSaveType(rdb,RDB_OPCODE_EXPIRETIME_MS) &#x3D;&#x3D; -1) return -1;
+        &#x2F;&#x2F; 保存过期时间(ms级)
+        if (rdbSaveMillisecondTime(rdb,expiretime) &#x3D;&#x3D; -1) return -1;
+    &#125;
+
+    &#x2F;&#x2F; 保存LRU信息
+    if (savelru) &#123;  &#x2F;&#x2F; 如果使用lru
+        &#x2F;&#x2F; 对象空闲时间  ms
+        uint64_t idletime &#x3D; estimateObjectIdleTime(val);
+        idletime &#x2F;&#x3D; 1000; &#x2F;&#x2F; 使用秒就足够了，而且需要的空间更少。 
+        &#x2F;&#x2F; 保存类型为LRU空闲时间
+        if (rdbSaveType(rdb,RDB_OPCODE_IDLE) &#x3D;&#x3D; -1) return -1;
+        &#x2F;&#x2F; 保存对象空间时间 (秒级)
+        if (rdbSaveLen(rdb,idletime) &#x3D;&#x3D; -1) return -1;
+    &#125;
+
+    &#x2F;&#x2F; 保存LFU信息
+    if (savelfu) &#123;
+        uint8_t buf[1];
+        &#x2F;&#x2F; 
+        buf[0] &#x3D; LFUDecrAndReturn(val);
+
+        &#x2F;&#x2F; 我们可以用两个字节对其进行编码：操作码和一个8位计数器，因为频率是 0-255 范围内的对数。
+        &#x2F;&#x2F; 请注意，我们不存储减半时间，因为在加载时将其重置一次不会对频率产生太大影响。  
+
+        &#x2F;&#x2F; 保存类型为LFU
+        if (rdbSaveType(rdb,RDB_OPCODE_FREQ) &#x3D;&#x3D; -1) return -1;
+        &#x2F;&#x2F; 保存LFU信息
+        if (rdbWriteRaw(rdb,buf,1) &#x3D;&#x3D; -1) return -1;
+    &#125;
+
+
+    &#x2F;&#x2F; 保存类型
+    if (rdbSaveObjectType(rdb,val) &#x3D;&#x3D; -1) return -1;
+    &#x2F;&#x2F; 保存key
+    if (rdbSaveStringObject(rdb,key) &#x3D;&#x3D; -1) return -1;
+    &#x2F;&#x2F; 保存value
+    if (rdbSaveObject(rdb,val,key) &#x3D;&#x3D; -1) return -1;
+
+    &#x2F;&#x2F; 如果需要延迟返回（用于测试）
+    if (server.rdb_key_save_delay)
+        usleep(server.rdb_key_save_delay);
+
+    return 1;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-2-1-写入数据-rdbWriteRaw"><a href="#4-2-1-写入数据-rdbWriteRaw" class="headerlink" title="(4.2.1) 写入数据-rdbWriteRaw"></a>(4.2.1) 写入数据-rdbWriteRaw</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">static</span> <span class="token class-name">ssize_t</span> <span class="token function">rdbWriteRaw</span><span class="token punctuation">(</span>rio <span class="token operator">*</span>rdb<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token class-name">size_t</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rdb <span class="token operator">&amp;&amp;</span> <span class="token function">rioWrite</span><span class="token punctuation">(</span>rdb<span class="token punctuation">,</span>p<span class="token punctuation">,</span>len<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> len<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/io.h</span>
+
+<span class="token comment">/*
+ * 
+ * @param *r 
+ * @param *buf 要写入的数据
+ * @param len 数据长度
+ */</span>
+<span class="token keyword">static</span> <span class="token keyword">inline</span> <span class="token class-name">size_t</span> <span class="token function">rioWrite</span><span class="token punctuation">(</span>rio <span class="token operator">*</span>r<span class="token punctuation">,</span> <span class="token keyword">const</span> <span class="token keyword">void</span> <span class="token operator">*</span>buf<span class="token punctuation">,</span> <span class="token class-name">size_t</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//  </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>r<span class="token operator">-></span>flags <span class="token operator">&amp;</span> RIO_FLAG_WRITE_ERROR<span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 长度大于-0</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 要写入的字节数 </span>
+        <span class="token class-name">size_t</span> bytes_to_write <span class="token operator">=</span> <span class="token punctuation">(</span>r<span class="token operator">-></span>max_processing_chunk <span class="token operator">&amp;&amp;</span> r<span class="token operator">-></span>max_processing_chunk <span class="token operator">&lt;</span> len<span class="token punctuation">)</span> <span class="token operator">?</span> r<span class="token operator">-></span>max_processing_chunk <span class="token operator">:</span> len<span class="token punctuation">;</span>
+        <span class="token comment">// 更新校验和</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>r<span class="token operator">-></span>update_cksum<span class="token punctuation">)</span> r<span class="token operator">-></span><span class="token function">update_cksum</span><span class="token punctuation">(</span>r<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>bytes_to_write<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 写入数据</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>r<span class="token operator">-></span><span class="token function">write</span><span class="token punctuation">(</span>r<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>bytes_to_write<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            r<span class="token operator">-></span>flags <span class="token operator">|=</span> RIO_FLAG_WRITE_ERROR<span class="token punctuation">;</span>
+            <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">//</span>
+        buf <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span>buf <span class="token operator">+</span> bytes_to_write<span class="token punctuation">;</span>
+        <span class="token comment">// 更新要写入的长度</span>
+        len <span class="token operator">-=</span> bytes_to_write<span class="token punctuation">;</span>
+        <span class="token comment">// </span>
+        r<span class="token operator">-></span>processed_bytes <span class="token operator">+=</span> bytes_to_write<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/415563">Redis 源码剖析与实战 - 18 | 如何生成和解读RDB文件？</a><br>[2] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/rdb.c">redis-rdb.c - github</a></p>
+
     </div>
 
     
@@ -339,14 +1016,15 @@
 
           <div class="post-tags">
               <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
           </div>
 
         
 
           <div class="post-nav">
             <div class="post-nav-item">
-                <a href="/2022/01/08/redis-io-model/" rel="prev" title="Redis高性能IO模型">
-                  <i class="fa fa-chevron-left"></i> Redis高性能IO模型
+                <a href="/2022/01/08/redis-io-model/" rel="prev" title="Redis IO模型">
+                  <i class="fa fa-chevron-left"></i> Redis IO模型
                 </a>
             </div>
             <div class="post-nav-item">

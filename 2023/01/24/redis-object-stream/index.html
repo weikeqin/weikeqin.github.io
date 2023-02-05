@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="(1) Stream是什么  Redis 从 5.0 版本开始支持提供 Stream 数据类型，它可以用来保存消息数据，能帮助我们实现一个带有消息读写基本功能的消息队列，并用于日常的分布式程序通信当中。 (1.1) Stream 消息数据的特征  Stream 作为消息队列，它保存的消息通常具有以下两个特征：  一条消息由一个或多个键值对组成；每插入一条消息，这条消息都会对应一个消息 ID。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 对象 Stream">
+<meta property="og:url" content="http://weikeqin.com/2023/01/24/redis-object-stream/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="(1) Stream是什么  Redis 从 5.0 版本开始支持提供 Stream 数据类型，它可以用来保存消息数据，能帮助我们实现一个带有消息读写基本功能的消息队列，并用于日常的分布式程序通信当中。 (1.1) Stream 消息数据的特征  Stream 作为消息队列，它保存的消息通常具有以下两个特征：  一条消息由一个或多个键值对组成；每插入一条消息，这条消息都会对应一个消息 ID。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/stream/redix-tree.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/stream/trie-tree.png">
+<meta property="article:published_time" content="2023-01-24T13:50:37.000Z">
+<meta property="article:modified_time" content="2023-02-05T13:12:18.751Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/redis-object/stream/redix-tree.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/24/redis-object-stream/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/24/redis-object-stream/","path":"2023/01/24/redis-object-stream/","title":"Redis 对象 Stream"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis 对象 Stream | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Stream%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) Stream是什么</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-Stream-%E6%B6%88%E6%81%AF%E6%95%B0%E6%8D%AE%E7%9A%84%E7%89%B9%E5%BE%81"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) Stream 消息数据的特征</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BD%BF%E7%94%A8Stream"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么使用Stream</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Stream%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) Stream原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-Redix-tree%E7%9A%84%E6%94%B9%E8%BF%9B"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) Redix tree的改进</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-Stream-%E5%A6%82%E4%BD%95%E7%BB%84%E5%90%88%E4%BD%BF%E7%94%A8-Radix-Tree-%E5%92%8C-listpack%EF%BC%9F"><span class="nav-number">3.2.</span> <span class="nav-text">(3.3) Stream 如何组合使用 Radix Tree 和 listpack？</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) 源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 结构定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E5%88%9B%E5%BB%BAstream%E7%BB%93%E6%9E%84"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 创建stream结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E9%87%8A%E6%94%BE"><span class="nav-number">4.3.</span> <span class="nav-text">(4.3) 释放</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-stream%E6%96%B0%E5%A2%9E%E5%85%83%E7%B4%A0"><span class="nav-number">4.4.</span> <span class="nav-text">(4.4) stream新增元素</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.5.</span> <span class="nav-text">查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E4%B8%8B%E4%B8%80%E4%B8%AAid"><span class="nav-number">4.6.</span> <span class="nav-text">获取下一个id</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">304</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/24/redis-object-stream/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis 对象 Stream | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 对象 Stream
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-24 21:50:37" itemprop="dateCreated datePublished" datetime="2023-01-24T21:50:37+08:00">2023-01-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-02-05 21:12:18" itemprop="dateModified" datetime="2023-02-05T21:12:18+08:00">2023-02-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>14k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>13 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <h1 id="1-Stream是什么"><a href="#1-Stream是什么" class="headerlink" title="(1) Stream是什么"></a>(1) Stream是什么</h1><p>  Redis 从 5.0 版本开始支持提供 Stream 数据类型，它可以用来保存消息数据，能帮助我们实现一个带有消息读写基本功能的消息队列，并用于日常的分布式程序通信当中。</p>
+<h2 id="1-1-Stream-消息数据的特征"><a href="#1-1-Stream-消息数据的特征" class="headerlink" title="(1.1) Stream 消息数据的特征"></a>(1.1) Stream 消息数据的特征</h2><p>  Stream 作为消息队列，它保存的消息通常具有以下两个特征：</p>
+<blockquote>
+<p>一条消息由一个或多个键值对组成；<br>每插入一条消息，这条消息都会对应一个消息 ID。</p>
+</blockquote>
+<p>  一般会让 Redis 服务器自动生成递增的消息 ID。此时，消息 ID 由时间戳和序号组成。其中，时间戳是消息插入时，以毫秒为单位的服务器当时时间，序号是插入消息在当前毫秒内的序号。</p>
+<span id="more"></span>
+
+<br>  
+
+
+<h1 id="2-为什么使用Stream"><a href="#2-为什么使用Stream" class="headerlink" title="(2) 为什么使用Stream"></a>(2) 为什么使用Stream</h1><p>  如果要用消息队列，用比较流行的mq 比如：Kafka、RocketMq，为什么要用Redis Stream呢？</p>
+<p>  Kafka等MQ使用起来比较重，如果仅仅是简单使用的话，成本比较高。而Redis Stream是对消息队列的完美实现，可以快速上手使用，成本也比较低。</p>
+<br>
+
+
+<h1 id="3-Stream原理"><a href="#3-Stream原理" class="headerlink" title="(3) Stream原理"></a>(3) Stream原理</h1><p>  Radix Tree 是属于前缀树的一种类型。<br>  前缀树也称为 Trie Tree，它的特点是，保存在树上的每个 key 会被拆分成单字符，然后逐一保存在树上的节点中。<br>  前缀树的根节点不保存任何字符，而除了根节点以外的其他节点，每个节点只保存一个字符。<br>  当我们把从根节点到当前节点的路径上的字符拼接在一起时，就可以得到相应 key 的值了。</p>
+<p>  <img src="/img/database/redis/redis-object/stream/redix-tree.png" alt="前缀树"></p>
+<p>  前缀树是把保存的 key 的公共前缀（即 r、e、a）独立出来共享使用的。这样一来，就可以避免在树中对相同的字符做重复存储。</p>
+<p>  前缀树相比于哈希表，节省了重复字符的内存开销</p>
+<h2 id="3-1-Redix-tree的改进"><a href="#3-1-Redix-tree的改进" class="headerlink" title="(3.1) Redix tree的改进"></a>(3.1) Redix tree的改进</h2><p>  前缀树的不足<br>  前缀树在每个节点中只保存一个字符，这样做的好处就是可以尽可能地共享不同 key 的公共前缀。<br>  但是，这也会导致 key 中的某些字符串，虽然不再被共享，可仍然会按照每个节点一个字符的形式来保存，这样反而会造成空间的浪费和查询性能的降低。</p>
+<p>  <img src="/img/database/redis/redis-object/stream/trie-tree.png" alt="前缀树"></p>
+<p>  如果我们还是按照前缀树的方式，为每一个字符创建一个节点进行保存的话，一是会浪费内存空间，二是在进行查询时，还需要逐一匹配每个节点表示的字符，对查询性能也会造成影响。</p>
+<p>  如果一系列单字符节点之间的分支连接是唯一的，那么这些单字符节点就可以合并成一个节点，而这种结构的树，就正是 <code>Radix Tree</code>，也被称为<code>基数树</code>。相比前缀树来说，Radix Tree 既可以节约内存的使用，同时还可以提高查询访问的效率。</p>
+<h2 id="3-3-Stream-如何组合使用-Radix-Tree-和-listpack？"><a href="#3-3-Stream-如何组合使用-Radix-Tree-和-listpack？" class="headerlink" title="(3.3) Stream 如何组合使用 Radix Tree 和 listpack？"></a>(3.3) Stream 如何组合使用 Radix Tree 和 listpack？</h2><p>  Stream 保存的消息数据，按照 key-value 形式来看的话，消息 ID 就相当于 key，而消息内容相当于是 value。<br>  也就是，Stream 会使用 Radix Tree 来保存消息 ID，然后将消息内容保存在 listpack 中，并作为消息 ID 的 value，用 raxNode 的 value 指针指向对应的 listpack。</p>
+<br>
+
+
+<h1 id="4-源码解读"><a href="#4-源码解读" class="headerlink" title="(4) 源码解读"></a>(4) 源码解读</h1><h2 id="4-1-结构定义"><a href="#4-1-结构定义" class="headerlink" title="(4.1) 结构定义"></a>(4.1) 结构定义</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: stream.h</span>
+
+<span class="token comment">/*
+ *
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">stream</span> <span class="token punctuation">&#123;</span>
+    rax <span class="token operator">*</span>rax<span class="token punctuation">;</span>               <span class="token comment">// 保存消息的Radix Tree</span>
+    <span class="token class-name">uint64_t</span> length<span class="token punctuation">;</span>        <span class="token comment">// 消息流中的元素个数</span>
+    streamID last_id<span class="token punctuation">;</span>       <span class="token comment">// 当前消息流中最后插入的消息的ID</span>
+    rax <span class="token operator">*</span>cgroups<span class="token punctuation">;</span>           <span class="token comment">// 当前消息流的消费组信息，也是用Radix Tree保存</span>
+<span class="token punctuation">&#125;</span> stream<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: rax.h</span>
+
+<span class="token comment">/*
+ * rax结构体
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">rax</span> <span class="token punctuation">&#123;</span>
+    raxNode <span class="token operator">*</span>head<span class="token punctuation">;</span>  <span class="token comment">// 保存消息的 Radix Tree</span>
+    <span class="token class-name">uint64_t</span> numele<span class="token punctuation">;</span>  <span class="token comment">// 元素/key个数</span>
+    <span class="token class-name">uint64_t</span> numnodes<span class="token punctuation">;</span> <span class="token comment">// raxNode个数</span>
+<span class="token punctuation">&#125;</span> rax<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: rax.h</span>
+
+<span class="token comment">/* Representation of a radix tree as implemented in this file, that contains
+ * the strings "foo", "foobar" and "footer" after the insertion of each
+ * word. When the node represents a key inside the radix tree, we write it
+ * between [], otherwise it is written between ().
+ *
+ * This is the vanilla representation:
+ *
+ *              (f) ""
+ *                \
+ *                (o) "f"
+ *                  \
+ *                  (o) "fo"
+ *                    \
+ *                  [t   b] "foo"
+ *                  /     \
+ *         "foot" (e)     (a) "foob"
+ *                /         \
+ *      "foote" (r)         (r) "fooba"
+ *              /             \
+ *    "footer" []             [] "foobar"
+ *
+ * However, this implementation implements a very common optimization where
+ * successive nodes having a single child are "compressed" into the node
+ * itself as a string of characters, each representing a next-level child,
+ * and only the link to the node representing the last character node is
+ * provided inside the representation. So the above representation is turned
+ * into:
+ *
+ *                  ["foo"] ""
+ *                     |
+ *                  [t   b] "foo"
+ *                  /     \
+ *        "foot" ("er")    ("ar") "foob"
+ *                 /          \
+ *       "footer" []          [] "foobar"
+ *
+ * However this optimization makes the implementation a bit more complex.
+ * For instance if a key "first" is added in the above radix tree, a
+ * "node splitting" operation is needed, since the "foo" prefix is no longer
+ * composed of nodes having a single child one after the other. This is the
+ * above tree and the resulting node splitting after this event happens:
+ *
+ *
+ *                    (f) ""
+ *                    /
+ *                 (i o) "f"
+ *                 /   \
+ *    "firs"  ("rst")  (o) "fo"
+ *              /        \
+ *    "first" []       [t   b] "foo"
+ *                     /     \
+ *           "foot" ("er")    ("ar") "foob"
+ *                    /          \
+ *          "footer" []          [] "foobar"
+ *
+ * Similarly after deletion, if a new chain of nodes having a single child
+ * is created (the chain must also not include nodes that represent keys),
+ * it must be compressed back into a single node.
+ *
+ */</span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">RAX_NODE_MAX_SIZE</span> <span class="token expression"><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">29</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span></span></span>
+
+<span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">raxNode</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">uint32_t</span> iskey<span class="token operator">:</span><span class="token number">1</span><span class="token punctuation">;</span>     <span class="token comment">// 节点是否包含key </span>
+    <span class="token class-name">uint32_t</span> isnull<span class="token operator">:</span><span class="token number">1</span><span class="token punctuation">;</span>    <span class="token comment">// 节点的值是否为NULL </span>
+    <span class="token class-name">uint32_t</span> iscompr<span class="token operator">:</span><span class="token number">1</span><span class="token punctuation">;</span>   <span class="token comment">// 节点是否被压缩 </span>
+    <span class="token class-name">uint32_t</span> size<span class="token operator">:</span><span class="token number">29</span><span class="token punctuation">;</span>     <span class="token comment">// 孩子节点个数 或 压缩字符长度 </span>
+    <span class="token comment">/* Data layout is as follows:
+     *
+     * If node is not compressed we have 'size' bytes, one for each children
+     * character, and 'size' raxNode pointers, point to each child node.
+     * Note how the character is not stored in the children but in the
+     * edge of the parents:
+     *
+     * [header iscompr=0][abc][a-ptr][b-ptr][c-ptr](value-ptr?)
+     *
+     * if node is compressed (iscompr bit is 1) the node has 1 children.
+     * In that case the 'size' bytes of the string stored immediately at
+     * the start of the data section, represent a sequence of successive
+     * nodes linked one after the other, for which only the last one in
+     * the sequence is actually represented as a node, and pointed to by
+     * the current compressed node.
+     *
+     * [header iscompr=1][xyz][z-ptr](value-ptr?)
+     *
+     * Both compressed and not compressed nodes can represent a key
+     * with associated data in the radix tree at any level (not just terminal
+     * nodes).
+     *
+     * If the node has an associated key (iskey=1) and is not NULL
+     * (isnull=0), then after the raxNode pointers pointing to the
+     * children, an additional value pointer is present (as you can see
+     * in the representation above as "value-ptr" field).
+     */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> data<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span> raxNode<span class="token punctuation">;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Stream item ID: a 128 bit number composed of a milliseconds time and
+ * a sequence counter. IDs generated in the same millisecond (or in a past
+ * millisecond if the clock jumped backward) will use the millisecond time
+ * of the latest generated ID and an incremented sequence. */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">streamID</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">uint64_t</span> ms<span class="token punctuation">;</span>        <span class="token comment">/* Unix time in milliseconds. */</span>
+    <span class="token class-name">uint64_t</span> seq<span class="token punctuation">;</span>       <span class="token comment">/* Sequence number. */</span>
+<span class="token punctuation">&#125;</span> streamID<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-2-创建stream结构"><a href="#4-2-创建stream结构" class="headerlink" title="(4.2) 创建stream结构"></a>(4.2) 创建stream结构</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 创建一个新的stream数据结构  
+ */</span>
+stream <span class="token operator">*</span><span class="token function">streamNew</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 分配内存</span>
+    stream <span class="token operator">*</span>s <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>s<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 新建</span>
+    s<span class="token operator">-></span>rax <span class="token operator">=</span> <span class="token function">raxNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    s<span class="token operator">-></span>length <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    s<span class="token operator">-></span>last_id<span class="token punctuation">.</span>ms <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    s<span class="token operator">-></span>last_id<span class="token punctuation">.</span>seq <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    s<span class="token operator">-></span>cgroups <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span> <span class="token comment">/* Created on demand to save memory when not used. */</span>
+    <span class="token keyword">return</span> s<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: rax.c</span>
+
+<span class="token comment">/* Allocate a new rax and return its pointer. On out of memory the function
+ * returns NULL. */</span>
+rax <span class="token operator">*</span><span class="token function">raxNew</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    rax <span class="token operator">*</span>rax <span class="token operator">=</span> <span class="token function">rax_malloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>rax<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rax <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    rax<span class="token operator">-></span>numele <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    rax<span class="token operator">-></span>numnodes <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    rax<span class="token operator">-></span>head <span class="token operator">=</span> <span class="token function">raxNewNode</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rax<span class="token operator">-></span>head <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">rax_free</span><span class="token punctuation">(</span>rax<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> rax<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+<h2 id="4-3-释放"><a href="#4-3-释放" class="headerlink" title="(4.3) 释放"></a>(4.3) 释放</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Free a stream, including the listpacks stored inside the radix tree. */</span>
+<span class="token keyword">void</span> <span class="token function">freeStream</span><span class="token punctuation">(</span>stream <span class="token operator">*</span>s<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">raxFreeWithCallback</span><span class="token punctuation">(</span>s<span class="token operator">-></span>rax<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">)</span>lpFree<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>s<span class="token operator">-></span>cgroups<span class="token punctuation">)</span>
+        <span class="token function">raxFreeWithCallback</span><span class="token punctuation">(</span>s<span class="token operator">-></span>cgroups<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">)</span>streamFreeCG<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">zfree</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="4-4-stream新增元素"><a href="#4-4-stream新增元素" class="headerlink" title="(4.4) stream新增元素"></a>(4.4) stream新增元素</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Adds a new item into the stream 's' having the specified number of
+ * field-value pairs as specified in 'numfields' and stored into 'argv'.
+ * Returns the new entry ID populating the 'added_id' structure.
+ *
+ * If 'use_id' is not NULL, the ID is not auto-generated by the function,
+ * but instead the passed ID is used to add the new entry. In this case
+ * adding the entry may fail as specified later in this comment.
+ *
+ * The function returns C_OK if the item was added, this is always true
+ * if the ID was generated by the function. However the function may return
+ * C_ERR in several cases:
+ * 1. If an ID was given via 'use_id', but adding it failed since the
+ *    current top ID is greater or equal. errno will be set to EDOM.
+ * 2. If a size of a single element or the sum of the elements is too big to
+ *    be stored into the stream. errno will be set to ERANGE. */</span>
+<span class="token keyword">int</span> <span class="token function">streamAppendItem</span><span class="token punctuation">(</span>stream <span class="token operator">*</span>s<span class="token punctuation">,</span> robj <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">,</span> <span class="token class-name">int64_t</span> numfields<span class="token punctuation">,</span> streamID <span class="token operator">*</span>added_id<span class="token punctuation">,</span> streamID <span class="token operator">*</span>use_id<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    
+    <span class="token comment">/* Generate the new entry ID. */</span>
+    streamID id<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>use_id<span class="token punctuation">)</span>
+        id <span class="token operator">=</span> <span class="token operator">*</span>use_id<span class="token punctuation">;</span>
+    <span class="token keyword">else</span>
+        <span class="token function">streamNextID</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>s<span class="token operator">-></span>last_id<span class="token punctuation">,</span><span class="token operator">&amp;</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Check that the new ID is greater than the last entry ID
+     * or return an error. Automatically generated IDs might
+     * overflow (and wrap-around) when incrementing the sequence 
+       part. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">streamCompareID</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>id<span class="token punctuation">,</span><span class="token operator">&amp;</span>s<span class="token operator">-></span>last_id<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        errno <span class="token operator">=</span> EDOM<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Avoid overflow when trying to add an element to the stream (listpack
+     * can only host up to 32bit length sttrings, and also a total listpack size
+     * can't be bigger than 32bit length. */</span>
+    <span class="token class-name">size_t</span> totelelen <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">int64_t</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> numfields<span class="token operator">*</span><span class="token number">2</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        sds ele <span class="token operator">=</span> argv<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+        totelelen <span class="token operator">+=</span> <span class="token function">sdslen</span><span class="token punctuation">(</span>ele<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>totelelen <span class="token operator">></span> STREAM_LISTPACK_MAX_SIZE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        errno <span class="token operator">=</span> ERANGE<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Add the new entry. */</span>
+    raxIterator ri<span class="token punctuation">;</span>
+    <span class="token function">raxStart</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">,</span>s<span class="token operator">-></span>rax<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">raxSeek</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">,</span><span class="token string">"$"</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">size_t</span> lp_bytes <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>        <span class="token comment">/* Total bytes in the tail listpack. */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>lp <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>   <span class="token comment">/* Tail listpack pointer. */</span>
+
+    <span class="token comment">/* Get a reference to the tail node listpack. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">raxNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        lp <span class="token operator">=</span> ri<span class="token punctuation">.</span>data<span class="token punctuation">;</span>
+        lp_bytes <span class="token operator">=</span> <span class="token function">lpBytes</span><span class="token punctuation">(</span>lp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">raxStop</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* We have to add the key into the radix tree in lexicographic order,
+     * to do so we consider the ID as a single 128 bit number written in
+     * big endian, so that the most significant bytes are the first ones. */</span>
+    <span class="token class-name">uint64_t</span> rax_key<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">/* Key in the radix tree containing the listpack.*/</span>
+    streamID master_id<span class="token punctuation">;</span>     <span class="token comment">/* ID of the master entry in the listpack. */</span>
+
+    <span class="token comment">/* Create a new listpack and radix tree node if needed. Note that when
+     * a new listpack is created, we populate it with a "master entry". This
+     * is just a set of fields that is taken as references in order to compress
+     * the stream entries that we'll add inside the listpack.
+     *
+     * Note that while we use the first added entry fields to create
+     * the master entry, the first added entry is NOT represented in the master
+     * entry, which is a stand alone object. But of course, the first entry
+     * will compress well because it's used as reference.
+     *
+     * The master entry is composed like in the following example:
+     *
+     * +-------+---------+------------+---------+--/--+---------+---------+-+
+     * | count | deleted | num-fields | field_1 | field_2 | ... | field_N |0|
+     * +-------+---------+------------+---------+--/--+---------+---------+-+
+     *
+     * count and deleted just represent respectively the total number of
+     * entries inside the listpack that are valid, and marked as deleted
+     * (deleted flag in the entry flags set). So the total number of items
+     * actually inside the listpack (both deleted and not) is count+deleted.
+     *
+     * The real entries will be encoded with an ID that is just the
+     * millisecond and sequence difference compared to the key stored at
+     * the radix tree node containing the listpack (delta encoding), and
+     * if the fields of the entry are the same as the master entry fields, the
+     * entry flags will specify this fact and the entry fields and number
+     * of fields will be omitted (see later in the code of this function).
+     *
+     * The "0" entry at the end is the same as the 'lp-count' entry in the
+     * regular stream entries (see below), and marks the fact that there are
+     * no more entries, when we scan the stream from right to left. */</span>
+
+    <span class="token comment">/* First of all, check if we can append to the current macro node or
+     * if we need to switch to the next one. 'lp' will be set to NULL if
+     * the current node is full. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>lp <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">size_t</span> node_max_bytes <span class="token operator">=</span> server<span class="token punctuation">.</span>stream_node_max_bytes<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>node_max_bytes <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">||</span> node_max_bytes <span class="token operator">></span> STREAM_LISTPACK_MAX_SIZE<span class="token punctuation">)</span>
+            node_max_bytes <span class="token operator">=</span> STREAM_LISTPACK_MAX_SIZE<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>lp_bytes <span class="token operator">+</span> totelelen <span class="token operator">>=</span> node_max_bytes<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            lp <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>stream_node_max_entries<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">int64_t</span> count <span class="token operator">=</span> <span class="token function">lpGetInteger</span><span class="token punctuation">(</span><span class="token function">lpFirst</span><span class="token punctuation">(</span>lp<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>count <span class="token operator">>=</span> server<span class="token punctuation">.</span>stream_node_max_entries<span class="token punctuation">)</span> lp <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">int</span> flags <span class="token operator">=</span> STREAM_ITEM_FLAG_NONE<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>lp <span class="token operator">==</span> <span class="token constant">NULL</span> <span class="token operator">||</span> lp_bytes <span class="token operator">>=</span> server<span class="token punctuation">.</span>stream_node_max_bytes<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        master_id <span class="token operator">=</span> id<span class="token punctuation">;</span>
+        <span class="token function">streamEncodeID</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">,</span><span class="token operator">&amp;</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">/* Create the listpack having the master entry ID and fields. */</span>
+        lp <span class="token operator">=</span> <span class="token function">lpNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* One item, the one we are adding. */</span>
+        lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Zero deleted so far. */</span>
+        lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>numfields<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">int64_t</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> numfields<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            sds field <span class="token operator">=</span> argv<span class="token punctuation">[</span>i<span class="token operator">*</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+            lp <span class="token operator">=</span> <span class="token function">lpAppend</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span>field<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>field<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Master entry zero terminator. */</span>
+        <span class="token function">raxInsert</span><span class="token punctuation">(</span>s<span class="token operator">-></span>rax<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token operator">&amp;</span>rax_key<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">)</span><span class="token punctuation">,</span>lp<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">/* The first entry we insert, has obviously the same fields of the
+         * master entry. */</span>
+        flags <span class="token operator">|=</span> STREAM_ITEM_FLAG_SAMEFIELDS<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverAssert</span><span class="token punctuation">(</span>ri<span class="token punctuation">.</span>key_len <span class="token operator">==</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">memcpy</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">,</span>ri<span class="token punctuation">.</span>key<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Read the master ID from the radix tree key. */</span>
+        <span class="token function">streamDecodeID</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">,</span><span class="token operator">&amp;</span>master_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>lp_ele <span class="token operator">=</span> <span class="token function">lpFirst</span><span class="token punctuation">(</span>lp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Update count and skip the deleted fields. */</span>
+        <span class="token class-name">int64_t</span> count <span class="token operator">=</span> <span class="token function">lpGetInteger</span><span class="token punctuation">(</span>lp_ele<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        lp <span class="token operator">=</span> <span class="token function">lpReplaceInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token operator">&amp;</span>lp_ele<span class="token punctuation">,</span>count<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        lp_ele <span class="token operator">=</span> <span class="token function">lpNext</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>lp_ele<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* seek deleted. */</span>
+        lp_ele <span class="token operator">=</span> <span class="token function">lpNext</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>lp_ele<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* seek master entry num fields. */</span>
+
+        <span class="token comment">/* Check if the entry we are adding, have the same fields
+         * as the master entry. */</span>
+        <span class="token class-name">int64_t</span> master_fields_count <span class="token operator">=</span> <span class="token function">lpGetInteger</span><span class="token punctuation">(</span>lp_ele<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        lp_ele <span class="token operator">=</span> <span class="token function">lpNext</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>lp_ele<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>numfields <span class="token operator">==</span> master_fields_count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">int64_t</span> i<span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span>i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> master_fields_count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                sds field <span class="token operator">=</span> argv<span class="token punctuation">[</span>i<span class="token operator">*</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+                <span class="token class-name">int64_t</span> e_len<span class="token punctuation">;</span>
+                <span class="token keyword">unsigned</span> <span class="token keyword">char</span> buf<span class="token punctuation">[</span>LP_INTBUF_SIZE<span class="token punctuation">]</span><span class="token punctuation">;</span>
+                <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>e <span class="token operator">=</span> <span class="token function">lpGet</span><span class="token punctuation">(</span>lp_ele<span class="token punctuation">,</span><span class="token operator">&amp;</span>e_len<span class="token punctuation">,</span>buf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token comment">/* Stop if there is a mismatch. */</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">sdslen</span><span class="token punctuation">(</span>field<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token punctuation">(</span><span class="token class-name">size_t</span><span class="token punctuation">)</span>e_len <span class="token operator">||</span>
+                    <span class="token function">memcmp</span><span class="token punctuation">(</span>e<span class="token punctuation">,</span>field<span class="token punctuation">,</span>e_len<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">break</span><span class="token punctuation">;</span>
+                lp_ele <span class="token operator">=</span> <span class="token function">lpNext</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>lp_ele<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token comment">/* All fields are the same! We can compress the field names
+             * setting a single bit in the flags. */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>i <span class="token operator">==</span> master_fields_count<span class="token punctuation">)</span> flags <span class="token operator">|=</span> STREAM_ITEM_FLAG_SAMEFIELDS<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Populate the listpack with the new entry. We use the following
+     * encoding:
+     *
+     * +-----+--------+----------+-------+-------+-/-+-------+-------+--------+
+     * |flags|entry-id|num-fields|field-1|value-1|...|field-N|value-N|lp-count|
+     * +-----+--------+----------+-------+-------+-/-+-------+-------+--------+
+     *
+     * However if the SAMEFIELD flag is set, we have just to populate
+     * the entry with the values, so it becomes:
+     *
+     * +-----+--------+-------+-/-+-------+--------+
+     * |flags|entry-id|value-1|...|value-N|lp-count|
+     * +-----+--------+-------+-/-+-------+--------+
+     *
+     * The entry-id field is actually two separated fields: the ms
+     * and seq difference compared to the master entry.
+     *
+     * The lp-count field is a number that states the number of listpack pieces
+     * that compose the entry, so that it's possible to travel the entry
+     * in reverse order: we can just start from the end of the listpack, read
+     * the entry, and jump back N times to seek the "flags" field to read
+     * the stream full entry. */</span>
+    lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>flags<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>id<span class="token punctuation">.</span>ms <span class="token operator">-</span> master_id<span class="token punctuation">.</span>ms<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>id<span class="token punctuation">.</span>seq <span class="token operator">-</span> master_id<span class="token punctuation">.</span>seq<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token punctuation">(</span>flags <span class="token operator">&amp;</span> STREAM_ITEM_FLAG_SAMEFIELDS<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>numfields<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">int64_t</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> numfields<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        sds field <span class="token operator">=</span> argv<span class="token punctuation">[</span>i<span class="token operator">*</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">,</span> value <span class="token operator">=</span> argv<span class="token punctuation">[</span>i<span class="token operator">*</span><span class="token number">2</span><span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token punctuation">(</span>flags <span class="token operator">&amp;</span> STREAM_ITEM_FLAG_SAMEFIELDS<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            lp <span class="token operator">=</span> <span class="token function">lpAppend</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span>field<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>field<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        lp <span class="token operator">=</span> <span class="token function">lpAppend</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span>value<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>value<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">/* Compute and store the lp-count field. */</span>
+    <span class="token class-name">int64_t</span> lp_count <span class="token operator">=</span> numfields<span class="token punctuation">;</span>
+    lp_count <span class="token operator">+=</span> <span class="token number">3</span><span class="token punctuation">;</span> <span class="token comment">/* Add the 3 fixed fields flags + ms-diff + seq-diff. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token punctuation">(</span>flags <span class="token operator">&amp;</span> STREAM_ITEM_FLAG_SAMEFIELDS<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* If the item is not compressed, it also has the fields other than
+         * the values, and an additional num-fileds field. */</span>
+        lp_count <span class="token operator">+=</span> numfields<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    lp <span class="token operator">=</span> <span class="token function">lpAppendInteger</span><span class="token punctuation">(</span>lp<span class="token punctuation">,</span>lp_count<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Insert back into the tree in order to update the listpack pointer. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>ri<span class="token punctuation">.</span>data <span class="token operator">!=</span> lp<span class="token punctuation">)</span>
+        <span class="token function">raxInsert</span><span class="token punctuation">(</span>s<span class="token operator">-></span>rax<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token operator">&amp;</span>rax_key<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>rax_key<span class="token punctuation">)</span><span class="token punctuation">,</span>lp<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    s<span class="token operator">-></span>length<span class="token operator">++</span><span class="token punctuation">;</span>
+    s<span class="token operator">-></span>last_id <span class="token operator">=</span> id<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>added_id<span class="token punctuation">)</span> <span class="token operator">*</span>added_id <span class="token operator">=</span> id<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="查询"><a href="#查询" class="headerlink" title="查询"></a>查询</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Return the length of a stream. */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">long</span> <span class="token function">streamLength</span><span class="token punctuation">(</span><span class="token keyword">const</span> robj <span class="token operator">*</span>subject<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    stream <span class="token operator">*</span>s <span class="token operator">=</span> subject<span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> s<span class="token operator">-></span>length<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="获取下一个id"><a href="#获取下一个id" class="headerlink" title="获取下一个id"></a>获取下一个id</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Generate the next stream item ID given the previous one. If the current
+ * milliseconds Unix time is greater than the previous one, just use this
+ * as time part and start with sequence part of zero. Otherwise we use the
+ * previous time (and never go backward) and increment the sequence. */</span>
+<span class="token keyword">void</span> <span class="token function">streamNextID</span><span class="token punctuation">(</span>streamID <span class="token operator">*</span>last_id<span class="token punctuation">,</span> streamID <span class="token operator">*</span>new_id<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 获取当前时间戳(ms)</span>
+    <span class="token class-name">uint64_t</span> ms <span class="token operator">=</span> <span class="token function">mstime</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>ms <span class="token operator">></span> last_id<span class="token operator">-></span>ms<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 设置 ms 及 该ms内的自增序号</span>
+        new_id<span class="token operator">-></span>ms <span class="token operator">=</span> ms<span class="token punctuation">;</span>
+        new_id<span class="token operator">-></span>seq <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 指针</span>
+        <span class="token operator">*</span>new_id <span class="token operator">=</span> <span class="token operator">*</span>last_id<span class="token punctuation">;</span>
+        <span class="token comment">// 序号+1</span>
+        <span class="token function">streamIncrID</span><span class="token punctuation">(</span>new_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Set 'id' to be its successor streamID */</span>
+<span class="token keyword">void</span> <span class="token function">streamIncrID</span><span class="token punctuation">(</span>streamID <span class="token operator">*</span>id<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>id<span class="token operator">-></span>seq <span class="token operator">==</span> UINT64_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 自增序号到64位最大</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>id<span class="token operator">-></span>ms <span class="token operator">==</span> UINT64_MAX<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 时间戳到64位最大</span>
+            <span class="token comment">/* Special case where 'id' is the last possible streamID... */</span>
+            id<span class="token operator">-></span>ms <span class="token operator">=</span> id<span class="token operator">-></span>seq <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 增加1ms  重新计数</span>
+            id<span class="token operator">-></span>ms<span class="token operator">++</span><span class="token punctuation">;</span>
+            id<span class="token operator">-></span>seq <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 自增序号+1</span>
+        id<span class="token operator">-></span>seq<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: object.c</span>
+
+robj <span class="token operator">*</span><span class="token function">createStreamObject</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    stream <span class="token operator">*</span>s <span class="token operator">=</span> <span class="token function">streamNew</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    robj <span class="token operator">*</span>o <span class="token operator">=</span> <span class="token function">createObject</span><span class="token punctuation">(</span>OBJ_STREAM<span class="token punctuation">,</span>s<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    o<span class="token operator">-></span>encoding <span class="token operator">=</span> OBJ_ENCODING_STREAM<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> o<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/406284">Redis 源码剖析与实战  07 | 为什么Stream使用了Radix Tree？</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/23/redis-server-start/" rel="prev" title="Redis Server 启动">
+                  <i class="fa fa-chevron-left"></i> Redis Server 启动
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/25/redis-event-driven-framework/" rel="next" title="Redis事件驱动框架">
+                  Redis事件驱动框架 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

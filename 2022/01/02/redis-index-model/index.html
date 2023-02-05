@@ -28,7 +28,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/index-model/redis-index-model.png">
 <meta property="article:published_time" content="2022-01-02T11:49:01.000Z">
-<meta property="article:modified_time" content="2023-01-27T15:20:59.504Z">
+<meta property="article:modified_time" content="2023-01-30T15:09:30.816Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
@@ -164,7 +164,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">296</span>
+          <span class="site-state-item-count">304</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -175,7 +175,7 @@
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">57</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -270,7 +270,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2023-01-27 23:20:59" itemprop="dateModified" datetime="2023-01-27T23:20:59+08:00">2023-01-27</time>
+      <time title="修改时间：2023-01-30 23:09:30" itemprop="dateModified" datetime="2023-01-30T23:09:30+08:00">2023-01-30</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -296,14 +296,14 @@
         <i class="far fa-file-word"></i>
       </span>
       <span class="post-meta-item-text">本文字数：</span>
-      <span>5.4k</span>
+      <span>4.5k</span>
     </span>
     <span class="post-meta-item" title="阅读时长">
       <span class="post-meta-item-icon">
         <i class="far fa-clock"></i>
       </span>
       <span class="post-meta-item-text">阅读时长 &asymp;</span>
-      <span>5 分钟</span>
+      <span>4 分钟</span>
     </span>
 </div>
 
@@ -329,185 +329,185 @@
 <br>
 
 
-<h1 id="3-Redis索引模型源码解读"><a href="#3-Redis索引模型源码解读" class="headerlink" title="(3) Redis索引模型源码解读"></a>(3) Redis索引模型源码解读</h1><h2 id="3-1-Redis服务端结构体-redisServer"><a href="#3-1-Redis服务端结构体-redisServer" class="headerlink" title="(3.1) Redis服务端结构体-redisServer"></a>(3.1) Redis服务端结构体-redisServer</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: &#x2F;src&#x2F;server.h
+<h1 id="3-Redis索引模型源码解读"><a href="#3-Redis索引模型源码解读" class="headerlink" title="(3) Redis索引模型源码解读"></a>(3) Redis索引模型源码解读</h1><h2 id="3-1-Redis服务端结构体-redisServer"><a href="#3-1-Redis服务端结构体-redisServer" class="headerlink" title="(3.1) Redis服务端结构体-redisServer"></a>(3.1) Redis服务端结构体-redisServer</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/server.h</span>
 
-struct redisServer &#123;
-    &#x2F;* General *&#x2F;
-    pid_t pid;                  &#x2F;* 主进程pid *&#x2F;
-    pthread_t main_thread_id;   &#x2F;* 主线程id *&#x2F;
-    char *configfile;           &#x2F;* 配置文件绝对路径，或 NULL *&#x2F;
-    char *executable;           &#x2F;* 可执行文件绝对路径。 *&#x2F;
-    char **exec_argv;           &#x2F;* 可执行 argv 向量（副本）。 *&#x2F;
-    int dynamic_hz;             &#x2F;* 根据客户端数量更改 hz 值。 *&#x2F;
-    int config_hz;              &#x2F;* 配置的 HZ 值。如果启用了动态hz，则可能与实际的“hz”字段值不同。 *&#x2F;
-    mode_t umask;               &#x2F;* 进程启动时的 umask 值 *&#x2F;
-    int hz;                     &#x2F;* serverCron() 调用频率  *&#x2F;
-    int in_fork_child;          &#x2F;* 复制的子进程 *&#x2F;
-    redisDb *db;                &#x2F;* 数据库 *&#x2F;    
-    dict *commands;             &#x2F;* 命令表 *&#x2F;
-    ...
-&#125;;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* General */</span>
+    <span class="token class-name">pid_t</span> pid<span class="token punctuation">;</span>                  <span class="token comment">/* 主进程pid */</span>
+    <span class="token class-name">pthread_t</span> main_thread_id<span class="token punctuation">;</span>   <span class="token comment">/* 主线程id */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>configfile<span class="token punctuation">;</span>           <span class="token comment">/* 配置文件绝对路径，或 NULL */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>executable<span class="token punctuation">;</span>           <span class="token comment">/* 可执行文件绝对路径。 */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>exec_argv<span class="token punctuation">;</span>           <span class="token comment">/* 可执行 argv 向量（副本）。 */</span>
+    <span class="token keyword">int</span> dynamic_hz<span class="token punctuation">;</span>             <span class="token comment">/* 根据客户端数量更改 hz 值。 */</span>
+    <span class="token keyword">int</span> config_hz<span class="token punctuation">;</span>              <span class="token comment">/* 配置的 HZ 值。如果启用了动态hz，则可能与实际的“hz”字段值不同。 */</span>
+    <span class="token class-name">mode_t</span> umask<span class="token punctuation">;</span>               <span class="token comment">/* 进程启动时的 umask 值 */</span>
+    <span class="token keyword">int</span> hz<span class="token punctuation">;</span>                     <span class="token comment">/* serverCron() 调用频率  */</span>
+    <span class="token keyword">int</span> in_fork_child<span class="token punctuation">;</span>          <span class="token comment">/* 复制的子进程 */</span>
+    redisDb <span class="token operator">*</span>db<span class="token punctuation">;</span>                <span class="token comment">/* 数据库 */</span>    
+    dict <span class="token operator">*</span>commands<span class="token punctuation">;</span>             <span class="token comment">/* 命令表 */</span>
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h2 id="3-2-Redis数据库-redisDb"><a href="#3-2-Redis数据库-redisDb" class="headerlink" title="(3.2) Redis数据库-redisDb"></a>(3.2) Redis数据库-redisDb</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: src&#x2F;server.h
+<h2 id="3-2-Redis数据库-redisDb"><a href="#3-2-Redis数据库-redisDb" class="headerlink" title="(3.2) Redis数据库-redisDb"></a>(3.2) Redis数据库-redisDb</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.h</span>
 
-&#x2F;* Redis数据库表示。
+<span class="token comment">/* Redis数据库表示。
    有多个数据库由从 0（默认数据库）到最大配置数据库的整数标识。
    数据库编号是结构中的“id”字段。 
-*&#x2F;
-typedef struct redisDb &#123;
-    dict *dict;                 &#x2F;* 这个数据库存储的key集合 *&#x2F;
-    dict *expires;              &#x2F;* 设置了超时时间的key集合 *&#x2F;
-    dict *blocking_keys;        &#x2F;* 客户端等待数据的key集合 (BLPOP)*&#x2F;
-    dict *ready_keys;           &#x2F;* Blocked keys that received a PUSH *&#x2F;
-    dict *watched_keys;         &#x2F;* WATCHED keys for MULTI&#x2F;EXEC CAS *&#x2F;
-    int id;                     &#x2F;* Database ID *&#x2F;
-    long long avg_ttl;          &#x2F;* Average TTL, just for stats *&#x2F;
-    unsigned long expires_cursor; &#x2F;* Cursor of the active expire cycle. *&#x2F;
-    list *defrag_later;         &#x2F;* List of key names to attempt to defrag one by one, gradually. *&#x2F;
-&#125; redisDb;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+*/</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisDb</span> <span class="token punctuation">&#123;</span>
+    dict <span class="token operator">*</span>dict<span class="token punctuation">;</span>                 <span class="token comment">/* 这个数据库存储的key集合 */</span>
+    dict <span class="token operator">*</span>expires<span class="token punctuation">;</span>              <span class="token comment">/* 设置了超时时间的key集合 */</span>
+    dict <span class="token operator">*</span>blocking_keys<span class="token punctuation">;</span>        <span class="token comment">/* 客户端等待数据的key集合 (BLPOP)*/</span>
+    dict <span class="token operator">*</span>ready_keys<span class="token punctuation">;</span>           <span class="token comment">/* Blocked keys that received a PUSH */</span>
+    dict <span class="token operator">*</span>watched_keys<span class="token punctuation">;</span>         <span class="token comment">/* WATCHED keys for MULTI/EXEC CAS */</span>
+    <span class="token keyword">int</span> id<span class="token punctuation">;</span>                     <span class="token comment">/* Database ID */</span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> avg_ttl<span class="token punctuation">;</span>          <span class="token comment">/* Average TTL, just for stats */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> expires_cursor<span class="token punctuation">;</span> <span class="token comment">/* Cursor of the active expire cycle. */</span>
+    list <span class="token operator">*</span>defrag_later<span class="token punctuation">;</span>         <span class="token comment">/* List of key names to attempt to defrag one by one, gradually. */</span>
+<span class="token punctuation">&#125;</span> redisDb<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>　redis默认有16个db，每个db里保存了</p>
-<h2 id="3-3-dict"><a href="#3-3-dict" class="headerlink" title="(3.3) dict"></a>(3.3) dict</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: &#x2F;src&#x2F;dict.h
+<h2 id="3-3-dict"><a href="#3-3-dict" class="headerlink" title="(3.3) dict"></a>(3.3) dict</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.h</span>
 
-&#x2F;**
+<span class="token comment">/*
  * 字典结构体
- *&#x2F;
-typedef struct dict &#123;
-    dictType *type;  &#x2F;** 字典类型 *&#x2F;
-    void *privdata;  &#x2F;** 私有数据 *&#x2F;
-    dictht ht[2];    &#x2F;** 全局哈希表 2个 默认使用第0个，扩容时使用第1个 *&#x2F;
-    long rehashidx;  &#x2F;* rehashing not in progress if rehashidx &#x3D;&#x3D; -1 *&#x2F;
-    int16_t pauserehash; &#x2F;* If &gt;0 rehashing is paused (&lt;0 indicates coding error) *&#x2F;
-&#125; dict;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dict</span> <span class="token punctuation">&#123;</span>
+    dictType <span class="token operator">*</span>type<span class="token punctuation">;</span>  <span class="token comment">/* 字典类型 */</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>privdata<span class="token punctuation">;</span>  <span class="token comment">/* 私有数据 */</span>
+    dictht ht<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">/* 全局哈希表 2个 默认使用第0个，扩容时使用第1个 */</span>
+    <span class="token keyword">long</span> rehashidx<span class="token punctuation">;</span>  <span class="token comment">/* rehashing not in progress if rehashidx == -1 */</span>
+    <span class="token class-name">int16_t</span> pauserehash<span class="token punctuation">;</span> <span class="token comment">/* If >0 rehashing is paused (&lt;0 indicates coding error) */</span>
+<span class="token punctuation">&#125;</span> dict<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <h2 id="3-4-哈希表-dictht"><a href="#3-4-哈希表-dictht" class="headerlink" title="(3.4) 哈希表-dictht"></a>(3.4) 哈希表-dictht</h2><p>  Redis里的哈希表数据结构的实现是<code>dictht</code><br>  哈希函数使用 ``<br>  哈希冲突使用 <code>链地址法</code></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: &#x2F;src&#x2F;dict.h
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.h</span>
 
-&#x2F;** 
+<span class="token comment">/* 
  * 这是哈希表结构。
  * 每个字典都有两个这样的字典，因为我们实现了增量重新哈希，从旧表到新表。 
- *&#x2F;
-typedef struct dictht &#123;
-    dictEntry **table;   &#x2F;&#x2F; 一维数组的指针
-    unsigned long size;  &#x2F;&#x2F; 哈希表大小  
-    unsigned long sizemask;  &#x2F;&#x2F; size-1 &#x3D; (2^n - 1)，比2^n少1，用于计算key对应桶的下标
-    unsigned long used;  &#x2F;&#x2F; 已使用个数 
-&#125; dictht;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictht</span> <span class="token punctuation">&#123;</span>
+    dictEntry <span class="token operator">*</span><span class="token operator">*</span>table<span class="token punctuation">;</span>   <span class="token comment">// 一维数组的指针</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> size<span class="token punctuation">;</span>  <span class="token comment">// 哈希表大小  </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> sizemask<span class="token punctuation">;</span>  <span class="token comment">// size-1 = (2^n - 1)，比2^n少1，用于计算key对应桶的下标</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> used<span class="token punctuation">;</span>  <span class="token comment">// 已使用个数 </span>
+<span class="token punctuation">&#125;</span> dictht<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<h2 id="3-5-dictEntry"><a href="#3-5-dictEntry" class="headerlink" title="(3.5) dictEntry"></a>(3.5) dictEntry</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: src&#x2F;dict.h
+<h2 id="3-5-dictEntry"><a href="#3-5-dictEntry" class="headerlink" title="(3.5) dictEntry"></a>(3.5) dictEntry</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/dict.h</span>
 
-&#x2F;** 
- * 哈希表节点&#x2F;Entry实体 
- *&#x2F;
-typedef struct dictEntry &#123;
-    void *key; &#x2F;&#x2F; key的指针
-    union &#123;
-        void *val;
-        uint64_t u64;
-        int64_t s64;
-        double d;
-    &#125; v;  &#x2F;&#x2F; value  联合结构体(不同场景使用不同大小，省内存)
-    struct dictEntry *next;  &#x2F;&#x2F; 链表的下一个节点的指针
-&#125; dictEntry;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token comment">/* 
+ * 哈希表节点/Entry实体 
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>key<span class="token punctuation">;</span> <span class="token comment">// key的指针</span>
+    <span class="token keyword">union</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">void</span> <span class="token operator">*</span>val<span class="token punctuation">;</span>
+        <span class="token class-name">uint64_t</span> u64<span class="token punctuation">;</span>
+        <span class="token class-name">int64_t</span> s64<span class="token punctuation">;</span>
+        <span class="token keyword">double</span> d<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> v<span class="token punctuation">;</span>  <span class="token comment">// value  联合结构体(不同场景使用不同大小，省内存)</span>
+    <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token operator">*</span>next<span class="token punctuation">;</span>  <span class="token comment">// 链表的下一个节点的指针</span>
+<span class="token punctuation">&#125;</span> dictEntry<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>　dictEntry里保存了<code>key指针</code>、<code>next指针</code>，各8字节</p>
-<h2 id="3-6-Redis对象类型-redisObject"><a href="#3-6-Redis对象类型-redisObject" class="headerlink" title="(3.6) Redis对象类型-redisObject"></a>(3.6) Redis对象类型-redisObject</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;**
+<h2 id="3-6-Redis对象类型-redisObject"><a href="#3-6-Redis对象类型-redisObject" class="headerlink" title="(3.6) Redis对象类型-redisObject"></a>(3.6) Redis对象类型-redisObject</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
  * Redis对象类型
- *&#x2F;
-typedef struct redisObject &#123;
-    unsigned type:4;  &#x2F;&#x2F; 数据类型  4个bits
-    unsigned encoding:4;  &#x2F;&#x2F; 编码方式 4个bits
-    unsigned lru:LRU_BITS;  &#x2F;&#x2F; LRU时间(相对于全局 lru_clock) 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  LRU_BITS为24个bits
-    int refcount;  &#x2F;&#x2F; 引用计数  4字节
-    void *ptr;  &#x2F;&#x2F; 指针 指向对象的值  8字节
-&#125; robj;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisObject</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> type<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 数据类型  4个bits</span>
+    <span class="token keyword">unsigned</span> encoding<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 编码方式 4个bits</span>
+    <span class="token keyword">unsigned</span> lru<span class="token operator">:</span>LRU_BITS<span class="token punctuation">;</span>  <span class="token comment">// LRU时间(相对于全局 lru_clock) 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  LRU_BITS为24个bits</span>
+    <span class="token keyword">int</span> refcount<span class="token punctuation">;</span>  <span class="token comment">// 引用计数  4字节</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>ptr<span class="token punctuation">;</span>  <span class="token comment">// 指针 指向对象的值  8字节</span>
+<span class="token punctuation">&#125;</span> robj<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>　redisObject保存了</p>
-<h2 id="3-7-redis查找key方法"><a href="#3-7-redis查找key方法" class="headerlink" title="(3.7) redis查找key方法"></a>(3.7) redis查找key方法</h2><h3 id="3-7-1-数据库里找对应的对象"><a href="#3-7-1-数据库里找对应的对象" class="headerlink" title="(3.7.1) 数据库里找对应的对象"></a>(3.7.1) 数据库里找对应的对象</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: &#x2F;src&#x2F;db.c
+<h2 id="3-7-redis查找key方法"><a href="#3-7-redis查找key方法" class="headerlink" title="(3.7) redis查找key方法"></a>(3.7) redis查找key方法</h2><h3 id="3-7-1-数据库里找对应的对象"><a href="#3-7-1-数据库里找对应的对象" class="headerlink" title="(3.7.1) 数据库里找对应的对象"></a>(3.7.1) 数据库里找对应的对象</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/db.c</span>
 
-&#x2F;**
+<span class="token comment">/*
  * 低级key查找API
  * 实际上并没有直接从应该依赖lookupKeyRead()、lookupKeyWrite()和lookupKeyReadWithFlags()的命令实现中调用。
  *
  * Low level key lookup API, not actually called directly from commands 
  * implementations that should instead rely on lookupKeyRead(),
  * lookupKeyWrite() and lookupKeyReadWithFlags(). 
- *&#x2F;
-robj *lookupKey(redisDb *db, robj *key, int flags) &#123;
-    &#x2F;&#x2F; 从db的dict里去找key对应的桶&#x2F;链表节点
-    dictEntry *de &#x3D; dictFind(db-&gt;dict,key-&gt;ptr);
-    if (de) &#123; &#x2F;&#x2F; 如果节点存在
-        &#x2F;&#x2F; 从节点里获取对应的对象
-        robj *val &#x3D; dictGetVal(de);
+ */</span>
+robj <span class="token operator">*</span><span class="token function">lookupKey</span><span class="token punctuation">(</span>redisDb <span class="token operator">*</span>db<span class="token punctuation">,</span> robj <span class="token operator">*</span>key<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 从db的dict里去找key对应的桶/链表节点</span>
+    dictEntry <span class="token operator">*</span>de <span class="token operator">=</span> <span class="token function">dictFind</span><span class="token punctuation">(</span>db<span class="token operator">-></span>dict<span class="token punctuation">,</span>key<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>de<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 如果节点存在</span>
+        <span class="token comment">// 从节点里获取对应的对象</span>
+        robj <span class="token operator">*</span>val <span class="token operator">=</span> <span class="token function">dictGetVal</span><span class="token punctuation">(</span>de<span class="token punctuation">)</span><span class="token punctuation">;</span>
 
-        &#x2F;* Update the access time for the ageing algorithm.
-         * Don&#39;t do it if we have a saving child, as this will trigger
-         * a copy on write madness. *&#x2F;
-        if (!hasActiveChildProcess() &amp;&amp; !(flags &amp; LOOKUP_NOTOUCH))&#123;
-            &#x2F;&#x2F; 
-            if (server.maxmemory_policy &amp; MAXMEMORY_FLAG_LFU) &#123;
-                &#x2F;&#x2F; 更新lfu
-                updateLFU(val);
-            &#125; else &#123;
-                &#x2F;&#x2F; 更新lru
-                val-&gt;lru &#x3D; LRU_CLOCK();
-            &#125;
-        &#125;
-        &#x2F;&#x2F; 返回查到的值
-        return val;
-    &#125; else &#123;
-        return NULL;
-    &#125;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+        <span class="token comment">/* Update the access time for the ageing algorithm.
+         * Don't do it if we have a saving child, as this will trigger
+         * a copy on write madness. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">hasActiveChildProcess</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token punctuation">(</span>flags <span class="token operator">&amp;</span> LOOKUP_NOTOUCH<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+            <span class="token comment">// </span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>maxmemory_policy <span class="token operator">&amp;</span> MAXMEMORY_FLAG_LFU<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 更新lfu</span>
+                <span class="token function">updateLFU</span><span class="token punctuation">(</span>val<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// 更新lru</span>
+                val<span class="token operator">-></span>lru <span class="token operator">=</span> <span class="token function">LRU_CLOCK</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 返回查到的值</span>
+        <span class="token keyword">return</span> val<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h3 id="3-7-2-字典里找对应的节点"><a href="#3-7-2-字典里找对应的节点" class="headerlink" title="(3.7.2) 字典里找对应的节点"></a>(3.7.2) 字典里找对应的节点</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: &#x2F;src&#x2F;dict.c
+<h3 id="3-7-2-字典里找对应的节点"><a href="#3-7-2-字典里找对应的节点" class="headerlink" title="(3.7.2) 字典里找对应的节点"></a>(3.7.2) 字典里找对应的节点</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.c</span>
 
-&#x2F;**
+<span class="token comment">/*
  * 从db的dict里去找key对应的节点
  *
  * @param *d 字段
  * @param *key 键
- *&#x2F;
-dictEntry *dictFind(dict *d, const void *key)
-&#123;
-    &#x2F;&#x2F; 链表节点  可能为空
-    dictEntry *he; 
-    uint64_t h, idx, table;
+ */</span>
+dictEntry <span class="token operator">*</span><span class="token function">dictFind</span><span class="token punctuation">(</span>dict <span class="token operator">*</span>d<span class="token punctuation">,</span> <span class="token keyword">const</span> <span class="token keyword">void</span> <span class="token operator">*</span>key<span class="token punctuation">)</span>
+<span class="token punctuation">&#123;</span>
+    <span class="token comment">// 链表节点  可能为空</span>
+    dictEntry <span class="token operator">*</span>he<span class="token punctuation">;</span> 
+    <span class="token class-name">uint64_t</span> h<span class="token punctuation">,</span> idx<span class="token punctuation">,</span> table<span class="token punctuation">;</span>
 
-    &#x2F;&#x2F; 字典是空的，字典里两个哈希表都是空的
-    if (dictSize(d) &#x3D;&#x3D; 0) return NULL; 
+    <span class="token comment">// 字典是空的，字典里两个哈希表都是空的</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">dictSize</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span> 
 
-    &#x2F;&#x2F; 如果正在rehash，执行一小步rehash
-    if (dictIsRehashing(d)) _dictRehashStep(d);
+    <span class="token comment">// 如果正在rehash，执行一小步rehash</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">dictIsRehashing</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token function">_dictRehashStep</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">;</span>
 
-    &#x2F;&#x2F; 计算key的hash
-    h &#x3D; dictHashKey(d, key);
-    &#x2F;&#x2F; 有2个哈希表 ht[0] ht[1]，有可能正在rehash，所以都要查，对应代码是 table&#x3D;0 table&lt;&#x3D;1
-    for (table &#x3D; 0; table &lt;&#x3D; 1; table++) &#123;
-        &#x2F;&#x2F; 获取数组索引下标
-        idx &#x3D; h &amp; d-&gt;ht[table].sizemask;
-        &#x2F;&#x2F; 桶&#x2F;链表头结点
-        he &#x3D; d-&gt;ht[table].table[idx];
-        &#x2F;&#x2F; 遍历链表
-        while(he) &#123;
-            &#x2F;&#x2F; key相同 或 key对比相等
-            if (key&#x3D;&#x3D;he-&gt;key || dictCompareKeys(d, key, he-&gt;key))
-                return he; &#x2F;&#x2F; 返回对应节点
-            he &#x3D; he-&gt;next;
-        &#125;
-        &#x2F;**  *&#x2F;
-        if (!dictIsRehashing(d)) return NULL;
-    &#125;
-    return NULL;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+    <span class="token comment">// 计算key的hash</span>
+    h <span class="token operator">=</span> <span class="token function">dictHashKey</span><span class="token punctuation">(</span>d<span class="token punctuation">,</span> key<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 有2个哈希表 ht[0] ht[1]，有可能正在rehash，所以都要查，对应代码是 table=0 table&lt;=1</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>table <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> table <span class="token operator">&lt;=</span> <span class="token number">1</span><span class="token punctuation">;</span> table<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 获取数组索引下标</span>
+        idx <span class="token operator">=</span> h <span class="token operator">&amp;</span> d<span class="token operator">-></span>ht<span class="token punctuation">[</span>table<span class="token punctuation">]</span><span class="token punctuation">.</span>sizemask<span class="token punctuation">;</span>
+        <span class="token comment">// 桶/链表头结点</span>
+        he <span class="token operator">=</span> d<span class="token operator">-></span>ht<span class="token punctuation">[</span>table<span class="token punctuation">]</span><span class="token punctuation">.</span>table<span class="token punctuation">[</span>idx<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token comment">// 遍历链表</span>
+        <span class="token keyword">while</span><span class="token punctuation">(</span>he<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// key相同 或 key对比相等</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>key<span class="token operator">==</span>he<span class="token operator">-></span>key <span class="token operator">||</span> <span class="token function">dictCompareKeys</span><span class="token punctuation">(</span>d<span class="token punctuation">,</span> key<span class="token punctuation">,</span> he<span class="token operator">-></span>key<span class="token punctuation">)</span><span class="token punctuation">)</span>
+                <span class="token keyword">return</span> he<span class="token punctuation">;</span> <span class="token comment">// 返回对应节点</span>
+            he <span class="token operator">=</span> he<span class="token operator">-></span>next<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">/*  */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">dictIsRehashing</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; file: dict.h
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: dict.h</span>
 
-&#x2F;** 从节点里获取对应的对象 *&#x2F;
-#define dictGetVal(he) ((he)-&gt;v.val)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token comment">/* 从节点里获取对应的对象 */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name function">dictGetVal</span><span class="token expression"><span class="token punctuation">(</span>he<span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>he<span class="token punctuation">)</span><span class="token operator">-></span>v<span class="token punctuation">.</span>val<span class="token punctuation">)</span></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
 
 
 
@@ -552,8 +552,8 @@ dictEntry *dictFind(dict *d, const void *key)
                 </a>
             </div>
             <div class="post-nav-item">
-                <a href="/2022/01/08/redis-io-model/" rel="next" title="Redis高性能IO模型">
-                  Redis高性能IO模型 <i class="fa fa-chevron-right"></i>
+                <a href="/2022/01/08/redis-io-model/" rel="next" title="Redis IO模型">
+                  Redis IO模型 <i class="fa fa-chevron-right"></i>
                 </a>
             </div>
           </div>

@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Redis整体架构   Redis是典型的 Client-Server 架构，类似于MySQL和RPC框架。  Redis Server类似于RPC框架Server，在客户端使用前需要先启动Redis Server。那么有一个问题，Redis Server启动后会做哪些操作？需要哪些配置，有没有什么坑？ (1) Redis Server启动入口-main函数  源码地址  https:&#x2F;&#x2F;gi">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis Server 启动">
+<meta property="og:url" content="http://weikeqin.com/2023/01/23/redis-server-start/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Redis整体架构   Redis是典型的 Client-Server 架构，类似于MySQL和RPC框架。  Redis Server类似于RPC框架Server，在客户端使用前需要先启动Redis Server。那么有一个问题，Redis Server启动后会做哪些操作？需要哪些配置，有没有什么坑？ (1) Redis Server启动入口-main函数  源码地址  https:&#x2F;&#x2F;gi">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/io-model/redis_server-main-init_server.png">
+<meta property="article:published_time" content="2023-01-23T13:08:07.000Z">
+<meta property="article:modified_time" content="2023-02-05T13:13:43.538Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/io-model/redis_server-main-init_server.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/23/redis-server-start/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/23/redis-server-start/","path":"2023/01/23/redis-server-start/","title":"Redis Server 启动"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis Server 启动 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis-Server%E5%90%AF%E5%8A%A8%E5%85%A5%E5%8F%A3-main%E5%87%BD%E6%95%B0"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis Server启动入口-main函数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E9%83%A8%E5%88%86%E7%BB%86%E8%8A%82"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 部分细节</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis%E4%B8%BB%E8%A6%81%E5%8F%82%E6%95%B0%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis主要参数类型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-Redis%E5%8F%82%E6%95%B0%E7%9A%84%E8%AE%BE%E7%BD%AE%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) Redis参数的设置方法</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-mian%E6%96%B9%E6%B3%95-%E5%88%9D%E5%A7%8B%E5%8C%96RedisServer"><span class="nav-number">3.</span> <span class="nav-text">(3) mian方法-初始化RedisServer</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-initServer-%E5%88%9B%E5%BB%BADB"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) initServer-创建DB</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-initServer-%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) initServer-事件处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E4%BB%96"><span class="nav-number">3.3.</span> <span class="nav-text">其他</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-main%E6%96%B9%E6%B3%95-%E5%BE%AA%E7%8E%AF%E5%A4%84%E7%90%86%E8%AF%B7%E6%B1%82"><span class="nav-number">4.</span> <span class="nav-text">(4) main方法-循环处理请求</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%80%9D%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">(5) 思考</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">304</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/23/redis-server-start/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis Server 启动 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis Server 启动
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-23 21:08:07" itemprop="dateCreated datePublished" datetime="2023-01-23T21:08:07+08:00">2023-01-23</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-02-05 21:13:43" itemprop="dateModified" datetime="2023-02-05T21:13:43+08:00">2023-02-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>5.2k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>5 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Redis整体架构</p>
+<p>  Redis是典型的 <code>Client-Server</code> 架构，类似于MySQL和RPC框架。<br>  Redis Server类似于RPC框架Server，在客户端使用前需要先启动Redis Server。那么有一个问题，Redis Server启动后会做哪些操作？需要哪些配置，有没有什么坑？</p>
+<h1 id="1-Redis-Server启动入口-main函数"><a href="#1-Redis-Server启动入口-main函数" class="headerlink" title="(1) Redis Server启动入口-main函数"></a>(1) Redis Server启动入口-main函数</h1><p>  源码地址  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/server.c">https://github.com/redis/redis/blob/6.0/src/server.c</a> </p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">//file: src/server.c</span>
+
+<span class="token comment">// #L5297  5297行</span>
+<span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token keyword">int</span> argc<span class="token punctuation">,</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 1. 初始化配置 设置默认值</span>
+    <span class="token function">initServerConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* We need to init sentinel right now as parsing the configuration file
+     * in sentinel mode will have the effect of populating the sentinel
+     * data structures with master nodes to monitor. */</span>
+    <span class="token comment">// 2. 判断server是否设置为哨兵模式 </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>sentinel_mode<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">initSentinelConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 初始化哨兵</span>
+        <span class="token function">initSentinel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Check if we need to start in redis-check-rdb/aof mode. We just execute
+     * the program main. However the program is part of the Redis executable
+     * so that we can easily execute an RDB check on loading errors. */</span>
+    <span class="token comment">// 3. 持久化 rdb aof  </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">strstr</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token string">"redis-check-rdb"</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span>
+        <span class="token function">redis_check_rdb_main</span><span class="token punctuation">(</span>argc<span class="token punctuation">,</span>argv<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">strstr</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token string">"redis-check-aof"</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span>
+        <span class="token function">redis_check_aof_main</span><span class="token punctuation">(</span>argc<span class="token punctuation">,</span>argv<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 4. 加载Server配置 </span>
+    <span class="token function">loadServerConfig</span><span class="token punctuation">(</span>configfile<span class="token punctuation">,</span>options<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 5. 启动RedisServer时 初始化配置及资源</span>
+    <span class="token function">initServer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 6. 循环处理请求及事件，直到服务器关闭为止</span>
+    <span class="token function">aeMain</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>el<span class="token punctuation">)</span><span class="token punctuation">;</span> 
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<span id="more"></span>
+
+<br>
+
+<h2 id="1-1-部分细节"><a href="#1-1-部分细节" class="headerlink" title="(1.1) 部分细节"></a>(1.1) 部分细节</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// 设置时区</span>
+<span class="token function">setlocale</span><span class="token punctuation">(</span>LC_COLLATE<span class="token punctuation">,</span><span class="token string">""</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token function">tzset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Populates 'timezone' global. */</span>
+
+<span class="token comment">// </span>
+<span class="token function">zmalloc_set_oom_handler</span><span class="token punctuation">(</span>redisOutOfMemoryHandler<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// </span>
+<span class="token class-name">uint8_t</span> hashseed<span class="token punctuation">[</span><span class="token number">16</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token function">getRandomBytes</span><span class="token punctuation">(</span>hashseed<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>hashseed<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 省略部分代码...</span>
+
+<span class="token comment">// 哨兵</span>
+server<span class="token punctuation">.</span>sentinel_mode <span class="token operator">=</span> <span class="token function">checkForSentinelMode</span><span class="token punctuation">(</span>argc<span class="token punctuation">,</span>argv<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h1 id="2-Redis主要参数类型"><a href="#2-Redis主要参数类型" class="headerlink" title="(2) Redis主要参数类型"></a>(2) Redis主要参数类型</h1><p>Redis 运行所需的各种参数，都统一定义在了<code>server.h</code>文件的 redisServer 结构体中。</p>
+<p>各种参数划分为了七大类型，包括 通用参数、数据结构参数、网络参数、持久化参数、主从复制参数、切片集群参数、性能优化参数。</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数类型</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">通用参数</td>
+<td align="left">Redis Server运行基本配置</td>
+</tr>
+<tr>
+<td align="left">数据结构参数</td>
+<td align="left">定义内存紧凑型数据结构使用条件</td>
+</tr>
+<tr>
+<td align="left">网络参数</td>
+<td align="left">定义了Server监听地址、端口、TCP缓冲区大小等参数</td>
+</tr>
+<tr>
+<td align="left">持久化参数</td>
+<td align="left">定义了RDB和AOF运行时需要的参数</td>
+</tr>
+<tr>
+<td align="left">主从复制参数</td>
+<td align="left">定义了主从库复制时的关键机制，包括主库信息，主从复制方式、主从复制积压缓冲区大小、从库是否只读等</td>
+</tr>
+<tr>
+<td align="left">切片集群参数</td>
+<td align="left">定义了切片集群运行时的关键机制，包括是否启动切片集群、切片洁群是否支持故障结合、集群节点心跳超时时间等</td>
+</tr>
+<tr>
+<td align="left">性能优化参数</td>
+<td align="left">包括2方面内容 \n 一方面是Server运行时的监控机制，比如慢查询触发条件、延迟监控的触发阈值等；、\n 另一方面主要是和Redis提供的优化机制相关，比如惰性删除机制、主动内存碎片整理机制等。</td>
+</tr>
+</tbody></table>
+<br>
+
+<h2 id="2-1-Redis参数的设置方法"><a href="#2-1-Redis参数的设置方法" class="headerlink" title="(2.1) Redis参数的设置方法"></a>(2.1) Redis参数的设置方法</h2><p>Redis 对运行参数的设置实际上会经过三轮赋值，分别是默认配置值、命令行启动参数，以及配置文件配置值。</p>
+<p>第一轮，Redis 在 main 函数中会先调用 <code>initServerConfig</code> 函数，为各种参数设置默认值。<br>第二轮，main 函数就会对 Redis 程序启动时的命令行参数进行逐一解析。调用 <code>loadServerConfig</code> 函数进行第二轮赋值。</p>
+<br>
+
+
+<h1 id="3-mian方法-初始化RedisServer"><a href="#3-mian方法-初始化RedisServer" class="headerlink" title="(3) mian方法-初始化RedisServer"></a>(3) mian方法-初始化RedisServer</h1><p>  初始化RedisServer  initServer</p>
+<p>  在 <code>initServer</code> 这个函数内，Redis 做了这么几件重要的事情。</p>
+<h2 id="3-1-initServer-创建DB"><a href="#3-1-initServer-创建DB" class="headerlink" title="(3.1) initServer-创建DB"></a>(3.1) initServer-创建DB</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: server.c</span>
+
+<span class="token keyword">void</span> <span class="token function">initServer</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 创建db</span>
+    server<span class="token punctuation">.</span>db <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>redisDb<span class="token punctuation">)</span><span class="token operator">*</span>server<span class="token punctuation">.</span>dbnum<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Create the Redis databases, and initialize other internal state. */</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>dbnum<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 创建当前db的字典 (哈希表)</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>dict <span class="token operator">=</span> <span class="token function">dictCreate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>dbDictType<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 创建当前db的过期key哈希表</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>expires <span class="token operator">=</span> <span class="token function">dictCreate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>keyptrDictType<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 过期键游标</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>expires_cursor <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token comment">// 为被BLPOP阻塞的key创建哈希表</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>blocking_keys <span class="token operator">=</span> <span class="token function">dictCreate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>keylistDictType<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 为将执行PUSH的阻塞key创建哈希表</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>ready_keys <span class="token operator">=</span> <span class="token function">dictCreate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>objectKeyPointerValueDictType<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 为被MULTI/WATCH操作监听的key创建哈希表</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>watched_keys <span class="token operator">=</span> <span class="token function">dictCreate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>keylistDictType<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>id <span class="token operator">=</span> j<span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>avg_ttl <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>defrag_later <span class="token operator">=</span> <span class="token function">listCreate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">listSetFreeMethod</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>db<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">.</span>defrag_later<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">void</span> <span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">)</span>sdsfree<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+
+<h2 id="3-2-initServer-事件处理"><a href="#3-2-initServer-事件处理" class="headerlink" title="(3.2) initServer-事件处理"></a>(3.2) initServer-事件处理</h2><p> <img src="/img/database/redis/io-model/redis_server-main-init_server.png" alt="RedisServer启动initServer流程"></p>
+<p>1、创建一个epoll对象<br>2、对配置的监听端口进行listen<br>3、把 listen socket 让 epoll 给管理起来</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: server.c</span>
+
+<span class="token keyword">void</span> <span class="token function">initServer</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 1.  创建epoll</span>
+    server<span class="token punctuation">.</span>el <span class="token operator">=</span> <span class="token function">aeCreateEventLoop</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>maxclients<span class="token operator">+</span>CONFIG_FDSET_INCR<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 2. 监听端口</span>
+    <span class="token function">listenToPort</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>port<span class="token punctuation">,</span>server<span class="token punctuation">.</span>ipfd<span class="token punctuation">,</span><span class="token operator">&amp;</span>server<span class="token punctuation">.</span>ipfd_count<span class="token punctuation">)</span>
+
+    <span class="token comment">// 3. 创建时间处理器 事件处理器 </span>
+
+    <span class="token comment">// 3.1 创建时间回调，这个是我们处理许多后台操作 的方式，像客户端连接超时，过期key 等等</span>
+    <span class="token comment">/* Create the timer callback, this is our way to process many background
+     * operations incrementally, like clients timeout, eviction of unaccessed
+     * expired keys and so forth. */</span>
+    <span class="token function">aeCreateTimeEvent</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>el<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> serverCron<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3.2 为接收新建立的 TCP sockets 连接 设置事件处理器(acceptTcpHandler)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>ipfd_count<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 为每一个db 注册accept事件处理器  (只是注册 后面会用到)</span>
+        <span class="token function">aeCreateFileEvent</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>el<span class="token punctuation">,</span> server<span class="token punctuation">.</span>ipfd<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">,</span> AE_READABLE<span class="token punctuation">,</span>
+            acceptTcpHandler<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: server.c</span>
+
+<span class="token keyword">void</span> <span class="token function">initServer</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token function">createSharedObjects</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">adjustOpenFilesLimit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token function">evictionPoolAlloc</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Initialize the LRU keys pool. */</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+<h1 id="4-main方法-循环处理请求"><a href="#4-main方法-循环处理请求" class="headerlink" title="(4) main方法-循环处理请求"></a>(4) main方法-循环处理请求</h1><p>  循环处理请求 aeMain()</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/ae.c </span>
+
+<span class="token comment">/*
+ * 循环处理事件
+ * 
+ * @param *eventLoop 
+ */</span> 
+<span class="token keyword">void</span> <span class="token function">aeMain</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    eventLoop<span class="token operator">-></span>stop <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 循环处理事件</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token operator">!</span>eventLoop<span class="token operator">-></span>stop<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 处理事件</span>
+        <span class="token function">aeProcessEvents</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span> AE_ALL_EVENTS<span class="token operator">|</span>
+                                   AE_CALL_BEFORE_SLEEP<span class="token operator">|</span>
+                                   AE_CALL_AFTER_SLEEP<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/ae.c </span>
+
+<span class="token comment">/*
+ * 处理事件
+ * 
+ * @param *eventLoop
+ * @param flags
+ */</span> 
+<span class="token keyword">int</span> <span class="token function">aeProcessEvents</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span>
+<span class="token punctuation">&#123;</span>
+    <span class="token comment">// 省略部分细节...</span>
+
+    <span class="token comment">// 调用多路复用API获取就绪事件</span>
+    numevents <span class="token operator">=</span> <span class="token function">aeApiPoll</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span> tvp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 处理写事件</span>
+    fe<span class="token operator">-></span><span class="token function">wfileProc</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span>fd<span class="token punctuation">,</span>fe<span class="token operator">-></span>clientData<span class="token punctuation">,</span>mask<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 处理读事件</span>
+    fe<span class="token operator">-></span><span class="token function">rfileProc</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span>fd<span class="token punctuation">,</span>fe<span class="token operator">-></span>clientData<span class="token punctuation">,</span>mask<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  其实整个 Redis 的工作过程，就只需要理解清楚 main 函数中调用的 <code>initServer</code> 和 <code>aeMain</code> 这两个函数就足够了。</p>
+<br>
+
+
+
+<h1 id="5-思考"><a href="#5-思考" class="headerlink" title="(5) 思考"></a>(5) 思考</h1><p>Redis 启动流程，主要的工作有：</p>
+<p>1、初始化前置操作（设置时区、随机种子）</p>
+<p>2、初始化 Server 的各种默认配置（server.c 的 initServerConfig 函数），默认配置见 server.h 中的 CONFIG_DEFAULT_XXX，比较典型的配置有：</p>
+<ul>
+<li>默认端口</li>
+<li>定时任务频率</li>
+<li>数据库数量</li>
+<li>AOF 刷盘策略</li>
+<li>淘汰策略</li>
+<li>数据结构转换阈值</li>
+<li>主从复制参数</li>
+</ul>
+<p>3、加载配置启动参数，覆盖默认配置（config.c 的 loadServerConfig 函数）：</p>
+<ul>
+<li>解析命令行参数</li>
+<li>解析配置文件</li>
+</ul>
+<p>3、初始化 Server（server.c 的 initServer 函数），例如会初始化：</p>
+<ul>
+<li>共享对象池</li>
+<li>客户端链表</li>
+<li>从库链表</li>
+<li>监听端口</li>
+<li>全局哈希表</li>
+<li>LRU 池</li>
+<li>注册定时任务函数</li>
+<li>注册监听请求函数</li>
+</ul>
+<p>4、启动事件循环（ae.c 的 aeMain 函数）</p>
+<ul>
+<li>处理请求</li>
+<li>处理定时任务</li>
+</ul>
+<p>这里补充一下，初始化 Server 完成后，Redis 还会启动 3 类后台线程（server.c 的 InitServerLast 函数），协助主线程工作（异步释放 fd、AOF 每秒刷盘、lazyfree）。</p>
+<p>课后题：Redis 源码的 main 函数在调用 initServer 函数之前，会执行如下的代码片段，你知道这个代码片段的作用是什么吗？</p>
+<p>int main(int argc, char **argv) {<br>    …<br>    server.supervised = redisIsSupervised(server.supervised_mode);<br>    int background = server.daemonize &amp;&amp; !server.supervised;<br>    if (background) daemonize();<br>    …<br>}</p>
+<p>Redis 可以配置以守护进程的方式启动（配置文件 daemonize = yes），也可以把 Redis 托管给 upstart 或 systemd 来启动 / 停止（supervised = upstart|systemd|auto）。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/406556">Redis源码剖析与实战-08 | Redis server启动后会做哪些操作？</a> </p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/22/redis-object-sorted-set/" rel="prev" title="Redis 对象 有序集合 / Sorted Set / zset">
+                  <i class="fa fa-chevron-left"></i> Redis 对象 有序集合 / Sorted Set / zset
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/24/redis-object-stream/" rel="next" title="Redis 对象 Stream">
+                  Redis 对象 Stream <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

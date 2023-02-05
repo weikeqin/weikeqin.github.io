@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="无论是 LRU 算法还是 LFU 算法，它们在删除淘汰数据时，实际上都会根据 Redis server 的 lazyfree-lazy-eviction 配置项，来决定是否使用 Lazy Free，也就是惰性删除。 (1) 惰性删除是什么  惰性删除是 Redis 4.0 版本后提供的功能，它会使用后台线程来执行删除数据的任务 (2) 为什么要用惰性删除  可以避免了删除操作对主线程的阻塞。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis key 惰性删除">
+<meta property="og:url" content="http://weikeqin.com/2023/02/04/redis-key-lazy-free/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="无论是 LRU 算法还是 LFU 算法，它们在删除淘汰数据时，实际上都会根据 Redis server 的 lazyfree-lazy-eviction 配置项，来决定是否使用 Lazy Free，也就是惰性删除。 (1) 惰性删除是什么  惰性删除是 Redis 4.0 版本后提供的功能，它会使用后台线程来执行删除数据的任务 (2) 为什么要用惰性删除  可以避免了删除操作对主线程的阻塞。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-02-04T09:37:18.000Z">
+<meta property="article:modified_time" content="2023-02-05T13:08:29.967Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/02/04/redis-key-lazy-free/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/02/04/redis-key-lazy-free/","path":"2023/02/04/redis-key-lazy-free/","title":"Redis key 惰性删除"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis key 惰性删除 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E6%83%B0%E6%80%A7%E5%88%A0%E9%99%A4%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) 惰性删除是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8%E6%83%B0%E6%80%A7%E5%88%A0%E9%99%A4"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用惰性删除</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%83%B0%E6%80%A7%E5%88%A0%E9%99%A4%E6%80%8E%E4%B9%88%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">(3) 惰性删除怎么用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E6%83%B0%E6%80%A7%E5%88%A0%E9%99%A4%E7%9A%84%E9%85%8D%E7%BD%AE"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 惰性删除的配置</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%83%B0%E6%80%A7%E5%88%A0%E9%99%A4%E5%8E%9F%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">(4) 惰性删除原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E8%A2%AB%E6%B7%98%E6%B1%B0%E6%95%B0%E6%8D%AE%E7%9A%84%E5%88%A0%E9%99%A4%E8%BF%87%E7%A8%8B"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 被淘汰数据的删除过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-1-%E4%BC%A0%E6%92%AD%E8%BF%87%E6%9C%9Fkey-propagateExpire"><span class="nav-number">4.1.1.</span> <span class="nav-text">(4.1.1) 传播过期key-propagateExpire</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-2-%E6%83%B0%E6%80%A7%E5%88%A0%E9%99%A4-dbAsyncDelete"><span class="nav-number">4.1.2.</span> <span class="nav-text">(4.1.2) 惰性删除-dbAsyncDelete</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E6%95%B0%E6%8D%AE%E5%BC%82%E6%AD%A5%E5%88%A0%E9%99%A4-dbAsyncDelete"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 数据异步删除-dbAsyncDelete</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">304</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/02/04/redis-key-lazy-free/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis key 惰性删除 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis key 惰性删除
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-02-04 17:37:18" itemprop="dateCreated datePublished" datetime="2023-02-04T17:37:18+08:00">2023-02-04</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-02-05 21:08:29" itemprop="dateModified" datetime="2023-02-05T21:08:29+08:00">2023-02-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>10k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>9 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  无论是 LRU 算法还是 LFU 算法，它们在删除淘汰数据时，实际上都会根据 Redis server 的 lazyfree-lazy-eviction 配置项，来决定是否使用 Lazy Free，也就是惰性删除。</p>
+<h1 id="1-惰性删除是什么"><a href="#1-惰性删除是什么" class="headerlink" title="(1) 惰性删除是什么"></a>(1) 惰性删除是什么</h1><p>  惰性删除是 Redis 4.0 版本后提供的功能，它会使用后台线程来执行删除数据的任务</p>
+<h1 id="2-为什么要用惰性删除"><a href="#2-为什么要用惰性删除" class="headerlink" title="(2) 为什么要用惰性删除"></a>(2) 为什么要用惰性删除</h1><p>  可以避免了删除操作对主线程的阻塞。</p>
+<span id="more"></span>
+
+<p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/redis.conf#L941">https://github.com/redis/redis/blob/6.0/redis.conf#L941</a></p>
+<p> Redis有2个命令/原语删除keys<br> 一种是<code>DEL</code>阻塞删除对象，它意味着Redis Server停止处理新命令，以便同步回收与对象关联的所有内存。<br> 如果删除的这个key关联了一个小对象，为了执行删除命令需要的时间是非常小的，<br> 并且与 Redis 中的大多数其它 O(1) 或 O(log_N) 命令相当。</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">
+If the key deleted is associated with a small object<span class="token punctuation">,</span>
+ the time needed
+ in order to execute the DEL command is very small 
+ and comparable to most other  O<span class="token operator">(</span><span class="token number">1</span><span class="token operator">)</span> or O<span class="token operator">(</span>log_N<span class="token operator">)</span> commands in Redis<span class="token punctuation">.</span> 
+ However if the key is associated with an
+<span class="token operator">#</span> aggregated value containing millions of elements<span class="token punctuation">,</span> the server can block for
+<span class="token operator">#</span> a long time <span class="token operator">(</span>even seconds<span class="token operator">)</span> in order to complete the operation<span class="token punctuation">.</span>
+<span class="token operator">#</span>
+<span class="token operator">#</span> For the above reasons Redis also offers non blocking deletion primitives
+<span class="token operator">#</span> such as UNLINK <span class="token operator">(</span>non blocking DEL<span class="token operator">)</span> and the ASYNC option of FLUSHALL and
+<span class="token operator">#</span> FLUSHDB commands<span class="token punctuation">,</span> in order to reclaim memory in background<span class="token punctuation">.</span> Those commands
+<span class="token operator">#</span> are executed in constant time<span class="token punctuation">.</span> Another thread will incrementally free the
+<span class="token operator">#</span> object in the background as fast as possible<span class="token punctuation">.</span>
+<span class="token operator">#</span>
+<span class="token operator">#</span> DEL<span class="token punctuation">,</span> UNLINK and ASYNC option of FLUSHALL and FLUSHDB are user<span class="token operator">-</span>controlled<span class="token punctuation">.</span>
+<span class="token operator">#</span> It's up to the design of the application to understand when it is a good
+<span class="token operator">#</span> idea to use one or the other<span class="token punctuation">.</span> However the Redis server sometimes has to
+<span class="token operator">#</span> delete keys or flush the whole database as a side effect of other operations<span class="token punctuation">.</span>
+<span class="token operator">#</span> Specifically Redis deletes objects independently of a user call in the
+<span class="token operator">#</span> following scenarios<span class="token operator">:</span>
+<span class="token operator">#</span>
+<span class="token operator">#</span> <span class="token number">1</span><span class="token operator">)</span> On eviction<span class="token punctuation">,</span> because of the maxmemory and maxmemory policy configurations<span class="token punctuation">,</span>
+<span class="token operator">#</span>    in order to make room for new data<span class="token punctuation">,</span> without going over the specified
+<span class="token operator">#</span>    memory limit<span class="token punctuation">.</span>
+<span class="token operator">#</span> <span class="token number">2</span><span class="token operator">)</span> Because of expire<span class="token operator">:</span> when a key with an associated time to live <span class="token operator">(</span>see the
+<span class="token operator">#</span>    EXPIRE command<span class="token operator">)</span> must be deleted from memory<span class="token punctuation">.</span>
+<span class="token operator">#</span> <span class="token number">3</span><span class="token operator">)</span> Because of a side effect of a command that stores data on a key that may
+<span class="token operator">#</span>    already exist<span class="token punctuation">.</span> For example the RENAME command may delete the old key
+<span class="token operator">#</span>    content when it is replaced with another one<span class="token punctuation">.</span> Similarly SUNIONSTORE
+<span class="token operator">#</span>    or SORT with STORE option may delete existing keys<span class="token punctuation">.</span> The SET command
+<span class="token operator">#</span>    itself removes any old content of the specified key in order to replace
+<span class="token operator">#</span>    it with the specified string<span class="token punctuation">.</span>
+<span class="token operator">#</span> <span class="token number">4</span><span class="token operator">)</span> During replication<span class="token punctuation">,</span> when a replica performs a full resynchronization with
+<span class="token operator">#</span>    its master<span class="token punctuation">,</span> the content of the whole database is removed in order to
+<span class="token operator">#</span>    load the RDB file just transferred<span class="token punctuation">.</span>
+<span class="token operator">#</span>
+<span class="token operator">#</span> In all the above cases the default is to delete objects in a blocking way<span class="token punctuation">,</span>
+<span class="token operator">#</span> like if DEL was called<span class="token punctuation">.</span> However you can configure each case specifically
+<span class="token operator">#</span> in order to instead release memory in a non<span class="token operator">-</span>blocking way like if UNLINK
+<span class="token operator">#</span> was called<span class="token punctuation">,</span> using the following configuration directives<span class="token punctuation">.</span>
+
+lazyfree<span class="token operator">-</span>lazy<span class="token operator">-</span>eviction no
+lazyfree<span class="token operator">-</span>lazy<span class="token operator">-</span>expire no
+lazyfree<span class="token operator">-</span>lazy<span class="token operator">-</span>server<span class="token operator">-</span>del no
+replica<span class="token operator">-</span>lazy<span class="token operator">-</span>flush no
+
+<span class="token operator">#</span> It is also possible<span class="token punctuation">,</span> for the case when to replace the user code DEL calls
+<span class="token operator">#</span> with UNLINK calls is not easy<span class="token punctuation">,</span> to modify the default behavior of the DEL
+<span class="token operator">#</span> command to act exactly like UNLINK<span class="token punctuation">,</span> using the following configuration
+<span class="token operator">#</span> directive<span class="token operator">:</span>
+
+lazyfree<span class="token operator">-</span>lazy<span class="token operator">-</span>user<span class="token operator">-</span>del no<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="3-惰性删除怎么用"><a href="#3-惰性删除怎么用" class="headerlink" title="(3) 惰性删除怎么用"></a>(3) 惰性删除怎么用</h1><h2 id="3-1-惰性删除的配置"><a href="#3-1-惰性删除的配置" class="headerlink" title="(3.1) 惰性删除的配置"></a>(3.1) 惰性删除的配置</h2><p>当 Redis server 需要启动惰性删除时，需要在<code>redis.conf</code>配置文件中设置和惰性删除相关的配置项。<br>其中包括了四个配置项，分别对应了如下的四种场景。<br>lazyfree-lazy-eviction：对应缓存淘汰时的数据删除场景。<br>lazyfree-lazy-expire：对应过期 key 的删除场景。<br>lazyfree-lazy-server-del：对应会隐式进行删除操作的 server 命令执行场景。<br>replica-lazy-flush：对应从节点完成全量同步后，删除原有旧数据的场景。</p>
+<p>这四个配置项的默认值都是 no。所以，如果要在缓存淘汰时启用，就需要将</p>
+<p>lazyfree-lazy-eviction 设置为 yes。</p>
+<h1 id="4-惰性删除原理"><a href="#4-惰性删除原理" class="headerlink" title="(4) 惰性删除原理"></a>(4) 惰性删除原理</h1><h2 id="4-1-被淘汰数据的删除过程"><a href="#4-1-被淘汰数据的删除过程" class="headerlink" title="(4.1) 被淘汰数据的删除过程"></a>(4.1) 被淘汰数据的删除过程</h2><p>  <code>freeMemoryIfNeeded</code> 函数（在evict.c文件中）会负责执行数据淘汰的流程。<br>  该函数在筛选出被淘汰的键值对后，就要开始删除被淘汰的数据，这个删除过程主要分成两步。</p>
+<p>  第一步，freeMemoryIfNeeded 函数会为被淘汰的 key 创建一个 SDS 对象，然后调用 propagateExpire 函数<br>  第二步，freeMemoryIfNeeded 函数会根据 server 是否启用了惰性删除，分别执行</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/evict.c</span>
+
+<span class="token comment">/* This function is periodically called to see if there is memory to free
+ * according to the current "maxmemory" settings. In case we are over the
+ * memory limit, the function will try to free some memory to return back
+ * under the limit.
+ *
+ * The function returns C_OK if we are under the memory limit or if we
+ * were over the limit, but the attempt to free memory was successful.
+ * Otherwise if we are over the memory limit, but not enough memory
+ * was freed to return back under the limit, the function returns C_ERR. */</span>
+<span class="token keyword">int</span> <span class="token function">freeMemoryIfNeeded</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> keys_freed <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 省略部分代码 ... </span>
+
+    <span class="token comment">// 已经释放的内存大小 &lt; 计划要释放的内存大小</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>mem_freed <span class="token operator">&lt;</span> mem_tofree<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> j<span class="token punctuation">,</span> k<span class="token punctuation">,</span> i<span class="token punctuation">;</span>
+
+        <span class="token comment">// sds</span>
+        sds bestkey <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 省略部分代码 </span>
+
+        <span class="token comment">// 最终移除选择要淘汰的key</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>bestkey<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 选择对应的db</span>
+            db <span class="token operator">=</span> server<span class="token punctuation">.</span>db<span class="token operator">+</span>bestdbid<span class="token punctuation">;</span>
+            <span class="token comment">// 创建redisObject</span>
+            robj <span class="token operator">*</span>keyobj <span class="token operator">=</span> <span class="token function">createStringObject</span><span class="token punctuation">(</span>bestkey<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>bestkey<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 删除</span>
+            <span class="token function">propagateExpire</span><span class="token punctuation">(</span>db<span class="token punctuation">,</span>keyobj<span class="token punctuation">,</span>server<span class="token punctuation">.</span>lazyfree_lazy_eviction<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">/* We compute the amount of memory freed by db*Delete() alone.
+             * It is possible that actually the memory needed to propagate
+             * the DEL in AOF and replication link is greater than the one
+             * we are freeing removing the key, but we can't account for
+             * that otherwise we would never exit the loop.
+             *
+             * Same for CSC invalidation messages generated by signalModifiedKey.
+             *
+             * AOF and Output buffer memory will be freed eventually so
+             * we only care about memory used by the key space. */</span>
+            delta <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">long</span> <span class="token keyword">long</span><span class="token punctuation">)</span> <span class="token function">zmalloc_used_memory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">latencyStartMonitor</span><span class="token punctuation">(</span>eviction_latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 是否惰性删除</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>lazyfree_lazy_eviction<span class="token punctuation">)</span>
+                <span class="token function">dbAsyncDelete</span><span class="token punctuation">(</span>db<span class="token punctuation">,</span>keyobj<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 异步删除</span>
+            <span class="token keyword">else</span>
+                <span class="token function">dbSyncDelete</span><span class="token punctuation">(</span>db<span class="token punctuation">,</span>keyobj<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 同步删除</span>
+
+            <span class="token function">latencyEndMonitor</span><span class="token punctuation">(</span>eviction_latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">latencyAddSampleIfNeeded</span><span class="token punctuation">(</span><span class="token string">"eviction-del"</span><span class="token punctuation">,</span>eviction_latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            delta <span class="token operator">-=</span> <span class="token punctuation">(</span><span class="token keyword">long</span> <span class="token keyword">long</span><span class="token punctuation">)</span> <span class="token function">zmalloc_used_memory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            mem_freed <span class="token operator">+=</span> delta<span class="token punctuation">;</span>
+            server<span class="token punctuation">.</span>stat_evictedkeys<span class="token operator">++</span><span class="token punctuation">;</span>
+            <span class="token function">signalModifiedKey</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>db<span class="token punctuation">,</span>keyobj<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">notifyKeyspaceEvent</span><span class="token punctuation">(</span>NOTIFY_EVICTED<span class="token punctuation">,</span> <span class="token string">"evicted"</span><span class="token punctuation">,</span>
+                keyobj<span class="token punctuation">,</span> db<span class="token operator">-></span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">decrRefCount</span><span class="token punctuation">(</span>keyobj<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            keys_freed<span class="token operator">++</span><span class="token punctuation">;</span>
+
+            <span class="token comment">/* When the memory to free starts to be big enough, we may
+             * start spending so much time here that is impossible to
+             * deliver data to the slaves fast enough, so we force the
+             * transmission here inside the loop. */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>slaves<span class="token punctuation">)</span> <span class="token function">flushSlavesOutputBuffers</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">/* Normally our stop condition is the ability to release
+             * a fixed, pre-computed amount of memory. However when we
+             * are deleting objects in another thread, it's better to
+             * check, from time to time, if we already reached our target
+             * memory, since the "mem_freed" amount is computed only
+             * across the dbAsyncDelete() call, while the thread can
+             * release the memory all the time. */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>lazyfree_lazy_eviction <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token punctuation">(</span>keys_freed <span class="token operator">%</span> <span class="token number">16</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">getMaxmemoryState</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token operator">==</span> C_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token comment">/* Let's satisfy our stop condition. */</span>
+                    mem_freed <span class="token operator">=</span> mem_tofree<span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">goto</span> cant_free<span class="token punctuation">;</span> <span class="token comment">/* nothing to free... */</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    result <span class="token operator">=</span> C_OK<span class="token punctuation">;</span>
+
+cant_free<span class="token operator">:</span>
+    <span class="token comment">/* We are here if we are not able to reclaim memory. There is only one
+     * last thing we can try: check if the lazyfree thread has jobs in queue
+     * and wait... */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>result <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">latencyStartMonitor</span><span class="token punctuation">(</span>lazyfree_latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token function">bioPendingJobsOfType</span><span class="token punctuation">(</span>BIO_LAZY_FREE<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">getMaxmemoryState</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token operator">==</span> C_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                result <span class="token operator">=</span> C_OK<span class="token punctuation">;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token function">usleep</span><span class="token punctuation">(</span><span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token function">latencyEndMonitor</span><span class="token punctuation">(</span>lazyfree_latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">latencyAddSampleIfNeeded</span><span class="token punctuation">(</span><span class="token string">"eviction-lazyfree"</span><span class="token punctuation">,</span>lazyfree_latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">latencyEndMonitor</span><span class="token punctuation">(</span>latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">latencyAddSampleIfNeeded</span><span class="token punctuation">(</span><span class="token string">"eviction-cycle"</span><span class="token punctuation">,</span>latency<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-1-1-传播过期key-propagateExpire"><a href="#4-1-1-传播过期key-propagateExpire" class="headerlink" title="(4.1.1) 传播过期key-propagateExpire"></a>(4.1.1) 传播过期key-propagateExpire</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/evict.c</span>
+
+<span class="token comment">/* 
+ * 传播 过期keys 到 从节点 和 AOF 文件。
+ * 当主节点中的key过期时，如果启用()，则会将对此key的DEL操作发送到 所有从节点 和 AOF 文件。
+ *
+ * 这样key过期集中在一个地方，并且由于 AOF 和 主->从 链接保证操作顺序，
+ * 即使我们允许对过期key进行写操作，一切也会保持一致。
+ *
+ * @param *db redisDb
+ * @param *key  过期key对象(redisObject格式)
+ * @param lazy  过期策略
+ */</span>
+<span class="token keyword">void</span> <span class="token function">propagateExpire</span><span class="token punctuation">(</span>redisDb <span class="token operator">*</span>db<span class="token punctuation">,</span> robj <span class="token operator">*</span>key<span class="token punctuation">,</span> <span class="token keyword">int</span> lazy<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    robj <span class="token operator">*</span>argv<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+    argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> lazy <span class="token operator">?</span> shared<span class="token punctuation">.</span>unlink <span class="token operator">:</span> shared<span class="token punctuation">.</span>del<span class="token punctuation">;</span>
+    argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> key<span class="token punctuation">;</span>
+    <span class="token comment">// 引用计数 +1 </span>
+    <span class="token function">incrRefCount</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 引用计数 +1 </span>
+    <span class="token function">incrRefCount</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// AOF未关闭</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>aof_state <span class="token operator">!=</span> AOF_OFF<span class="token punctuation">)</span>
+        <span class="token function">feedAppendOnlyFile</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>delCommand<span class="token punctuation">,</span>db<span class="token operator">-></span>id<span class="token punctuation">,</span>argv<span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 把删除命令追加到AOF缓存 </span>
+
+    <span class="token comment">// 将删除操作同步给从节点</span>
+    <span class="token function">replicationFeedSlaves</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">,</span>db<span class="token operator">-></span>id<span class="token punctuation">,</span>argv<span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 引用计数 -1 </span>
+    <span class="token function">decrRefCount</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 引用计数 -1 </span>
+    <span class="token function">decrRefCount</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="4-1-2-惰性删除-dbAsyncDelete"><a href="#4-1-2-惰性删除-dbAsyncDelete" class="headerlink" title="(4.1.2) 惰性删除-dbAsyncDelete"></a>(4.1.2) 惰性删除-dbAsyncDelete</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/evict.c</span>
+
+<span class="token comment">/*
+*/</span>
+<span class="token keyword">int</span> <span class="token function">freeMemoryIfNeeded</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 省略部分代码</span>
+
+            <span class="token comment">// 是否惰性删除</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>lazyfree_lazy_eviction<span class="token punctuation">)</span>
+                <span class="token function">dbAsyncDelete</span><span class="token punctuation">(</span>db<span class="token punctuation">,</span>keyobj<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 异步删除</span>
+            <span class="token keyword">else</span>
+                <span class="token function">dbSyncDelete</span><span class="token punctuation">(</span>db<span class="token punctuation">,</span>keyobj<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 同步删除</span>
+
+    <span class="token comment">// 省略部分代码</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+<h2 id="4-2-数据异步删除-dbAsyncDelete"><a href="#4-2-数据异步删除-dbAsyncDelete" class="headerlink" title="(4.2) 数据异步删除-dbAsyncDelete"></a>(4.2) 数据异步删除-dbAsyncDelete</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/lazyfree.c</span>
+
+<span class="token comment">// 从数据库中删除key、value 和 关联的过期entry(如果有)。</span>
+<span class="token comment">// 如果有足够的内存分配来释放值对象，则可以将其放入惰性释放列表而不是同步释放。 </span>
+<span class="token comment">// 惰性空闲列表将在不同的 bio.c 线程中回收。</span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">LAZYFREE_THRESHOLD</span> <span class="token expression"><span class="token number">64</span></span></span>
+
+<span class="token comment">/*
+ * 异步删除
+ * 
+ * @param *db 
+ * @param *key 
+ */</span>
+<span class="token keyword">int</span> <span class="token function">dbAsyncDelete</span><span class="token punctuation">(</span>redisDb <span class="token operator">*</span>db<span class="token punctuation">,</span> robj <span class="token operator">*</span>key<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 从 expires 字典中删除entry(dictEntry)不会释放key的sds，因为它与主字典共享。 </span>
+    <span class="token comment">// 需要删2次，第一次删entry(dictEntry)，第二次删key</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">dictSize</span><span class="token punctuation">(</span>db<span class="token operator">-></span>expires<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token function">dictDelete</span><span class="token punctuation">(</span>db<span class="token operator">-></span>expires<span class="token punctuation">,</span>key<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 如果该值由一些allocations组成，以惰性方式释放实际上会更慢...所以在一定限制下我们只是同步释放对象。 </span>
+
+    <span class="token comment">// 从字典里删除key</span>
+    dictEntry <span class="token operator">*</span>de <span class="token operator">=</span> <span class="token function">dictUnlink</span><span class="token punctuation">(</span>db<span class="token operator">-></span>dict<span class="token punctuation">,</span>key<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 如果节点不为空</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>de<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 获取节点的值</span>
+        robj <span class="token operator">*</span>val <span class="token operator">=</span> <span class="token function">dictGetVal</span><span class="token punctuation">(</span>de<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// </span>
+        <span class="token class-name">size_t</span> free_effort <span class="token operator">=</span> <span class="token function">lazyfreeGetFreeEffort</span><span class="token punctuation">(</span>val<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* If releasing the object is too much work, do it in the background
+         * by adding the object to the lazy free list.
+         * Note that if the object is shared, to reclaim it now it is not
+         * possible. This rarely happens, however sometimes the implementation
+         * of parts of the Redis core may call incrRefCount() to protect
+         * objects, and then call dbDelete(). In this case we'll fall
+         * through and reach the dictFreeUnlinkedEntry() call, that will be
+         * equivalent to just calling decrRefCount(). */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>free_effort <span class="token operator">></span> LAZYFREE_THRESHOLD <span class="token operator">&amp;&amp;</span> val<span class="token operator">-></span>refcount <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">atomicIncr</span><span class="token punctuation">(</span>lazyfree_objects<span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">bioCreateBackgroundJob</span><span class="token punctuation">(</span>BIO_LAZY_FREE<span class="token punctuation">,</span>val<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">dictSetVal</span><span class="token punctuation">(</span>db<span class="token operator">-></span>dict<span class="token punctuation">,</span>de<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Release the key-val pair, or just the key if we set the val
+     * field to NULL in order to lazy free it later. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>de<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">dictFreeUnlinkedEntry</span><span class="token punctuation">(</span>db<span class="token operator">-></span>dict<span class="token punctuation">,</span>de<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>cluster_enabled<span class="token punctuation">)</span> <span class="token function">slotToKeyDel</span><span class="token punctuation">(</span>key<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c">
+<span class="token comment">/* Return the amount of work needed in order to free an object.
+ * The return value is not always the actual number of allocations the
+ * object is composed of, but a number proportional to it.
+ *
+ * For strings the function always returns 1.
+ *
+ * For aggregated objects represented by hash tables or other data structures
+ * the function just returns the number of elements the object is composed of.
+ *
+ * Objects composed of single allocations are always reported as having a
+ * single item even if they are actually logical composed of multiple
+ * elements.
+ *
+ * For lists the function returns the number of elements in the quicklist
+ * representing the list. */</span>
+<span class="token class-name">size_t</span> <span class="token function">lazyfreeGetFreeEffort</span><span class="token punctuation">(</span>robj <span class="token operator">*</span>obj<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>type <span class="token operator">==</span> OBJ_LIST<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        quicklist <span class="token operator">*</span>ql <span class="token operator">=</span> obj<span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> ql<span class="token operator">-></span>len<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>type <span class="token operator">==</span> OBJ_SET <span class="token operator">&amp;&amp;</span> obj<span class="token operator">-></span>encoding <span class="token operator">==</span> OBJ_ENCODING_HT<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        dict <span class="token operator">*</span>ht <span class="token operator">=</span> obj<span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token function">dictSize</span><span class="token punctuation">(</span>ht<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>type <span class="token operator">==</span> OBJ_ZSET <span class="token operator">&amp;&amp;</span> obj<span class="token operator">-></span>encoding <span class="token operator">==</span> OBJ_ENCODING_SKIPLIST<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+        zset <span class="token operator">*</span>zs <span class="token operator">=</span> obj<span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> zs<span class="token operator">-></span>zsl<span class="token operator">-></span>length<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>type <span class="token operator">==</span> OBJ_HASH <span class="token operator">&amp;&amp;</span> obj<span class="token operator">-></span>encoding <span class="token operator">==</span> OBJ_ENCODING_HT<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        dict <span class="token operator">*</span>ht <span class="token operator">=</span> obj<span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token function">dictSize</span><span class="token punctuation">(</span>ht<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>type <span class="token operator">==</span> OBJ_STREAM<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">size_t</span> effort <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        stream <span class="token operator">*</span>s <span class="token operator">=</span> obj<span class="token operator">-></span>ptr<span class="token punctuation">;</span>
+
+        <span class="token comment">/* Make a best effort estimate to maintain constant runtime. Every macro
+         * node in the Stream is one allocation. */</span>
+        effort <span class="token operator">+=</span> s<span class="token operator">-></span>rax<span class="token operator">-></span>numnodes<span class="token punctuation">;</span>
+
+        <span class="token comment">/* Every consumer group is an allocation and so are the entries in its
+         * PEL. We use size of the first group's PEL as an estimate for all
+         * others. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>s<span class="token operator">-></span>cgroups <span class="token operator">&amp;&amp;</span> <span class="token function">raxSize</span><span class="token punctuation">(</span>s<span class="token operator">-></span>cgroups<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            raxIterator ri<span class="token punctuation">;</span>
+            streamCG <span class="token operator">*</span>cg<span class="token punctuation">;</span>
+            <span class="token function">raxStart</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">,</span>s<span class="token operator">-></span>cgroups<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">raxSeek</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">,</span><span class="token string">"^"</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">/* There must be at least one group so the following should always
+             * work. */</span>
+            <span class="token function">serverAssert</span><span class="token punctuation">(</span><span class="token function">raxNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            cg <span class="token operator">=</span> ri<span class="token punctuation">.</span>data<span class="token punctuation">;</span>
+            effort <span class="token operator">+=</span> <span class="token function">raxSize</span><span class="token punctuation">(</span>s<span class="token operator">-></span>cgroups<span class="token punctuation">)</span><span class="token operator">*</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">+</span><span class="token function">raxSize</span><span class="token punctuation">(</span>cg<span class="token operator">-></span>pel<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">raxStop</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>ri<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span> effort<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token comment">/* Everything else is a single allocation. */</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/413997">Redis 源码剖析与实战 - 17 | Lazy Free会影响缓存替换吗？</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/27/redis-execute-model/" rel="prev" title="Redis执行模型-Redis是单线程的吗？">
+                  <i class="fa fa-chevron-left"></i> Redis执行模型-Redis是单线程的吗？
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/02/05/redis-multi-io-thread/" rel="next" title="Redis IO多线程">
+                  Redis IO多线程 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

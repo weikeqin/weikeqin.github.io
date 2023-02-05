@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Redis的执行模型，是指 Redis 运行时使用的进程、子进程和线程的个数，以及它们各自负责的工作任务。   我们经常会听到一个问题: Redis 到底是不是一个单线程的程序？ 先来看 Redis server 启动时的进程运行。 (1) Redis进程创建在启动 Redis 实例时 .&#x2F;redis-server ..&#x2F;redis.conf    这个命令后，它实际会调用">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis执行模型-Redis是单线程的吗？">
+<meta property="og:url" content="http://weikeqin.com/2023/01/27/redis-execute-model/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Redis的执行模型，是指 Redis 运行时使用的进程、子进程和线程的个数，以及它们各自负责的工作任务。   我们经常会听到一个问题: Redis 到底是不是一个单线程的程序？ 先来看 Redis server 启动时的进程运行。 (1) Redis进程创建在启动 Redis 实例时 .&#x2F;redis-server ..&#x2F;redis.conf    这个命令后，它实际会调用">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-01-27T10:38:31.000Z">
+<meta property="article:modified_time" content="2023-01-30T15:09:30.815Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/01/27/redis-execute-model/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/27/redis-execute-model/","path":"2023/01/27/redis-execute-model/","title":"Redis执行模型-Redis是单线程的吗？"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis执行模型-Redis是单线程的吗？ | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E8%BF%9B%E7%A8%8B%E5%88%9B%E5%BB%BA"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis进程创建</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">(2) 守护进程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E5%90%8E%E5%8F%B0%E7%BA%BF%E7%A8%8B"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis后台线程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%A4%84%E7%90%86%E5%90%8E%E5%8F%B0%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 处理后台任务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E5%88%9B%E5%BB%BA%E5%90%8E%E5%8F%B0%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 创建后台任务</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">304</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/27/redis-execute-model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis执行模型-Redis是单线程的吗？ | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis执行模型-Redis是单线程的吗？
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2023-01-27 18:38:31" itemprop="dateCreated datePublished" datetime="2023-01-27T18:38:31+08:00">2023-01-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-01-30 23:09:30" itemprop="dateModified" datetime="2023-01-30T23:09:30+08:00">2023-01-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>7.4k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>7 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Redis的执行模型，是指 Redis 运行时使用的进程、子进程和线程的个数，以及它们各自负责的工作任务。</p>
+<p>  我们经常会听到一个问题: Redis 到底是不是一个单线程的程序？</p>
+<p>先来看 Redis server 启动时的进程运行。</p>
+<h1 id="1-Redis进程创建"><a href="#1-Redis进程创建" class="headerlink" title="(1) Redis进程创建"></a>(1) Redis进程创建</h1><p>在启动 Redis 实例时</p>
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">.&#x2F;redis-server ..&#x2F;redis.conf<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>  这个命令后，它实际会调用fork系统调用函数，最终会调用<code>Redis Server</code>的<code>main</code>函数，来新建一个进程。<br>  运行 Redis server 后，我们会看到 Redis server 启动后的日志输出会打印到终端屏幕上</p>
+<span id="more"></span>
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>bogon src<span class="token punctuation">]</span><span class="token operator">$</span> <span class="token file-path string">./redis-server</span>
+<span class="token number">77405</span><span class="token operator">:</span>C <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.194</span> <span class="token operator">#</span> oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+<span class="token number">77405</span><span class="token operator">:</span>C <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.195</span> <span class="token operator">#</span> Redis version<span class="token operator">=</span><span class="token number">6.0.9</span><span class="token punctuation">,</span> bits<span class="token operator">=</span><span class="token number">64</span><span class="token punctuation">,</span> commit<span class="token operator">=</span><span class="token number">00000000</span><span class="token punctuation">,</span> modified<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> pid<span class="token operator">=</span><span class="token number">77405</span><span class="token punctuation">,</span> just started
+<span class="token number">77405</span><span class="token operator">:</span>C <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.195</span> <span class="token operator">#</span> Warning<span class="token operator">:</span> no config file specified<span class="token punctuation">,</span> using the default config<span class="token punctuation">.</span> In order to specify a config file use <span class="token file-path string">./redis-server</span> <span class="token file-path string">/path/to/redis.conf</span>
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.197</span> <span class="token operator">*</span> Increased maximum number of open files to <span class="token number">10032</span> <span class="token operator">(</span>it was originally set to <span class="token number">256</span><span class="token operator">)</span><span class="token punctuation">.</span>
+                _<span class="token punctuation">.</span>_
+           _<span class="token punctuation">.</span><span class="token operator">-</span>``__ <span class="token string">''</span><span class="token operator">-</span><span class="token punctuation">.</span>_
+      _<span class="token punctuation">.</span><span class="token operator">-</span>``    `<span class="token punctuation">.</span>  `_<span class="token punctuation">.</span>  <span class="token string">''</span><span class="token operator">-</span><span class="token punctuation">.</span>_           Redis <span class="token number">6.0.9</span> <span class="token operator">(</span><span class="token number">00000000</span><span class="token operator">/</span><span class="token number">0</span><span class="token operator">)</span> <span class="token number">64</span> bit
+  <span class="token punctuation">.</span><span class="token operator">-</span>`` <span class="token punctuation">.</span><span class="token operator">-</span>```<span class="token punctuation">.</span>  ```\<span class="token operator">/</span>    _<span class="token punctuation">.</span><span class="token punctuation">,</span>_ <span class="token string">''</span><span class="token operator">-</span><span class="token punctuation">.</span>_
+ <span class="token operator">(</span>    '      <span class="token punctuation">,</span>       <span class="token punctuation">.</span><span class="token operator">-</span>`  <span class="token operator">|</span> `<span class="token punctuation">,</span>    <span class="token operator">)</span>     Running in standalone mode
+ <span class="token operator">|</span>`<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token operator">-</span>` __<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token operator">-</span><span class="token punctuation">.</span>``<span class="token operator">-</span><span class="token punctuation">.</span>_<span class="token operator">|</span><span class="token string">'` _.-'</span><span class="token operator">|</span>     <span class="token property">Port:</span> <span class="token number">6379</span>
+ <span class="token operator">|</span>    `<span class="token operator">-</span><span class="token punctuation">.</span>_   `<span class="token punctuation">.</span>_    <span class="token operator">/</span>     _<span class="token punctuation">.</span><span class="token operator">-</span>'    <span class="token operator">|</span>     <span class="token property">PID:</span> <span class="token number">77405</span>
+  `<span class="token operator">-</span><span class="token punctuation">.</span>_    `<span class="token operator">-</span><span class="token punctuation">.</span>_  `<span class="token operator">-</span><span class="token punctuation">.</span><span class="token operator">/</span>  _<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'    _.-'</span>
+ <span class="token operator">|</span>`<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span>_    `<span class="token operator">-</span><span class="token punctuation">.</span>__<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'    _.-'</span>_<span class="token punctuation">.</span><span class="token operator">-</span>'<span class="token operator">|</span>
+ <span class="token operator">|</span>    `<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span>_        _<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'_.-'</span>    <span class="token operator">|</span>           <span class="token url">http://redis.io</span>
+  `<span class="token operator">-</span><span class="token punctuation">.</span>_    `<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span>__<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'_.-'</span>    _<span class="token punctuation">.</span><span class="token operator">-</span>'
+ <span class="token operator">|</span>`<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span>_    `<span class="token operator">-</span><span class="token punctuation">.</span>__<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'    _.-'</span>_<span class="token punctuation">.</span><span class="token operator">-</span>'<span class="token operator">|</span>
+ <span class="token operator">|</span>    `<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span>_        _<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'_.-'</span>    <span class="token operator">|</span>
+  `<span class="token operator">-</span><span class="token punctuation">.</span>_    `<span class="token operator">-</span><span class="token punctuation">.</span>_`<span class="token operator">-</span><span class="token punctuation">.</span>__<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'_.-'</span>    _<span class="token punctuation">.</span><span class="token operator">-</span>'
+      `<span class="token operator">-</span><span class="token punctuation">.</span>_    `<span class="token operator">-</span><span class="token punctuation">.</span>__<span class="token punctuation">.</span><span class="token operator">-</span><span class="token string">'    _.-'</span>
+          `<span class="token operator">-</span><span class="token punctuation">.</span>_        _<span class="token punctuation">.</span><span class="token operator">-</span>'
+              `<span class="token operator">-</span><span class="token punctuation">.</span>__<span class="token punctuation">.</span><span class="token operator">-</span>'
+
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.203</span> <span class="token operator">#</span> Server initialized
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.203</span> <span class="token operator">*</span> Loading RDB produced by version <span class="token number">6.0.9</span>
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.203</span> <span class="token operator">*</span> RDB age <span class="token number">284987</span> seconds
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.203</span> <span class="token operator">*</span> RDB memory usage when created <span class="token number">0.96</span> Mb
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.204</span> <span class="token operator">*</span> DB loaded from disk<span class="token operator">:</span> <span class="token number">0.001</span> seconds
+<span class="token number">77405</span><span class="token operator">:</span>M <span class="token date number">27 Jan 2023</span> <span class="token time number">22:11:02.204</span> <span class="token operator">*</span> Ready to accept connections<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  Redis 进程创建开始运行后，它就会从 main 函数开始执行。</p>
+<h1 id="2-守护进程"><a href="#2-守护进程" class="headerlink" title="(2) 守护进程"></a>(2) 守护进程</h1><p>  在 main 函数完成参数解析后，会根据两个配置参数 <code>daemonize</code> 和 <code>supervised</code>，来设置变量 background 的值。它们的含义分别是：<br>参数 daemonize 表示，是否要设置 Redis 以守护进程方式运行；<br>参数 supervised 表示，是否使用 upstart 或是 systemd 这两种守护进程的管理程序来管理 Redis。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token keyword">int</span> argc<span class="token punctuation">,</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    server<span class="token punctuation">.</span>supervised <span class="token operator">=</span> <span class="token function">redisIsSupervised</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>supervised_mode<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">int</span> background <span class="token operator">=</span> server<span class="token punctuation">.</span>daemonize <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>server<span class="token punctuation">.</span>supervised<span class="token punctuation">;</span>
+    <span class="token comment">// 如果background值为1(true)，则调用daemonize函数。</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>background<span class="token punctuation">)</span> <span class="token function">daemonize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span> <span class="token string">"oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span>
+        <span class="token string">"Redis version=%s, bits=%d, commit=%s, modified=%d, pid=%d, just started"</span><span class="token punctuation">,</span>
+            REDIS_VERSION<span class="token punctuation">,</span>
+            <span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token keyword">long</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">8</span><span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token number">64</span> <span class="token operator">:</span> <span class="token number">32</span><span class="token punctuation">,</span>
+            <span class="token function">redisGitSHA1</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token function">strtol</span><span class="token punctuation">(</span><span class="token function">redisGitDirty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token number">10</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span><span class="token function">getpid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">void</span> <span class="token function">daemonize</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> fd<span class="token punctuation">;</span>
+
+    <span class="token comment">// fork成功执行或失败，则父进程退出</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">fork</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token function">exit</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* parent exits */</span>
+    <span class="token function">setsid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 创建新的session  /* create a new session */</span>
+
+    <span class="token comment">/* Every output goes to /dev/null. If Redis is daemonized but
+     * the 'logfile' is set to 'stdout' in the configuration file
+     * it will not log at all. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>fd <span class="token operator">=</span> <span class="token function">open</span><span class="token punctuation">(</span><span class="token string">"/dev/null"</span><span class="token punctuation">,</span> O_RDWR<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">dup2</span><span class="token punctuation">(</span>fd<span class="token punctuation">,</span> STDIN_FILENO<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">dup2</span><span class="token punctuation">(</span>fd<span class="token punctuation">,</span> STDOUT_FILENO<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">dup2</span><span class="token punctuation">(</span>fd<span class="token punctuation">,</span> STDERR_FILENO<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>fd <span class="token operator">></span> STDERR_FILENO<span class="token punctuation">)</span> <span class="token function">close</span><span class="token punctuation">(</span>fd<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="3-Redis后台线程"><a href="#3-Redis后台线程" class="headerlink" title="(3) Redis后台线程"></a>(3) Redis后台线程</h1><p>  main 函数在初始化过程最后调用的 <code>InitServerLast</code> 函数。<br>  <code>InitServerLast</code> 函数的作用是进一步调用 bioInit 函数，来创建后台线程，让 Redis 把部分任务交给后台线程处理。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token keyword">int</span> argc<span class="token punctuation">,</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token function">InitServerLast</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Some steps in server initialization need to be done last (after modules
+ * are loaded).
+ * Specifically, creation of threads due to a race bug in ld.so, in which
+ * Thread Local Storage initialization collides with dlopen call.
+ * see: https://sourceware.org/bugzilla/show_bug.cgi?id=19329 */</span>
+<span class="token keyword">void</span> <span class="token function">InitServerLast</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">bioInit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">initThreadedIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">set_jemalloc_bg_thread</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>jemalloc_bg_thread<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>initial_memory_usage <span class="token operator">=</span> <span class="token function">zmalloc_used_memory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Initialize the background system, spawning the thread. */</span>
+<span class="token keyword">void</span> <span class="token function">bioInit</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">pthread_attr_t</span> attr<span class="token punctuation">;</span>
+    <span class="token class-name">pthread_t</span> thread<span class="token punctuation">;</span>
+    <span class="token class-name">size_t</span> stacksize<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> j<span class="token punctuation">;</span>
+
+    <span class="token comment">/* Initialization of state vars and objects */</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> BIO_NUM_OPS<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 初始化互斥锁数组</span>
+        <span class="token function">pthread_mutex_init</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 初始化条件变量数组</span>
+        <span class="token function">pthread_cond_init</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_newjob_cond<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">pthread_cond_init</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_step_cond<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// bio_jobs 结构体类型，用来表示后台任务</span>
+        bio_jobs<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token function">listCreate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 每种任务中，处于等待状态的任务个数</span>
+        bio_pending<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Set the stack size as by default it may be small in some system */</span>
+    <span class="token function">pthread_attr_init</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>attr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">pthread_attr_getstacksize</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>attr<span class="token punctuation">,</span><span class="token operator">&amp;</span>stacksize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>stacksize<span class="token punctuation">)</span> stacksize <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token comment">/* The world is full of Solaris Fixes */</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>stacksize <span class="token operator">&lt;</span> REDIS_THREAD_STACK_SIZE<span class="token punctuation">)</span> stacksize <span class="token operator">*=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token function">pthread_attr_setstacksize</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>attr<span class="token punctuation">,</span> stacksize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Ready to spawn our threads. We use the single argument the thread
+     * function accepts in order to pass the job ID the thread is
+     * responsible of. */</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> BIO_NUM_OPS<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">void</span> <span class="token operator">*</span>arg <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">void</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">long</span><span class="token punctuation">)</span> j<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">pthread_create</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>thread<span class="token punctuation">,</span><span class="token operator">&amp;</span>attr<span class="token punctuation">,</span>bioProcessBackgroundJobs<span class="token punctuation">,</span>arg<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Fatal: Can't initialize Background Jobs."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">exit</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        bio_threads<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">=</span> thread<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-1-处理后台任务"><a href="#3-1-处理后台任务" class="headerlink" title="(3.1) 处理后台任务"></a>(3.1) 处理后台任务</h2><p>  <code>bioProcessBackgroundJobs</code>函数</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">void</span> <span class="token operator">*</span><span class="token function">bioProcessBackgroundJobs</span><span class="token punctuation">(</span><span class="token keyword">void</span> <span class="token operator">*</span>arg<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">struct</span> <span class="token class-name">bio_job</span> <span class="token operator">*</span>job<span class="token punctuation">;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> type <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">long</span><span class="token punctuation">)</span> arg<span class="token punctuation">;</span>
+    <span class="token class-name">sigset_t</span> sigset<span class="token punctuation">;</span>
+
+    <span class="token comment">/* Check that the type is within the right interval. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>type <span class="token operator">>=</span> BIO_NUM_OPS<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span>
+            <span class="token string">"Warning: bio thread started with wrong type %lu"</span><span class="token punctuation">,</span>type<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>type<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">case</span> BIO_CLOSE_FILE<span class="token operator">:</span>
+        <span class="token function">redis_set_thread_title</span><span class="token punctuation">(</span><span class="token string">"bio_close_file"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> BIO_AOF_FSYNC<span class="token operator">:</span>
+        <span class="token function">redis_set_thread_title</span><span class="token punctuation">(</span><span class="token string">"bio_aof_fsync"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> BIO_LAZY_FREE<span class="token operator">:</span>
+        <span class="token function">redis_set_thread_title</span><span class="token punctuation">(</span><span class="token string">"bio_lazy_free"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token function">redisSetCpuAffinity</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>bio_cpulist<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token function">makeThreadKillable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token function">pthread_mutex_lock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">/* Block SIGALRM so we are sure that only the main thread will
+     * receive the watchdog signal. */</span>
+    <span class="token function">sigemptyset</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>sigset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">sigaddset</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>sigset<span class="token punctuation">,</span> SIGALRM<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">pthread_sigmask</span><span class="token punctuation">(</span>SIG_BLOCK<span class="token punctuation">,</span> <span class="token operator">&amp;</span>sigset<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span>
+            <span class="token string">"Warning: can't mask SIGALRM in bio.c thread: %s"</span><span class="token punctuation">,</span> <span class="token function">strerror</span><span class="token punctuation">(</span>errno<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+
+        <span class="token comment">/* The loop always starts with the lock hold. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">listLength</span><span class="token punctuation">(</span>bio_jobs<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">pthread_cond_wait</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_newjob_cond<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">continue</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        
+        <span class="token comment">// 获取队列里的第一个任务  /* Pop the job from the queue. */</span>
+        ln <span class="token operator">=</span> <span class="token function">listFirst</span><span class="token punctuation">(</span>bio_jobs<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        job <span class="token operator">=</span> ln<span class="token operator">-></span>value<span class="token punctuation">;</span>
+        <span class="token comment">/* It is now possible to unlock the background system as we know have
+         * a stand alone job structure to process.*/</span>
+        <span class="token function">pthread_mutex_unlock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 判断后台任务类型是哪一种   /* Process the job accordingly to its type. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>type <span class="token operator">==</span> BIO_CLOSE_FILE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 关闭文件任务</span>
+            <span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token keyword">long</span><span class="token punctuation">)</span>job<span class="token operator">-></span>arg1<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 调用close函数</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>type <span class="token operator">==</span> BIO_AOF_FSYNC<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// AOF同步写任务</span>
+            <span class="token function">redis_fsync</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token keyword">long</span><span class="token punctuation">)</span>job<span class="token operator">-></span>arg1<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 调用redis_fsync函数</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>type <span class="token operator">==</span> BIO_LAZY_FREE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 惰性删除任务 </span>
+            <span class="token comment">// 根据任务的参数分别调用不同的惰性删除函数执行</span>
+            <span class="token comment">/* What we free changes depending on what arguments are set:
+             * arg1 -> free the object at pointer.
+             * arg2 &amp; arg3 -> free two dictionaries (a Redis DB).
+             * only arg3 -> free the radix tree. */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>job<span class="token operator">-></span>arg1<span class="token punctuation">)</span>
+                <span class="token function">lazyfreeFreeObjectFromBioThread</span><span class="token punctuation">(</span>job<span class="token operator">-></span>arg1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>job<span class="token operator">-></span>arg2 <span class="token operator">&amp;&amp;</span> job<span class="token operator">-></span>arg3<span class="token punctuation">)</span>
+                <span class="token function">lazyfreeFreeDatabaseFromBioThread</span><span class="token punctuation">(</span>job<span class="token operator">-></span>arg2<span class="token punctuation">,</span>job<span class="token operator">-></span>arg3<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>job<span class="token operator">-></span>arg3<span class="token punctuation">)</span>
+                <span class="token function">lazyfreeFreeSlotsMapFromBioThread</span><span class="token punctuation">(</span>job<span class="token operator">-></span>arg3<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverPanic</span><span class="token punctuation">(</span><span class="token string">"Wrong job type in bioProcessBackgroundJobs()."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token function">zfree</span><span class="token punctuation">(</span>job<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Lock again before reiterating the loop, if there are no longer
+         * jobs to process we'll block again in pthread_cond_wait(). */</span>
+        <span class="token function">pthread_mutex_lock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 任务执行完成后，调用listDelNode在任务队列中删除该任务</span>
+        <span class="token function">listDelNode</span><span class="token punctuation">(</span>bio_jobs<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">,</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// //将对应的等待任务个数减一</span>
+        bio_pending<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token operator">--</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Unblock threads blocked on bioWaitStepOfType() if any. */</span>
+        <span class="token function">pthread_cond_broadcast</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_step_cond<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  Redis启动了3个线程来执行文件关闭、AOF 同步写和惰性删除等操作</p>
+<h2 id="3-2-创建后台任务"><a href="#3-2-创建后台任务" class="headerlink" title="(3.2) 创建后台任务"></a>(3.2) 创建后台任务</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ */</span>
+<span class="token keyword">void</span> <span class="token function">bioCreateBackgroundJob</span><span class="token punctuation">(</span><span class="token keyword">int</span> type<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>arg1<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>arg2<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>arg3<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 创建任务结构体 分配内存</span>
+    <span class="token keyword">struct</span> <span class="token class-name">bio_job</span> <span class="token operator">*</span>job <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span><span class="token operator">*</span>job<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 设置任务数据结构中的参数</span>
+    job<span class="token operator">-></span>time <span class="token operator">=</span> <span class="token function">time</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    job<span class="token operator">-></span>arg1 <span class="token operator">=</span> arg1<span class="token punctuation">;</span>
+    job<span class="token operator">-></span>arg2 <span class="token operator">=</span> arg2<span class="token punctuation">;</span>
+    job<span class="token operator">-></span>arg3 <span class="token operator">=</span> arg3<span class="token punctuation">;</span>
+    <span class="token comment">// 线程互斥锁</span>
+    <span class="token function">pthread_mutex_lock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 添加到队尾</span>
+    <span class="token function">listAddNodeTail</span><span class="token punctuation">(</span>bio_jobs<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">,</span>job<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 任务数+1 </span>
+    bio_pending<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token function">pthread_cond_signal</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_newjob_cond<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">pthread_mutex_unlock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>bio_mutex<span class="token punctuation">[</span>type<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  Redis 进程想要启动一个后台任务时，只要调用 bioCreateBackgroundJob 函数，并设置好该任务对应的类型和参数即可。<br>  <code>bioCreateBackgroundJob</code> 函数就会把创建好的任务数据结构，放到后台任务对应的队列中。</p>
+<p>  <code>bioInit</code> 函数在 Redis server 启动时，创建的线程会不断地轮询后台任务队列，一旦发现有任务可以执行，就会将该任务取出并执行。</p>
+<p>  这种设计方式是典型的生产者 - 消费者模型。<br>  <code>bioCreateBackgroundJob</code> 函数是生产者，负责往每种任务队列中加入要执行的后台任务，<br>  <code>bioProcessBackgroundJobs</code> 函数是消费者，负责从每种任务队列中取出任务来执行。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/409927">Redis源码剖析与实战 - 12 | Redis真的是单线程吗？</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/25/redis-event-driven-framework/" rel="prev" title="Redis事件驱动框架">
+                  <i class="fa fa-chevron-left"></i> Redis事件驱动框架
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/02/04/redis-key-lazy-free/" rel="next" title="Redis key 惰性删除">
+                  Redis key 惰性删除 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

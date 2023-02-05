@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="在2020年5月推出的 Redis 6.0 版本中，Redis 在执行模型中使用了多线程来处理 IO 任务，这样是为了充分利用当前服务器的多核特性，使用多核运行多线程，让多线程帮助加速数据读取、命令解析以及数据写回的速度，提升 Redis 整体性能。   那么，这些多线程具体是在什么时候启动，又是通过什么方式来处理 IO 请求的呢？ (1) IO多线程  Redis里的IO多线程是指Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis IO多线程">
+<meta property="og:url" content="http://weikeqin.com/2023/02/05/redis-multi-io-thread/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="在2020年5月推出的 Redis 6.0 版本中，Redis 在执行模型中使用了多线程来处理 IO 任务，这样是为了充分利用当前服务器的多核特性，使用多核运行多线程，让多线程帮助加速数据读取、命令解析以及数据写回的速度，提升 Redis 整体性能。   那么，这些多线程具体是在什么时候启动，又是通过什么方式来处理 IO 请求的呢？ (1) IO多线程  Redis里的IO多线程是指Redis">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-02-05T13:26:18.000Z">
+<meta property="article:modified_time" content="2023-02-05T13:00:41.105Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/02/05/redis-multi-io-thread/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/02/05/redis-multi-io-thread/","path":"2023/02/05/redis-multi-io-thread/","title":"Redis IO多线程"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis IO多线程 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-IO%E5%A4%9A%E7%BA%BF%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">(1) IO多线程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-IO%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">(2) IO多线程的原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">(3) 源码解析</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%BB%8E%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%AF%BB%E5%8F%96%E6%95%B0%E6%8D%AE"><span class="nav-number">4.</span> <span class="nav-text">(4) 从客户端读取数据</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%90%91%E5%AE%A2%E6%88%B7%E7%AB%AF%E5%86%99%E6%95%B0%E6%8D%AE"><span class="nav-number">5.</span> <span class="nav-text">(5) 向客户端写数据</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%A6%82%E4%BD%95%E6%8A%8A%E5%BE%85%E8%AF%BB%E5%AE%A2%E6%88%B7%E7%AB%AF%E5%88%86%E9%85%8D%E7%BB%99IO%E7%BA%BF%E7%A8%8B%E6%89%A7%E8%A1%8C%EF%BC%9F"><span class="nav-number">6.</span> <span class="nav-text">(6) 如何把待读客户端分配给IO线程执行？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E5%A6%82%E4%BD%95%E6%8A%8A%E5%BE%85%E5%86%99%E5%AE%A2%E6%88%B7%E7%AB%AF%E5%88%86%E9%85%8D%E7%BB%99-IO-%E7%BA%BF%E7%A8%8B%E6%89%A7%E8%A1%8C%EF%BC%9F"><span class="nav-number">7.</span> <span class="nav-text">(7) 如何把待写客户端分配给 IO 线程执行？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#8-%E6%80%BB%E7%BB%93"><span class="nav-number">8.</span> <span class="nav-text">(8) 总结</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">9.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">304</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/02/05/redis-multi-io-thread/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis IO多线程 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis IO多线程
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2023-02-05 21:26:18 / 修改时间：21:00:41" itemprop="dateCreated datePublished" datetime="2023-02-05T21:26:18+08:00">2023-02-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>14k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>13 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  在2020年5月推出的 Redis 6.0 版本中，Redis 在执行模型中使用了多线程来处理 IO 任务，这样是为了充分利用当前服务器的多核特性，使用多核运行多线程，让多线程帮助加速数据读取、命令解析以及数据写回的速度，提升 Redis 整体性能。</p>
+<p>  那么，这些多线程具体是在什么时候启动，又是通过什么方式来处理 IO 请求的呢？</p>
+<h1 id="1-IO多线程"><a href="#1-IO多线程" class="headerlink" title="(1) IO多线程"></a>(1) IO多线程</h1><p>  Redis里的IO多线程是指Redis Server读取客户端请求或者向客户端写数据时，使用多个线程，利用CPU资源，加快整体读写速度。</p>
+<span id="more"></span>
+
+
+<h1 id="2-IO多线程的原理"><a href="#2-IO多线程的原理" class="headerlink" title="(2) IO多线程的原理"></a>(2) IO多线程的原理</h1><p>  IO多线程的原理是在CPU资源、内存资源利用不充分的情况下，开启多个线程可以充分利用CPU资源，加快整体读写速度。</p>
+<h1 id="3-源码解析"><a href="#3-源码解析" class="headerlink" title="(3) 源码解析"></a>(3) 源码解析</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: server.c</span>
+
+<span class="token comment">/*
+ * main方法
+ */</span>
+<span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token keyword">int</span> argc<span class="token punctuation">,</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token function">InitServerLast</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: server.c</span>
+
+<span class="token comment">/*
+ * 服务器初始化的一些步骤需要最后完成(在加载模块之后)。
+ * 具体来说，由于 ld.so 中的竞争错误导致线程创建，其中线程本地存储初始化与 dlopen 调用发生冲突。
+ * see: https://sourceware.org/bugzilla/show_bug.cgi?id=19329 */</span>
+<span class="token keyword">void</span> <span class="token function">InitServerLast</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token function">bioInit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 初始化IO线程</span>
+    <span class="token function">initThreadedIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">set_jemalloc_bg_thread</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>jemalloc_bg_thread<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>initial_memory_usage <span class="token operator">=</span> <span class="token function">zmalloc_used_memory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: networking.c</span>
+
+<span class="token comment">/*
+ * 初始化线程 I/O 所需的数据结构。
+ */</span>
+<span class="token keyword">void</span> <span class="token function">initThreadedIO</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// io_threads_active 初始化为 0，表示 IO 线程还没有被激活</span>
+    server<span class="token punctuation">.</span>io_threads_active <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> <span class="token comment">/* We start with threads not active. */</span>
+
+    <span class="token comment">// 如果用户选择了单个线程，则不要生成任何线程：我们将直接从主线程处理 I/O。</span>
+    <span class="token comment">// 只有1个主 IO 线程</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>io_threads_num <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 最多有128个IO线程</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>io_threads_num <span class="token operator">></span> IO_THREADS_MAX_NUM<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Fatal: too many I/O threads configured. "</span>
+                             <span class="token string">"The maximum number is %d."</span><span class="token punctuation">,</span> IO_THREADS_MAX_NUM<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">exit</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 生成并初始化 I/O 线程。</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 我们为包括主线程在内的所有线程所做的事情。</span>
+        <span class="token comment">// 链表</span>
+        io_threads_list<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token function">listCreate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>i <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">continue</span><span class="token punctuation">;</span> <span class="token comment">/* Thread 0 is the main thread. */</span>
+
+        <span class="token comment">// 我们只为额外的线程做的事情。</span>
+        <span class="token class-name">pthread_t</span> tid<span class="token punctuation">;</span>
+        <span class="token comment">// 初始化io_threads_mutex数组</span>
+        <span class="token function">pthread_mutex_init</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>io_threads_mutex<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 初始化io_threads_pending数组</span>
+        io_threads_pending<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token function">pthread_mutex_lock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>io_threads_mutex<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Thread will be stopped. */</span>
+        <span class="token comment">// 调用pthread_create函数创建IO线程，线程运行函数为IOThreadMain</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">pthread_create</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>tid<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span>IOThreadMain<span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token operator">*</span><span class="token punctuation">)</span><span class="token punctuation">(</span><span class="token keyword">long</span><span class="token punctuation">)</span>i<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Fatal: Can't initialize IO thread."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">exit</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 初始化io_threads数组，设置值为线程标识</span>
+        io_threads<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> tid<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: networking.c</span>
+
+<span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">void</span> <span class="token operator">*</span><span class="token function">IOThreadMain</span><span class="token punctuation">(</span><span class="token keyword">void</span> <span class="token operator">*</span>myid<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* The ID is the thread number (from 0 to server.iothreads_num-1), and is
+     * used by the thread to just manipulate a single sub-array of clients. */</span>
+    <span class="token keyword">long</span> id <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">long</span><span class="token punctuation">)</span>myid<span class="token punctuation">;</span>
+    <span class="token keyword">char</span> thdname<span class="token punctuation">[</span><span class="token number">16</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+    <span class="token function">snprintf</span><span class="token punctuation">(</span>thdname<span class="token punctuation">,</span> <span class="token keyword">sizeof</span><span class="token punctuation">(</span>thdname<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"io_thd_%ld"</span><span class="token punctuation">,</span> id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">redis_set_thread_title</span><span class="token punctuation">(</span>thdname<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">redisSetCpuAffinity</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>server_cpulist<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">makeThreadKillable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* Wait for start */</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> <span class="token number">1000000</span><span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>io_threads_pending<span class="token punctuation">[</span>id<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">/* Give the main thread a chance to stop this thread. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>io_threads_pending<span class="token punctuation">[</span>id<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">pthread_mutex_lock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>io_threads_mutex<span class="token punctuation">[</span>id<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">pthread_mutex_unlock</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>io_threads_mutex<span class="token punctuation">[</span>id<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">continue</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token function">serverAssert</span><span class="token punctuation">(</span>io_threads_pending<span class="token punctuation">[</span>id<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>tio_debug<span class="token punctuation">)</span> <span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"[%ld] %d to handle\n"</span><span class="token punctuation">,</span> id<span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span><span class="token function">listLength</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>id<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Process: note that the main thread will never touch our list
+         * before we drop the pending count to 0. */</span>
+        listIter li<span class="token punctuation">;</span>
+        <span class="token comment">// 链表节点</span>
+        listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+        <span class="token comment">// 获取IO线程要处理的客户端列表</span>
+        <span class="token function">listRewind</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>id<span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 遍历链表</span>
+        <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 获取链表节点的值 也就是一个客户端</span>
+            client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>io_threads_op <span class="token operator">==</span> IO_THREADS_OP_WRITE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 写操作</span>
+                <span class="token function">writeToClient</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 将数据写到客户端</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>io_threads_op <span class="token operator">==</span> IO_THREADS_OP_READ<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 读操作</span>
+                <span class="token function">readQueryFromClient</span><span class="token punctuation">(</span>c<span class="token operator">-></span>conn<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 取数据</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">serverPanic</span><span class="token punctuation">(</span><span class="token string">"io_threads_op value is unknown"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// 处理完所有客户端后，清空链表</span>
+        <span class="token function">listEmpty</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>id<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// 将该线程的待处理任务数量设置为0</span>
+        io_threads_pending<span class="token punctuation">[</span>id<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>tio_debug<span class="token punctuation">)</span> <span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"[%ld] Done\n"</span><span class="token punctuation">,</span> id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  每一个IO线程运行时，都会不断检查是否有等待它处理的客户端。如果有，就根据操作类型，从客户端读取数据或是将数据写回客户端。<br>  这也是为什么我们把这些线程称为IO线程的原因。</p>
+<h1 id="4-从客户端读取数据"><a href="#4-从客户端读取数据" class="headerlink" title="(4) 从客户端读取数据"></a>(4) 从客户端读取数据</h1><p>  readQueryFromClient</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">void</span> <span class="token function">readQueryFromClient</span><span class="token punctuation">(</span>connection <span class="token operator">*</span>conn<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 从连接的私有数据获取client</span>
+    client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">connGetPrivateData</span><span class="token punctuation">(</span>conn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> nread<span class="token punctuation">,</span> readlen<span class="token punctuation">;</span>
+    <span class="token class-name">size_t</span> qblen<span class="token punctuation">;</span>
+
+    <span class="token comment">// 在退出事件循环时检查我们是否想稍后从客户端读取。 如果启用了线程 I/O，就会出现这种情况。</span>
+    <span class="token comment">//  判断是否稍后处理 从客户端读数据</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">postponeClientRead</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Update total number of reads on server */</span>
+    server<span class="token punctuation">.</span>stat_total_reads_processed<span class="token operator">++</span><span class="token punctuation">;</span>
+
+    readlen <span class="token operator">=</span> PROTO_IOBUF_LEN<span class="token punctuation">;</span>
+    <span class="token comment">/* If this is a multi bulk request, and we are processing a bulk reply
+     * that is large enough, try to maximize the probability that the query
+     * buffer contains exactly the SDS string representing the object, even
+     * at the risk of requiring more read(2) calls. This way the function
+     * processMultiBulkBuffer() can avoid copying buffers to create the
+     * Redis Object representing the argument. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>reqtype <span class="token operator">==</span> PROTO_REQ_MULTIBULK <span class="token operator">&amp;&amp;</span> c<span class="token operator">-></span>multibulklen <span class="token operator">&amp;&amp;</span> c<span class="token operator">-></span>bulklen <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span>
+        <span class="token operator">&amp;&amp;</span> c<span class="token operator">-></span>bulklen <span class="token operator">>=</span> PROTO_MBULK_BIG_ARG<span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token class-name">ssize_t</span> remaining <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">size_t</span><span class="token punctuation">)</span><span class="token punctuation">(</span>c<span class="token operator">-></span>bulklen<span class="token operator">+</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token function">sdslen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Note that the 'remaining' variable may be zero in some edge case,
+         * for example once we resume a blocked client after CLIENT PAUSE. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>remaining <span class="token operator">></span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> remaining <span class="token operator">&lt;</span> readlen<span class="token punctuation">)</span> readlen <span class="token operator">=</span> remaining<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    qblen <span class="token operator">=</span> <span class="token function">sdslen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf_peak <span class="token operator">&lt;</span> qblen<span class="token punctuation">)</span> c<span class="token operator">-></span>querybuf_peak <span class="token operator">=</span> qblen<span class="token punctuation">;</span>
+    <span class="token comment">// 内存预分配  扩大sds字符串末尾的可用空间</span>
+    c<span class="token operator">-></span>querybuf <span class="token operator">=</span> <span class="token function">sdsMakeRoomFor</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">,</span> readlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// </span>
+    nread <span class="token operator">=</span> <span class="token function">connRead</span><span class="token punctuation">(</span>c<span class="token operator">-></span>conn<span class="token punctuation">,</span> c<span class="token operator">-></span>querybuf<span class="token operator">+</span>qblen<span class="token punctuation">,</span> readlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>nread <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> 
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">connGetState</span><span class="token punctuation">(</span>conn<span class="token punctuation">)</span> <span class="token operator">==</span> CONN_STATE_CONNECTED<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_VERBOSE<span class="token punctuation">,</span> <span class="token string">"Reading from client: %s"</span><span class="token punctuation">,</span><span class="token function">connGetLastError</span><span class="token punctuation">(</span>c<span class="token operator">-></span>conn<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">freeClientAsync</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>nread <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 客户端已经关闭连接</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_VERBOSE<span class="token punctuation">,</span> <span class="token string">"Client closed connection"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">freeClientAsync</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_MASTER<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* Append the query buffer to the pending (not applied) buffer
+         * of the master. We'll use this buffer later in order to have a
+         * copy of the string applied by the last command executed. */</span>
+        c<span class="token operator">-></span>pending_querybuf <span class="token operator">=</span> <span class="token function">sdscatlen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>pending_querybuf<span class="token punctuation">,</span>
+                                        c<span class="token operator">-></span>querybuf<span class="token operator">+</span>qblen<span class="token punctuation">,</span>nread<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token function">sdsIncrLen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">,</span>nread<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    c<span class="token operator">-></span>lastinteraction <span class="token operator">=</span> server<span class="token punctuation">.</span>unixtime<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_MASTER<span class="token punctuation">)</span> c<span class="token operator">-></span>read_reploff <span class="token operator">+=</span> nread<span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>stat_net_input_bytes <span class="token operator">+=</span> nread<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">sdslen</span><span class="token punctuation">(</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">)</span> <span class="token operator">></span> server<span class="token punctuation">.</span>client_max_querybuf_len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        sds ci <span class="token operator">=</span> <span class="token function">catClientInfoString</span><span class="token punctuation">(</span><span class="token function">sdsempty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>c<span class="token punctuation">)</span><span class="token punctuation">,</span> bytes <span class="token operator">=</span> <span class="token function">sdsempty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        bytes <span class="token operator">=</span> <span class="token function">sdscatrepr</span><span class="token punctuation">(</span>bytes<span class="token punctuation">,</span>c<span class="token operator">-></span>querybuf<span class="token punctuation">,</span><span class="token number">64</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Closing client that reached max query buffer length: %s (qbuf initial bytes: %s)"</span><span class="token punctuation">,</span> ci<span class="token punctuation">,</span> bytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>ci<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>bytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">freeClientAsync</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+     <span class="token comment">// 客户端输入缓冲区中有更多的数据，继续解析，以防检查是否有要执行的完整命令。</span>
+     <span class="token function">processInputBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="5-向客户端写数据"><a href="#5-向客户端写数据" class="headerlink" title="(5) 向客户端写数据"></a>(5) 向客户端写数据</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: networking.c </span>
+
+<span class="token comment">/* -----------------------------------------------------------------------------
+ * 更高级别的函数用于在客户端输出缓冲区上对数据进行排队。
+ * 以下函数是命令实现将调用的函数。
+ * -------------------------------------------------------------------------- */</span>
+
+<span class="token comment">/* 
+ * 将对象“obj”字符串表示添加到客户端输出缓冲区。 
+ * 
+ * @param *c  redis client  
+ * @param *obj  命令执行的结果   类型是redisObject
+ */</span>
+<span class="token keyword">void</span> <span class="token function">addReply</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">,</span> robj <span class="token operator">*</span>obj<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 判断client是否可以接收新数据 (假客户端不能接收)</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">prepareClientToWrite</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 根据redisobject格式把数据写入缓存</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">sdsEncodedObject</span><span class="token punctuation">(</span>obj<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// obj如果是row或者embstr格式</span>
+
+        <span class="token comment">// 尝试将应答添加到客户端结构中的静态缓冲区。</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">_addReplyToBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span>
+            <span class="token comment">// 将回复添加到回复列表中。</span>
+            <span class="token function">_addReplyProtoToList</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">,</span><span class="token function">sdslen</span><span class="token punctuation">(</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>obj<span class="token operator">-></span>encoding <span class="token operator">==</span> OBJ_ENCODING_INT<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// obj 是数字格式</span>
+
+        <span class="token comment">/* 对于整数编码字符串，我们只需使用优化函数将其转换为字符串，并将结果字符串附加到输出缓冲区。 */</span>
+        <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token number">32</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token comment">// 数字转为字符串</span>
+        <span class="token class-name">size_t</span> len <span class="token operator">=</span> <span class="token function">ll2string</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>buf<span class="token punctuation">)</span><span class="token punctuation">,</span><span class="token punctuation">(</span><span class="token keyword">long</span><span class="token punctuation">)</span>obj<span class="token operator">-></span>ptr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">_addReplyToBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>len<span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span>
+            <span class="token function">_addReplyProtoToList</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>buf<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverPanic</span><span class="token punctuation">(</span><span class="token string">"Wrong obj->encoding in addReply()"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c">
+<span class="token comment">/* This function is called every time we are going to transmit new data
+ * to the client. The behavior is the following:
+ *
+ * If the client should receive new data (normal clients will) the function
+ * returns C_OK, and make sure to install the write handler in our event
+ * loop so that when the socket is writable new data gets written.
+ *
+ * If the client should not receive new data, because it is a fake client
+ * (used to load AOF in memory), a master or because the setup of the write
+ * handler failed, the function returns C_ERR.
+ *
+ * The function may return C_OK without actually installing the write
+ * event handler in the following cases:
+ *
+ * 1) The event handler should already be installed since the output buffer
+ *    already contains something.
+ * 2) The client is a slave but not yet online, so we want to just accumulate
+ *    writes in the buffer but not actually sending them yet.
+ *
+ * Typically gets called every time a reply is built, before adding more
+ * data to the clients output buffers. If the function returns C_ERR no
+ * data should be appended to the output buffers. */</span>
+<span class="token keyword">int</span> <span class="token function">prepareClientToWrite</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* If it's the Lua client we always return ok without installing any
+     * handler since there is no socket at all. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> <span class="token punctuation">(</span>CLIENT_LUA<span class="token operator">|</span>CLIENT_MODULE<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
+
+    <span class="token comment">/* If CLIENT_CLOSE_ASAP flag is set, we need not write anything. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_CLOSE_ASAP<span class="token punctuation">)</span> <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
+
+    <span class="token comment">/* CLIENT REPLY OFF / SKIP handling: don't send replies. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> <span class="token punctuation">(</span>CLIENT_REPLY_OFF<span class="token operator">|</span>CLIENT_REPLY_SKIP<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
+
+    <span class="token comment">/* Masters don't receive replies, unless CLIENT_MASTER_FORCE_REPLY flag
+     * is set. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_MASTER<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span>
+        <span class="token operator">!</span><span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_MASTER_FORCE_REPLY<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>c<span class="token operator">-></span>conn<span class="token punctuation">)</span> <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span> <span class="token comment">/* Fake client for AOF loading. */</span>
+
+    <span class="token comment">/* Schedule the client to write the output buffers to the socket, unless
+     * it should already be setup to do so (it has already pending data).
+     *
+     * If CLIENT_PENDING_READ is set, we're in an IO thread and should
+     * not install a write handler. Instead, it will be done by
+     * handleClientsWithPendingReadsUsingThreads() upon return.
+     */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">clientHasPendingReplies</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_PENDING_READ<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token function">clientInstallWriteHandler</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Authorize the caller to queue in the output buffer of this client. */</span>
+    <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="6-如何把待读客户端分配给IO线程执行？"><a href="#6-如何把待读客户端分配给IO线程执行？" class="headerlink" title="(6) 如何把待读客户端分配给IO线程执行？"></a>(6) 如何把待读客户端分配给IO线程执行？</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* When threaded I/O is also enabled for the reading + parsing side, the
+ * readable handler will just put normal clients into a queue of clients to
+ * process (instead of serving them synchronously). This function runs
+ * the queue using the I/O threads, and process them in order to accumulate
+ * the reads in the buffers, and also parse the first command available
+ * rendering it in the client structures. */</span>
+<span class="token keyword">int</span> <span class="token function">handleClientsWithPendingReadsUsingThreads</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>server<span class="token punctuation">.</span>io_threads_active <span class="token operator">||</span> <span class="token operator">!</span>server<span class="token punctuation">.</span>io_threads_do_reads<span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> processed <span class="token operator">=</span> <span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_read<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>processed <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>tio_debug<span class="token punctuation">)</span> <span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"%d TOTAL READ pending clients\n"</span><span class="token punctuation">,</span> processed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Distribute the clients across N different lists. */</span>
+    listIter li<span class="token punctuation">;</span>
+    listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+    <span class="token function">listRewind</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_read<span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> item_id <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">int</span> target_id <span class="token operator">=</span> item_id <span class="token operator">%</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span>
+        <span class="token function">listAddNodeTail</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>target_id<span class="token punctuation">]</span><span class="token punctuation">,</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        item_id<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Give the start condition to the waiting threads, by setting the
+     * start condition atomic var. */</span>
+    io_threads_op <span class="token operator">=</span> IO_THREADS_OP_READ<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> count <span class="token operator">=</span> <span class="token function">listLength</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        io_threads_pending<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">=</span> count<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Also use the main thread to process a slice of clients. */</span>
+    <span class="token function">listRewind</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">readQueryFromClient</span><span class="token punctuation">(</span>c<span class="token operator">-></span>conn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">listEmpty</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Wait for all the other threads to end their work. */</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">long</span> pending <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span>
+            pending <span class="token operator">+=</span> io_threads_pending<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>pending <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>tio_debug<span class="token punctuation">)</span> <span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"I/O READ All threads finshed\n"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Run the list of clients again to process the new buffers. */</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_read<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        ln <span class="token operator">=</span> <span class="token function">listFirst</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_read<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        c<span class="token operator">-></span>flags <span class="token operator">&amp;=</span> <span class="token operator">~</span>CLIENT_PENDING_READ<span class="token punctuation">;</span>
+        <span class="token function">listDelNode</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_read<span class="token punctuation">,</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">/* Clients can become paused while executing the queued commands,
+         * so we need to check in between each command. If a pause was
+         * executed, we still remove the command and it will get picked up
+         * later when clients are unpaused and we re-queue all clients. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">clientsArePaused</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">continue</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">processPendingCommandsAndResetClient</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">==</span> C_ERR<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* If the client is no longer valid, we avoid
+             * processing the client later. So we just go
+             * to the next. */</span>
+            <span class="token keyword">continue</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token function">processInputBuffer</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* We may have pending replies if a thread readQueryFromClient() produced
+         * replies and did not install a write handler (it can't).
+         */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_PENDING_WRITE<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> <span class="token function">clientHasPendingReplies</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token function">clientInstallWriteHandler</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Update processed count on server */</span>
+    server<span class="token punctuation">.</span>stat_io_reads_processed <span class="token operator">+=</span> processed<span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> processed<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="7-如何把待写客户端分配给-IO-线程执行？"><a href="#7-如何把待写客户端分配给-IO-线程执行？" class="headerlink" title="(7) 如何把待写客户端分配给 IO 线程执行？"></a>(7) 如何把待写客户端分配给 IO 线程执行？</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c">
+<span class="token keyword">int</span> <span class="token function">handleClientsWithPendingWritesUsingThreads</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> processed <span class="token operator">=</span> <span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_write<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>processed <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span> <span class="token comment">/* Return ASAP if there are no clients. */</span>
+
+    <span class="token comment">/* If I/O threads are disabled or we have few clients to serve, don't
+     * use I/O threads, but thejboring synchronous code. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>io_threads_num <span class="token operator">==</span> <span class="token number">1</span> <span class="token operator">||</span> <span class="token function">stopThreadedIOIfNeeded</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token function">handleClientsWithPendingWrites</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Start threads if needed. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>server<span class="token punctuation">.</span>io_threads_active<span class="token punctuation">)</span> <span class="token function">startThreadedIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>tio_debug<span class="token punctuation">)</span> <span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"%d TOTAL WRITE pending clients\n"</span><span class="token punctuation">,</span> processed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Distribute the clients across N different lists. */</span>
+    listIter li<span class="token punctuation">;</span>
+    listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+    <span class="token function">listRewind</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_write<span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> item_id <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        c<span class="token operator">-></span>flags <span class="token operator">&amp;=</span> <span class="token operator">~</span>CLIENT_PENDING_WRITE<span class="token punctuation">;</span>
+
+        <span class="token comment">/* Remove clients from the list of pending writes since
+         * they are going to be closed ASAP. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_CLOSE_ASAP<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">listDelNode</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_write<span class="token punctuation">,</span> ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">continue</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">int</span> target_id <span class="token operator">=</span> item_id <span class="token operator">%</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span>
+        <span class="token function">listAddNodeTail</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>target_id<span class="token punctuation">]</span><span class="token punctuation">,</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        item_id<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Give the start condition to the waiting threads, by setting the
+     * start condition atomic var. */</span>
+    io_threads_op <span class="token operator">=</span> IO_THREADS_OP_WRITE<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> count <span class="token operator">=</span> <span class="token function">listLength</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        io_threads_pending<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">=</span> count<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Also use the main thread to process a slice of clients. */</span>
+    <span class="token function">listRewind</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">writeToClient</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">listEmpty</span><span class="token punctuation">(</span>io_threads_list<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Wait for all the other threads to end their work. */</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">long</span> pending <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> server<span class="token punctuation">.</span>io_threads_num<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span>
+            pending <span class="token operator">+=</span> io_threads_pending<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>pending <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>tio_debug<span class="token punctuation">)</span> <span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"I/O WRITE All threads finshed\n"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Run the list of clients again to install the write handler where
+     * needed. */</span>
+    <span class="token function">listRewind</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_write<span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        client <span class="token operator">*</span>c <span class="token operator">=</span> <span class="token function">listNodeValue</span><span class="token punctuation">(</span>ln<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Install the write handler if there are pending writes in some
+         * of the clients. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">clientHasPendingReplies</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span>
+                <span class="token function">connSetWriteHandler</span><span class="token punctuation">(</span>c<span class="token operator">-></span>conn<span class="token punctuation">,</span> sendReplyToClient<span class="token punctuation">)</span> <span class="token operator">==</span> AE_ERR<span class="token punctuation">)</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token function">freeClientAsync</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">listEmpty</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>clients_pending_write<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Update processed count on server */</span>
+    server<span class="token punctuation">.</span>stat_io_writes_processed <span class="token operator">+=</span> processed<span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> processed<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h1 id="8-总结"><a href="#8-总结" class="headerlink" title="(8) 总结"></a>(8) 总结</h1><p>1、Redis 6.0 之前，处理客户端请求是单线程，这种模型的缺点是，只能用到「单核」CPU。如果并发量很高，那么在读写客户端数据时，容易引发性能瓶颈，所以 Redis 6.0 引入了多 IO 线程解决这个问题</p>
+<p>2、配置文件开启 io-threads N 后，Redis Server 启动时，会启动 N - 1 个 IO 线程（主线程也算一个 IO 线程），这些 IO 线程执行的逻辑是 networking.c 的 IOThreadMain 函数。但默认只开启多线程「写」client socket，如果要开启多线程「读」，还需配置 io-threads-do-reads = yes</p>
+<p>3、Redis 在读取客户端请求时，判断如果开启了 IO 多线程，则把这个 client 放到 clients_pending_read 链表中（postponeClientRead 函数），之后主线程在处理每次事件循环之前，把链表数据轮询放到 IO 线程的链表（io_threads_list）中</p>
+<p>4、同样地，在写回响应时，是把 client 放到 clients_pending_write 中（prepareClientToWrite 函数），执行事件循环之前把数据轮询放到 IO 线程的链表（io_threads_list）中</p>
+<p>5、主线程把 client 分发到 IO 线程时，自己也会读写客户端 socket（主线程也要分担一部分读写操作），之后「等待」所有 IO 线程完成读写，再由主线程「串行」执行后续逻辑</p>
+<p>6、每个 IO 线程，不停地从 io_threads_list 链表中取出 client，并根据指定类型读、写 client socket</p>
+<p>7、IO 线程在处理读、写 client 时有些许差异，如果 write_client_pedding &lt; io_threads * 2，则直接由「主线程」负责写，不再交给 IO 线程处理，从而节省 CPU 消耗</p>
+<p>8、Redis 官方建议，服务器最少 4 核 CPU 才建议开启 IO 多线程，4 核 CPU 建议开 2-3 个 IO 线程，8 核 CPU 开 6 个 IO 线程，超过 8 个线程性能提升不大</p>
+<p>9、Redis 官方表示，开启多 IO 线程后，性能可提升 1 倍。当然，如果 Redis 性能足够用，没必要开 IO 线程</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/410666">13 | Redis 6.0多IO线程的效率提高了吗？</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/02/04/redis-key-lazy-free/" rel="prev" title="Redis key 惰性删除">
+                  <i class="fa fa-chevron-left"></i> Redis key 惰性删除
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>
