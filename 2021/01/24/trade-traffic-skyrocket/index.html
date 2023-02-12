@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="背景 随着业务的快速发展，每天交易的订单量已经过千万，从2021-01-20开始，交易下单的请求越来越高，在流量越来越高的时候，问题也在悄悄来临。 (1) 问题时间线  2021-01-20 10:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000） 流量激增  2021-01-20 16:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000）">
+<meta property="og:type" content="article">
+<meta property="og:title" content="那些年我们在商城奋斗的光辉岁月 - 交易系统-下单流量暴涨">
+<meta property="og:url" content="http://weikeqin.com/2021/01/24/trade-traffic-skyrocket/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="背景 随着业务的快速发展，每天交易的订单量已经过千万，从2021-01-20开始，交易下单的请求越来越高，在流量越来越高的时候，问题也在悄悄来临。 (1) 问题时间线  2021-01-20 10:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000） 流量激增  2021-01-20 16:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000）">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210120/order-create-pay-request-count-monitor-16.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210122/order-create-20210122-10.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/trade/order-pre-pay-flow-chart.png">
+<meta property="article:published_time" content="2021-01-24T12:54:36.000Z">
+<meta property="article:modified_time" content="2023-02-12T15:31:37.207Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="stability">
+<meta property="article:tag" content="trade">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/business/stability/20210120/order-create-pay-request-count-monitor-16.png">
+
+
+<link rel="canonical" href="http://weikeqin.com/2021/01/24/trade-traffic-skyrocket/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2021/01/24/trade-traffic-skyrocket/","path":"2021/01/24/trade-traffic-skyrocket/","title":"那些年我们在商城奋斗的光辉岁月 - 交易系统-下单流量暴涨"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>那些年我们在商城奋斗的光辉岁月 - 交易系统-下单流量暴涨 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E9%97%AE%E9%A2%98%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">1.</span> <span class="nav-text">(1) 问题时间线</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5%E5%88%86%E6%9E%90%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">2.</span> <span class="nav-text">(2) 问题排查分析时间线</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">(3) 问题分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E9%97%AE%E9%A2%98%E7%9B%B4%E6%8E%A5%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 问题直接原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E9%97%AE%E9%A2%98%E8%AF%A6%E7%BB%86%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 问题详细原因</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8B%E5%8D%95%E6%B5%81%E9%87%8F%E9%AB%98%E4%BA%86%EF%BC%9F"><span class="nav-number">3.2.1.</span> <span class="nav-text">(3.2.1) 为什么下单流量高了？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%94%B6%E9%93%B6%E6%94%AF%E4%BB%98%E8%A7%A6%E5%8F%91%E9%99%90%E6%B5%81%EF%BC%9F"><span class="nav-number">3.2.2.</span> <span class="nav-text">(3.2.2) 为什么收银支付触发限流？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-3-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%89%8D%E7%AB%AF%E4%BA%A4%E4%BA%92%E5%AD%98%E5%9C%A8%E9%97%AE%E9%A2%98%EF%BC%9F"><span class="nav-number">3.2.3.</span> <span class="nav-text">(3.2.3) 为什么前端交互存在问题？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-4-%E4%B8%BA%E4%BB%80%E4%B9%88%E7%94%A8%E6%88%B7%E4%BC%9A%E9%87%8D%E5%A4%8D%E7%82%B9%E5%87%BB%EF%BC%9F"><span class="nav-number">3.2.4.</span> <span class="nav-text">(3.2.4) 为什么用户会重复点击？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E4%B8%8B%E5%8D%95%E9%94%99%E8%AF%AF%E6%97%A5%E5%BF%97"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 下单错误日志</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">310</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">59</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2021/01/24/trade-traffic-skyrocket/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="那些年我们在商城奋斗的光辉岁月 - 交易系统-下单流量暴涨 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          那些年我们在商城奋斗的光辉岁月 - 交易系统-下单流量暴涨
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2021-01-24 20:54:36" itemprop="dateCreated datePublished" datetime="2021-01-24T20:54:36+08:00">2021-01-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-02-12 23:31:37" itemprop="dateModified" datetime="2023-02-12T23:31:37+08:00">2023-02-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/stability/" itemprop="url" rel="index"><span itemprop="name">stability</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.4k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  背景 随着业务的快速发展，每天交易的订单量已经过千万，从2021-01-20开始，交易下单的请求越来越高，在流量越来越高的时候，问题也在悄悄来临。</p>
+<h1 id="1-问题时间线"><a href="#1-问题时间线" class="headerlink" title="(1) 问题时间线"></a>(1) 问题时间线</h1><p>  2021-01-20 10:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000） <strong>流量激增</strong><br>  2021-01-20 16:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000）<br>  2021-01-20 16:02 通过监控发现，下单请求峰值是历史峰值的4倍多。 <strong>看到这个数据开始担忧起来</strong><br>  2021-01-20 16:02 排查日志，初步看无异常日志。</p>
+<p>  2021-01-21 下午4点流量飙升，峰值qps再次刷新。</p>
+<p>  2021-01-22 10:00 流量飙升，峰值qps相比昨天(01-21)翻倍  <strong>问题开始变的严重起来</strong><br>  2021-01-22 18:00 拉群”下单流量增长10倍问题治理专项”  <strong>成立专项-处理流量暴涨问题</strong></p>
+<p>  2021-01-23 15:37 发现直接原因之一是下单时创建预付单失败，用户多次点击，重复调用下单接口，导致流量暴涨，但是整体的订单量却没变化。<br>  2021-01-23 20:30 评估流量，申请支付限流提升到xxqps <strong>问题初步解决</strong></p>
+<p>  2021-01-24 10:00 (周日) shop-order出现一台容器CPU idle掉底(CPU打满了)，但是其它容器正常，服务整体可用，不影响正常业务。</p>
+<p>  2021-01-25 拉会讨论其它原因及优化方案及排期</p>
+<!--
+  2021-01-25 14:37 拉会解决
+  2021-01-25 23:30 会议结论，明天开发+联调，协调测试 上线
+-->
+
+<p>  2021-01-26 00:45:50 下单服务扩容，集群由40台扩容到80台<br>  2021-01-26 01:15 ~ 3:00 压测</p>
+<p>  2021-02 优化上线。 <strong>问题彻底解决</strong></p>
+<br>
+
+
+
+<h1 id="2-问题排查分析时间线"><a href="#2-问题排查分析时间线" class="headerlink" title="(2) 问题排查分析时间线"></a>(2) 问题排查分析时间线</h1><!--
+   2020-12-03 01:23 交易系统下单服务shop-order容器由60台缩容到40台，缩容后没有问题
+
+   2021-01-20 上午10点和下午4点流量飙升，峰值qps 1696
+   2021-01-21 上午10点和下午4点流量飙升，峰值qps 1831
+   2021-01-22 10:00 峰值3682
+-->
+
+<p>  2021-01-20 10:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000） <strong>流量激增、比较兴奋</strong><br>  2021-01-20 16:01 下单服务报警 流量突增（集群1min内下单接口qp10s突增5000）<br>  2021-01-20 16:02 通过监控发现，下单请求峰值是历史峰值的4倍多。 <strong>看到这个数据开始担忧起来</strong></p>
+<p>  <img src="/img/business/stability/20210120/order-create-pay-request-count-monitor-16.png" alt="下单请求监控"></p>
+<p>  2021-01-20 16:02 开始排查日志，无异常，通过和昨天监控日志对比，初步猜测是营销系统-用户增长搞活动了<br>  2021-01-20 16:24 询问营销系统-用户增长服务的研发是否有新活动。确认他们今天新推了活动。</p>
+<!--
+发现用户增长产品确实在`07:57`、 `09:57`、 `11:57`、 `13:57`推了c2c活动，营销系统-触达服务会按照配置的时间向用户推送c2c活动信息。
+-->
+<p>  2021-01-20 16点 确认 营销系统-商品秒杀活动(秒杀鸡蛋) 和 营销系统-用户增长 C推C活动 重叠了<br>  2021-01-20 晚上 通过监控和日志看，下单量比较大，但是支付完单量和前几天几乎一样  <strong>流量涨了，支付完单量没涨，有点奇怪</strong></p>
+<p>  2021-01-21 01 ~ 04 凌晨全链路压测，摸清目前交易链路QPS上限</p>
+<p>  2021-01-21 15:37 营销系统-用户增长确认下午4点不推活动 <strong>用排除法</strong><br>  2021-01-21 下午4点流量飙升，峰值qps再次刷新  <strong>难道全是秒杀的流量？</strong></p>
+<p>  2021-01-22 10:00 流量飙升，峰值qps相比昨天(01-21)翻倍  <strong>问题开始变的严重起来</strong></p>
+<p>  <img src="/img/business/stability/20210122/order-create-20210122-10.png"></p>
+<!--  
+  2021-01-22 15:00 上线 shop-order 【下单流程中的异常提醒优化】 分支
+-->
+
+<p>  2021-01-22 18:00 拉群”下单流量增长10倍问题治理专项”  <strong>成立专项-处理流量暴涨问题</strong></p>
+<!--
+
+-->
+
+<p>  2021-01-23 15:37 发现原因，是用户下单失败后，多次点击立即支付按钮，重复调用下单接口，导致流量暴涨，但是整体的订单量却没变化。<br>  2021-01-23 20:30  评估流量，申请收银限流提升至5000qps </p>
+<p>  2021-01-24 10:00 (周日) shop-order出现一台容器CPU idle掉底(CPU打满了)，但是其它容器正常，服务整体可用，不影响正常业务。</p>
+<!--
+  2021-01-25 14:37 拉会解决
+  2021-01-25 23:30 会议结论，明天开发+联调，协调测试 上线
+-->
+
+<p>  2021-01-26 00:45:50 下单服务扩容，集群由40台扩容到80台 ****<br>  2021-01-26 01:15 ~ 3:00 压测</p>
+<br>
+
+<h1 id="3-问题分析"><a href="#3-问题分析" class="headerlink" title="(3) 问题分析"></a>(3) 问题分析</h1><ol>
+<li>下单时触发支付限流，创建订单成功，创建收银支付订单失败，下单报错，对用户提示“调用收银台返回异常” </li>
+<li>用户继续点击，触发限购，对用户提示“秒杀商品xx，您的购买已经超过上限”</li>
+<li>用户继续点击，对用户提示“请勿重复提交”</li>
+</ol>
+<p><strong>下单支付流程</strong></p>
+<p>  <img src="/img/business/trade/order-pre-pay-flow-chart.png" alt="下单支付流程"></p>
+<h2 id="3-1-问题直接原因"><a href="#3-1-问题直接原因" class="headerlink" title="(3.1) 问题直接原因"></a>(3.1) 问题直接原因</h2><ol>
+<li>商品秒杀活动瞬时流量 + 用户活动流量叠加，整体流量较高。</li>
+<li>下单时收银支付接口限流导致下单失败(创建订单成功-生成预付单失败)。</li>
+<li>前端交互存在问题，服务端下单接口返回错误码，没有跳转到对应页面。</li>
+<li>前端在用户点击下单支付按钮后，没有把按钮置灰。</li>
+<li>用户点击立即支付按钮后没有成功，重复点击，导致流量翻倍。</li>
+</ol>
+<h2 id="3-2-问题详细原因"><a href="#3-2-问题详细原因" class="headerlink" title="(3.2) 问题详细原因"></a>(3.2) 问题详细原因</h2><h3 id="3-2-1-为什么下单流量高了？"><a href="#3-2-1-为什么下单流量高了？" class="headerlink" title="(3.2.1) 为什么下单流量高了？"></a>(3.2.1) 为什么下单流量高了？</h3><ol>
+<li>优选业务处在快速增长时期，一直在开城，流量每天增高是正常现象。</li>
+<li>问题发生事件在年底(腊月初八 ~ 腊月十二)，用户在备年货，运营在搞活动，团队在冲业绩，商品活动和用户活动较多。</li>
+<li>秒杀商品价格低于成本价，导致购买用户较多，瞬时交易流量较大。</li>
+<li>下单失败用户重试导致流量翻倍。</li>
+</ol>
+<h3 id="3-2-2-为什么收银支付触发限流？"><a href="#3-2-2-为什么收银支付触发限流？" class="headerlink" title="(3.2.2) 为什么收银支付触发限流？"></a>(3.2.2) 为什么收银支付触发限流？</h3><ol>
+<li>下单流程里包含创建订单和创建收银支付单。</li>
+<li>下单的QPS高了导致收银支付的QPS也高了。</li>
+<li>当时只接了收银支付的一个机房，QPS达到收银支付那个机房的阈值，触发限流。</li>
+</ol>
+<h3 id="3-2-3-为什么前端交互存在问题？"><a href="#3-2-3-为什么前端交互存在问题？" class="headerlink" title="(3.2.3) 为什么前端交互存在问题？"></a>(3.2.3) 为什么前端交互存在问题？</h3><p>  按照预期的流程，用户点击立即支付按钮后，前端调服务端下单接口，下单创建订单成功，生成预付单失败，返回了错误码，前端根据错误码跳转到订单列表提示用户二次支付；<br>  但实际没有跳转。</p>
+<ol>
+<li>历史原因，前端不知道有个错误码没有处理。</li>
+<li>其它错误码都处理了，也可能是前端搞出的bug。 (前端合代码冲突 或 误删代码)</li>
+<li>在微信小程序交易场景，没有收银台，默认支付方式微信支付，前端调完下单接口即调用微信支付SDK，这样用户体验好，交易效率也高。</li>
+</ol>
+<h3 id="3-2-4-为什么用户会重复点击？"><a href="#3-2-4-为什么用户会重复点击？" class="headerlink" title="(3.2.4) 为什么用户会重复点击？"></a>(3.2.4) 为什么用户会重复点击？</h3><ol>
+<li>秒杀活动商品价格低于成本价，用户都想抢，迟了可能会售罄。</li>
+<li>服务端下单接口返回错误码和错误信息后，前端处理成提示了。</li>
+<li>前端没有把立即支付按钮置灰，用户可以一直点击。</li>
+<li>服务端下单接口幂等时间较短。</li>
+</ol>
+<h2 id="3-3-下单错误日志"><a href="#3-3-下单错误日志" class="headerlink" title="(3.3) 下单错误日志"></a>(3.3) 下单错误日志</h2><p>下单流量暴涨-原因分析-2021-01-24</p>
+<ol>
+<li><p>2021-01-24 16:00:26.321 +0800<br>traceid=4047fd9ec9ccfb3913f9973a5736b739<br>uid= 637276943577573996 的用户 购买  goods_id=175002114  goods_name=【到手价1.99元】幸福童依 土鸡蛋 6个/盒  is_limit=1 限购一件 的商品<br>下单成功</p>
+</li>
+<li><p>2021-01-24 20:00:10.024 +0800<br>traceid=    9cbebb762e5e322a11e276e699ff908c<br>用户uid=637276943577573996 再次购买 goods_id=175002114  goods_name=【到手价1.99元】幸福童依 土鸡蛋 6个/盒  is_limit=1 限购一件 的商品<br>下单失败  提示 调用收银台返回异常<br>这块应该是超过购买上限，应该在限购逻辑拦住，但实际没拦住 </p>
+</li>
+<li><p>2021-01-24 20:00:11.246 +0800<br>traceid=0cdf61a169062052c5222d48e4494b33<br>用户uid=637276943577573996 再次购买 goods_id=175002114  goods_name=【到手价1.99元】幸福童依 土鸡蛋 6个/盒  is_limit=1 限购一件 的商品<br>提示 请勿重复提交 </p>
+</li>
+<li><p>2021-01-24 20:00:12.712 +0800<br>traceid=09f8ac8c60f3662e2d67d22bce438e11<br>用户uid=637276943577573996 再次购买 goods_id=175002114  goods_name=【到手价1.99元】幸福童依 土鸡蛋 6个/盒  is_limit=1 限购一件 的商品<br>下单失败，提示  该商品【到手价1.99元】幸福童依 土鸡蛋 6个/盒购买数量已达到限购数量，无法再次购买</p>
+</li>
+</ol>
+<!--
+2021-01-24 20:00 ~ 2021-01-24 20:10
+-->
+<p>某个时间段 0号机 共有7677个请求<br>成功 3444条<br>失败 4223条<br>    限购 导致的 2869/2 = 1434条  (除以2是因为一条日志出现2次)<br>    当前访问人数过多，请稍后再试  2848/2=1424条<br>    库存不足 702/2=351条<br>    请勿重复提交 1173/2 = 586条<br>    调用收银台返回异常 531/2=265条<br>    参数非法 118条</p>
+<p>  traceId=b648873da884a858015f2794dbdf94d0 </p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://pay.weixin.qq.com/wiki/doc/apiv3/open/pay/chapter2_8_2.shtml">微信支付-小程序支付开发指引</a></p>
+<!--
+
+  20210123 秒杀场流量升高、错误数升高  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=518093563 
+
+  点击 https://im.xiaojukeji.com/channel?uid=188508&token=245c877e14abf492f0ce75a7459009e8&id=1078870699520973568 ，加入D-Chat“商城下单压测-2021-02-04”
+
+  点击 https://im.xiaojukeji.com/channel?uid=188508&token=dfc51ec712d935fb185e7bef887eb352&id=1087671366154778368 ，加入D-Chat“用户增长新活动”
+
+
+  点击 https://im.xiaojukeji.com/channel?uid=188508&token=8a95c50142ea570cc915bf8003dee318&id=1090667269362832896 ，加入D-Chat“下单流量增长10倍问题治理专项”
+
+  点击 https://im.xiaojukeji.com/channel?uid=188508&token=fe8edea5fab560b43e94cebf24b7f530&id=1090667269362832896 ，加入D-Chat“下单流量增长10倍问题治理专项”
+
+  点击 https://im.xiaojukeji.com/channel?uid=188508&token=9704008971486f163f92b6ce63f9ee77&id=1093765779101362176 ，加入D-Chat“下单流量暴涨+秒杀限购 问题排查”
+
+
+  秒杀下单数据统计 http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=519766415
+
+-->
+
+<!--
+  2020-07-31   07-31 我们的目标是10w+  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=402857617
+  2020-07-31  下单QPS峰值 50/s
+  2020-09-13  日订单70万  下单QPS峰值(19:01:50) 100/s  9.16日单量统计流量统计 http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=441037693
+
+  1002压测方案  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=444943491 
+  2020 10-11月压测总结  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=474184050 
+  http://wiki.intra.xiaojukeji.com/pages/viewpage.action?pageId=528936196
+
+-->
+
+
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/stability/" rel="tag"># stability</a>
+              <a href="/tags/trade/" rel="tag"># trade</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2021/01/17/sentinel-deshboard/" rel="prev" title="Sentinel控制台">
+                  <i class="fa fa-chevron-left"></i> Sentinel控制台
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2021/02/21/system-design-jd/" rel="next" title="电商-京东 黄金流程 PC">
+                  电商-京东 黄金流程 PC <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>

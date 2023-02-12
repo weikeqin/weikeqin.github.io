@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.0">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" integrity="sha256-AbA177XfpSnFEvgpYu1jMygiLabzPCJCRIBtR5jGc0k=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.13.2","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12},"copycode":{"enable":true,"style":"default"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Redis 是如何实现主从复制的？ (1) Redis主从复制从原理上来说，Redis 的主从复制主要包括了全量复制、增量复制和长连接同步三种情况。  全量复制传输 RDB 文件； 增量复制传输主从断连期间的命令； 长连接同步则是把主节点正常收到的请求传输给从节点。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis主从复制">
+<meta property="og:url" content="http://weikeqin.com/2023/02/12/redis-main-subordinate-replication/index.html">
+<meta property="og:site_name" content="天道酬勤">
+<meta property="og:description" content="Redis 是如何实现主从复制的？ (1) Redis主从复制从原理上来说，Redis 的主从复制主要包括了全量复制、增量复制和长连接同步三种情况。  全量复制传输 RDB 文件； 增量复制传输主从断连期间的命令； 长连接同步则是把主节点正常收到的请求传输给从节点。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-02-12T14:43:05.000Z">
+<meta property="article:modified_time" content="2023-02-12T15:00:03.444Z">
+<meta property="article:author" content="WKQ">
+<meta property="article:tag" content="database">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://weikeqin.com/2023/02/12/redis-main-subordinate-replication/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/02/12/redis-main-subordinate-replication/","path":"2023/02/12/redis-main-subordinate-replication/","title":"Redis主从复制"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis主从复制 | 天道酬勤</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
+  <script class="next-config" data-name="google_analytics" type="application/json">{"tracking_id":"UA-113485469-1","only_pageview":false}</script>
+  <script src="/js/third-party/analytics/google-analytics.js"></script>
+
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup"><div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close" role="button">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis主从复制</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么需要主从复制</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis主从复制原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E4%BB%8E%E5%BA%93%E8%AE%BE%E7%BD%AE%E4%B8%BB%E5%BA%93"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 从库设置主库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E4%B8%BB%E4%BB%8E%E5%BB%BA%E7%AB%8B%E8%BF%9E%E6%8E%A5"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 主从建立连接</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E4%B8%BB%E4%BB%8E%E6%8F%A1%E6%89%8B"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 主从握手</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B%E5%88%A4%E6%96%AD%E4%B8%8E%E6%89%A7%E8%A1%8C"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 复制类型判断与执行</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) 主从复制源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E4%BB%8E%E5%BA%93%E8%AE%BE%E7%BD%AE%E4%B8%BB%E5%BA%93"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 从库设置主库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E4%B8%BB%E4%BB%8E%E5%BB%BA%E7%AB%8B%E8%BF%9E%E6%8E%A5"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 主从建立连接</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E4%B8%BB%E4%BB%8E%E6%8F%A1%E6%89%8B%E5%B9%B6%E5%88%A4%E6%96%AD%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B"><span class="nav-number">4.3.</span> <span class="nav-text">(4.3) 主从握手并判断复制类型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B%E5%88%A4%E6%96%AD%E4%B8%8E%E6%89%A7%E8%A1%8C"><span class="nav-number">4.4.</span> <span class="nav-text">(4.4) 复制类型判断与执行</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">310</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">59</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/yourname" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;yourname" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/02/12/redis-main-subordinate-replication/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis主从复制 | 天道酬勤">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis主从复制
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2023-02-12 22:43:05 / 修改时间：23:00:03" itemprop="dateCreated datePublished" datetime="2023-02-12T22:43:05+08:00">2023-02-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>20k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>18 分钟</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>  Redis 是如何实现主从复制的？</p>
+<h1 id="1-Redis主从复制"><a href="#1-Redis主从复制" class="headerlink" title="(1) Redis主从复制"></a>(1) Redis主从复制</h1><p>从原理上来说，Redis 的主从复制主要包括了全量复制、增量复制和长连接同步三种情况。</p>
+<ol>
+<li>全量复制传输 RDB 文件；</li>
+<li>增量复制传输主从断连期间的命令；</li>
+<li>长连接同步则是把主节点正常收到的请求传输给从节点。</li>
+</ol>
+<span id="more"></span>
+
+<h1 id="2-为什么需要主从复制"><a href="#2-为什么需要主从复制" class="headerlink" title="(2) 为什么需要主从复制"></a>(2) 为什么需要主从复制</h1><p>  为了提高服务的分区容错性，一般都会通过冗余来提高分区容错性。<br>  主从复制技术类似于冗余，是提高分区容错性的一种办法。</p>
+<p>  在使用 Redis 或 MySQL 数据库时，经常会使用主从复制来实现主从节点间的数据同步，以此提升服务的高可用性。</p>
+<h1 id="3-Redis主从复制原理"><a href="#3-Redis主从复制原理" class="headerlink" title="(3) Redis主从复制原理"></a>(3) Redis主从复制原理</h1><ol>
+<li>从库设置主库</li>
+<li>主从建立连接</li>
+<li>主从握手并判断复制类型</li>
+<li>复制类型判断与执行</li>
+</ol>
+<h2 id="3-1-从库设置主库"><a href="#3-1-从库设置主库" class="headerlink" title="(3.1) 从库设置主库"></a>(3.1) 从库设置主库</h2><p>  主要是获得了主库的 IP 和端口号。<br>  可以用三种方式来设置。<br>  方式一：在实例 A 上执行 replicaof masterip masterport 的主从复制命令，指明实例 B 的 IP（masterip）和端口号（masterport）。<br>  方式二：在实例 A 的配置文件中设置 replicaof masterip masterport，实例 A 可以通过解析文件获得主库 IP 和端口号。<br>  方式三：在实例 A 启动时，设置启动参数–replicaof [masterip] [masterport]。实例 A 解析启动参数，就能获得主库的 IP 和端口号。</p>
+<h2 id="3-2-主从建立连接"><a href="#3-2-主从建立连接" class="headerlink" title="(3.2) 主从建立连接"></a>(3.2) 主从建立连接</h2><p>  从库获得了主库的IP和端口号，就会尝试和主库建立TCP网络连接，并且会在建立好的网络连接上，监听是否有主库发送的命令。</p>
+<h2 id="3-3-主从握手"><a href="#3-3-主从握手" class="headerlink" title="(3.3) 主从握手"></a>(3.3) 主从握手</h2><p>  当从库和主库建立好连接之后，从库就开始和主库进行握手。<br>  简单来说，握手过程就是主从库间相互发送PING-PONG消息，同时从库根据配置信息向主库进行验证。<br>  从库把自己的 IP、端口号，以及对无盘复制和 PSYNC 2 协议的支持情况发给主库。</p>
+<h2 id="3-4-复制类型判断与执行"><a href="#3-4-复制类型判断与执行" class="headerlink" title="(3.4) 复制类型判断与执行"></a>(3.4) 复制类型判断与执行</h2><p>  等到主从库之间的握手完成后，从库就会给主库发送 PSYNC 命令。主库会根据从库发送的命令参数作出相应的三种回复，分别是执行<code>全量复制</code>、执行增量复制、发生错误。<br>  最后，从库在收到上述回复后，就会根据回复的复制类型，开始执行具体的复制操作。</p>
+<br>
+
+
+
+<h1 id="4-主从复制源码解读"><a href="#4-主从复制源码解读" class="headerlink" title="(4) 主从复制源码解读"></a>(4) 主从复制源码解读</h1><p>  主从复制中的状态机具体对应的是什么呢？</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.h</span>
+
+<span class="token comment">/*
+ */</span>
+<span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">// ...</span>
+
+   <span class="token comment">/* 复制相关 */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>masterauth<span class="token punctuation">;</span>         <span class="token comment">// 用于和主库进行验证的密码</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>masterhost<span class="token punctuation">;</span>         <span class="token comment">// 主库主机名</span>
+    <span class="token keyword">int</span> masterport<span class="token punctuation">;</span>           <span class="token comment">// 主库端口号</span>
+    <span class="token keyword">int</span> repl_timeout<span class="token punctuation">;</span>         <span class="token comment">//</span>
+    client <span class="token operator">*</span>master<span class="token punctuation">;</span>           <span class="token comment">// 从库上用来和主库连接的客户端</span>
+    client <span class="token operator">*</span>cached_master<span class="token punctuation">;</span>    <span class="token comment">// 从库上缓存的主库信息</span>
+    <span class="token keyword">int</span> repl_state<span class="token punctuation">;</span>           <span class="token comment">// 从库的复制状态</span>
+    <span class="token class-name">off_t</span> repl_transfer_size<span class="token punctuation">;</span>  
+    <span class="token class-name">off_t</span> repl_transfer_read<span class="token punctuation">;</span>  
+    <span class="token class-name">off_t</span> repl_transfer_last_fsync_off<span class="token punctuation">;</span>  
+    connection <span class="token operator">*</span>repl_transfer_s<span class="token punctuation">;</span> 
+    <span class="token keyword">int</span> repl_transfer_fd<span class="token punctuation">;</span>     
+    <span class="token keyword">char</span> <span class="token operator">*</span>repl_transfer_tmpfile<span class="token punctuation">;</span>  
+    <span class="token class-name">time_t</span> repl_transfer_lastio<span class="token punctuation">;</span>  
+    <span class="token keyword">int</span> repl_serve_stale_data<span class="token punctuation">;</span>  
+    <span class="token keyword">int</span> repl_slave_ro<span class="token punctuation">;</span>           
+    <span class="token keyword">int</span> repl_slave_ignore_maxmemory<span class="token punctuation">;</span>   
+    <span class="token class-name">time_t</span> repl_down_since<span class="token punctuation">;</span>  
+    <span class="token keyword">int</span> repl_disable_tcp_nodelay<span class="token punctuation">;</span>    
+    <span class="token keyword">int</span> slave_priority<span class="token punctuation">;</span>              
+    <span class="token keyword">int</span> slave_announce_port<span class="token punctuation">;</span>         
+    <span class="token keyword">char</span> <span class="token operator">*</span>slave_announce_ip<span class="token punctuation">;</span>         
+    <span class="token comment">// ...</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-1-从库设置主库"><a href="#4-1-从库设置主库" class="headerlink" title="(4.1) 从库设置主库"></a>(4.1) 从库设置主库</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.c</span>
+
+<span class="token keyword">void</span> <span class="token function">initServerConfig</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">// 初始化复制状态  默认为没有</span>
+   server<span class="token punctuation">.</span>repl_state <span class="token operator">=</span> REPL_STATE_NONE<span class="token punctuation">;</span>
+   
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  实例执行了 <code>replicaof mainip mainport</code> 命令</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/replication.c </span>
+
+<span class="token comment">/*
+ */</span>
+<span class="token keyword">void</span> <span class="token function">replicaofCommand</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* SLAVEOF is not allowed in cluster mode as replication is automatically
+     * configured using the current address of the master node. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>cluster_enabled<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">addReplyError</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token string">"REPLICAOF not allowed in cluster mode."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* The special host/port combination "NO" "ONE" turns the instance
+     * into a master. Otherwise the new master address is set. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">strcasecmp</span><span class="token punctuation">(</span>c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">,</span><span class="token string">"no"</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span>
+        <span class="token operator">!</span><span class="token function">strcasecmp</span><span class="token punctuation">(</span>c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">,</span><span class="token string">"one"</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">replicationUnsetMaster</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            sds client <span class="token operator">=</span> <span class="token function">catClientInfoString</span><span class="token punctuation">(</span><span class="token function">sdsempty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"MASTER MODE enabled (user request from '%s')"</span><span class="token punctuation">,</span>
+                client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">sdsfree</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">long</span> port<span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>c<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_SLAVE<span class="token punctuation">)</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* If a client is already a replica they cannot run this command,
+             * because it involves flushing all replicas (including this
+             * client) */</span>
+            <span class="token function">addReplyError</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span> <span class="token string">"Command is not valid when client is a replica."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token function">getLongFromObjectOrReply</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span> c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token operator">&amp;</span>port<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Check if we are already attached to the specified slave */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token function">strcasecmp</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost<span class="token punctuation">,</span>c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">)</span>
+            <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>masterport <span class="token operator">==</span> port<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"REPLICAOF would result into synchronization "</span>
+                                <span class="token string">"with the master we are already connected "</span>
+                                <span class="token string">"with. No operation performed."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">addReplySds</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token function">sdsnew</span><span class="token punctuation">(</span><span class="token string">"+OK Already connected to specified "</span>
+                                 <span class="token string">"master\r\n"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">/* There was no previous master or the user specified a different one,
+         * we can continue. */</span>
+        <span class="token function">replicationSetMaster</span><span class="token punctuation">(</span>c<span class="token operator">-></span>argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token operator">-></span>ptr<span class="token punctuation">,</span> port<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        sds client <span class="token operator">=</span> <span class="token function">catClientInfoString</span><span class="token punctuation">(</span><span class="token function">sdsempty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"REPLICAOF %s:%d enabled (user request from '%s')"</span><span class="token punctuation">,</span>
+            server<span class="token punctuation">.</span>masterhost<span class="token punctuation">,</span> server<span class="token punctuation">.</span>masterport<span class="token punctuation">,</span> client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">addReply</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span>shared<span class="token punctuation">.</span>ok<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Set replication to the specified master address and port. */</span>
+<span class="token keyword">void</span> <span class="token function">replicationSetMaster</span><span class="token punctuation">(</span><span class="token keyword">char</span> <span class="token operator">*</span>ip<span class="token punctuation">,</span> <span class="token keyword">int</span> port<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> was_master <span class="token operator">=</span> server<span class="token punctuation">.</span>masterhost <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+
+    <span class="token function">sdsfree</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>masterhost <span class="token operator">=</span> <span class="token function">sdsnew</span><span class="token punctuation">(</span>ip<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    server<span class="token punctuation">.</span>masterport <span class="token operator">=</span> port<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>master<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">freeClient</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>master<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">disconnectAllBlockedClients</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">/* Clients blocked in master, now slave. */</span>
+
+    <span class="token comment">/* Update oom_score_adj */</span>
+    <span class="token function">setOOMScoreAdj</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Force our slaves to resync with us as well. They may hopefully be able
+     * to partially resync with us, but we can notify the replid change. */</span>
+    <span class="token function">disconnectSlaves</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">cancelReplicationHandshake</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">/* Before destroying our master state, create a cached master using
+     * our own parameters, to later PSYNC with the new master. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>was_master<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">replicationDiscardCachedMaster</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">replicationCacheMasterUsingMyself</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Fire the role change modules event. */</span>
+    <span class="token function">moduleFireServerEvent</span><span class="token punctuation">(</span>REDISMODULE_EVENT_REPLICATION_ROLE_CHANGED<span class="token punctuation">,</span>
+                          REDISMODULE_EVENT_REPLROLECHANGED_NOW_REPLICA<span class="token punctuation">,</span>
+                          <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Fire the master link modules event. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_state <span class="token operator">==</span> REPL_STATE_CONNECTED<span class="token punctuation">)</span>
+        <span class="token function">moduleFireServerEvent</span><span class="token punctuation">(</span>REDISMODULE_EVENT_MASTER_LINK_CHANGE<span class="token punctuation">,</span>
+                              REDISMODULE_SUBEVENT_MASTER_LINK_DOWN<span class="token punctuation">,</span>
+                              <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    server<span class="token punctuation">.</span>repl_state <span class="token operator">=</span> REPL_STATE_CONNECT<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  replicationSetMaster 函数除了会记录主库的 IP、端口号之外，还会把从库实例的状态机设置为 REPL_STATE_CONNECT。<br>  此时，主从复制的状态机会从 <code>REPL_STATE_NONE</code> 变迁为 <code>REPL_STATE_CONNECT</code>。</p>
+<h2 id="4-2-主从建立连接"><a href="#4-2-主从建立连接" class="headerlink" title="(4.2) 主从建立连接"></a>(4.2) 主从建立连接</h2><p>  从库是何时开始和主库建立网络连接的呢？</p>
+<p>  replicationCron() 任务。这个任务的执行频率是每 1000ms 执行一次</p>
+<p>  replicationCron() 任务的函数实现逻辑是在 server.c 中，在该任务中，一个重要的判断就是，检查从库的复制状态机状态。如果状态机状态是 REPL_STATE_CONNECT，那么从库就开始和主库建立连接。连接的建立是通过调用 connectWithMaster() 函数来完成的。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ *
+ * @param *eventLoop
+ * @param id
+ * @param *clientData
+ */</span>
+<span class="token keyword">int</span> <span class="token function">serverCron</span><span class="token punctuation">(</span><span class="token keyword">struct</span> <span class="token class-name">aeEventLoop</span> <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">long</span> <span class="token keyword">long</span> id<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>clientData<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/* Replication cron function -- used to reconnect to master,
+     * detect transfer failures, start background RDB transfers and so forth. */</span>
+    <span class="token function">run_with_period</span><span class="token punctuation">(</span><span class="token number">1000</span><span class="token punctuation">)</span> <span class="token function">replicationCron</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/replication.c</span>
+
+
+<span class="token comment">/* --------------------------- REPLICATION CRON  ---------------------------- */</span>
+
+<span class="token comment">/* Replication cron function, called 1 time per second. */</span>
+<span class="token keyword">void</span> <span class="token function">replicationCron</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">static</span> <span class="token keyword">long</span> <span class="token keyword">long</span> replication_cron_loops <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Non blocking connection timeout? */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost <span class="token operator">&amp;&amp;</span>
+        <span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_state <span class="token operator">==</span> REPL_STATE_CONNECTING <span class="token operator">||</span>
+         <span class="token function">slaveIsInHandshakeState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span>
+         <span class="token punctuation">(</span><span class="token function">time</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token operator">-</span>server<span class="token punctuation">.</span>repl_transfer_lastio<span class="token punctuation">)</span> <span class="token operator">></span> server<span class="token punctuation">.</span>repl_timeout<span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Timeout connecting to the MASTER..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">cancelReplicationHandshake</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Bulk transfer I/O timeout? */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>repl_state <span class="token operator">==</span> REPL_STATE_TRANSFER <span class="token operator">&amp;&amp;</span>
+        <span class="token punctuation">(</span><span class="token function">time</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token operator">-</span>server<span class="token punctuation">.</span>repl_transfer_lastio<span class="token punctuation">)</span> <span class="token operator">></span> server<span class="token punctuation">.</span>repl_timeout<span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Timeout receiving bulk data from MASTER... If the problem persists try to set the 'repl-timeout' parameter in redis.conf to a larger value."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">cancelReplicationHandshake</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Timed out master when we are an already connected slave? */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>repl_state <span class="token operator">==</span> REPL_STATE_CONNECTED <span class="token operator">&amp;&amp;</span>
+        <span class="token punctuation">(</span><span class="token function">time</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token operator">-</span>server<span class="token punctuation">.</span>master<span class="token operator">-></span>lastinteraction<span class="token punctuation">)</span> <span class="token operator">></span> server<span class="token punctuation">.</span>repl_timeout<span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"MASTER timeout: no data nor PING received..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">freeClient</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>master<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Check if we should connect to a MASTER */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_state <span class="token operator">==</span> REPL_STATE_CONNECT<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"Connecting to MASTER %s:%d"</span><span class="token punctuation">,</span>
+            server<span class="token punctuation">.</span>masterhost<span class="token punctuation">,</span> server<span class="token punctuation">.</span>masterport<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">connectWithMaster</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> C_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"MASTER &lt;-> REPLICA sync started"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Send ACK to master from time to time.
+     * Note that we do not send periodic acks to masters that don't
+     * support PSYNC and replication offsets. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>masterhost <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>master <span class="token operator">&amp;&amp;</span>
+        <span class="token operator">!</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>master<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_PRE_PSYNC<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token function">replicationSendAck</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* If we have attached slaves, PING them from time to time.
+     * So slaves can implement an explicit timeout to masters, and will
+     * be able to detect a link disconnection even if the TCP connection
+     * will not actually go down. */</span>
+    listIter li<span class="token punctuation">;</span>
+    listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+    robj <span class="token operator">*</span>ping_argv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* First, send PING according to ping_slave_period. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>replication_cron_loops <span class="token operator">%</span> server<span class="token punctuation">.</span>repl_ping_slave_period<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span>
+        <span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* Note that we don't send the PING if the clients are paused during
+         * a Redis Cluster manual failover: the PING we send will otherwise
+         * alter the replication offsets of master and slave, and will no longer
+         * match the one stored into 'mf_master_offset' state. */</span>
+        <span class="token keyword">int</span> manual_failover_in_progress <span class="token operator">=</span>
+            server<span class="token punctuation">.</span>cluster_enabled <span class="token operator">&amp;&amp;</span>
+            server<span class="token punctuation">.</span>cluster<span class="token operator">-></span>mf_end <span class="token operator">&amp;&amp;</span>
+            <span class="token function">clientsArePaused</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>manual_failover_in_progress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            ping_argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token function">createStringObject</span><span class="token punctuation">(</span><span class="token string">"PING"</span><span class="token punctuation">,</span><span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">replicationFeedSlaves</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">,</span> server<span class="token punctuation">.</span>slaveseldb<span class="token punctuation">,</span>
+                ping_argv<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">decrRefCount</span><span class="token punctuation">(</span>ping_argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Second, send a newline to all the slaves in pre-synchronization
+     * stage, that is, slaves waiting for the master to create the RDB file.
+     *
+     * Also send the a newline to all the chained slaves we have, if we lost
+     * connection from our master, to keep the slaves aware that their
+     * master is online. This is needed since sub-slaves only receive proxied
+     * data from top-level masters, so there is no explicit pinging in order
+     * to avoid altering the replication offsets. This special out of band
+     * pings (newlines) can be sent, they will have no effect in the offset.
+     *
+     * The newline will be ignored by the slave but will refresh the
+     * last interaction timer preventing a timeout. In this case we ignore the
+     * ping period and refresh the connection once per second since certain
+     * timeouts are set at a few seconds (example: PSYNC response). */</span>
+    <span class="token function">listRewind</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        client <span class="token operator">*</span>slave <span class="token operator">=</span> ln<span class="token operator">-></span>value<span class="token punctuation">;</span>
+
+        <span class="token keyword">int</span> is_presync <span class="token operator">=</span>
+            <span class="token punctuation">(</span>slave<span class="token operator">-></span>replstate <span class="token operator">==</span> SLAVE_STATE_WAIT_BGSAVE_START <span class="token operator">||</span>
+            <span class="token punctuation">(</span>slave<span class="token operator">-></span>replstate <span class="token operator">==</span> SLAVE_STATE_WAIT_BGSAVE_END <span class="token operator">&amp;&amp;</span>
+             server<span class="token punctuation">.</span>rdb_child_type <span class="token operator">!=</span> RDB_CHILD_TYPE_SOCKET<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>is_presync<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">connWrite</span><span class="token punctuation">(</span>slave<span class="token operator">-></span>conn<span class="token punctuation">,</span> <span class="token string">"\n"</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Disconnect timedout slaves. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        listIter li<span class="token punctuation">;</span>
+        listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+
+        <span class="token function">listRewind</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            client <span class="token operator">*</span>slave <span class="token operator">=</span> ln<span class="token operator">-></span>value<span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>slave<span class="token operator">-></span>replstate <span class="token operator">==</span> SLAVE_STATE_ONLINE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>slave<span class="token operator">-></span>flags <span class="token operator">&amp;</span> CLIENT_PRE_PSYNC<span class="token punctuation">)</span>
+                    <span class="token keyword">continue</span><span class="token punctuation">;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>unixtime <span class="token operator">-</span> slave<span class="token operator">-></span>repl_ack_time<span class="token punctuation">)</span> <span class="token operator">></span> server<span class="token punctuation">.</span>repl_timeout<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span> <span class="token string">"Disconnecting timedout replica (streaming sync): %s"</span><span class="token punctuation">,</span>
+                          <span class="token function">replicationGetSlaveName</span><span class="token punctuation">(</span>slave<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token function">freeClient</span><span class="token punctuation">(</span>slave<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">continue</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token comment">/* We consider disconnecting only diskless replicas because disk-based replicas aren't fed
+             * by the fork child so if a disk-based replica is stuck it doesn't prevent the fork child
+             * from terminating. */</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>slave<span class="token operator">-></span>replstate <span class="token operator">==</span> SLAVE_STATE_WAIT_BGSAVE_END <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>rdb_child_type <span class="token operator">==</span> RDB_CHILD_TYPE_SOCKET<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>slave<span class="token operator">-></span>repl_last_partial_write <span class="token operator">!=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span>
+                    <span class="token punctuation">(</span>server<span class="token punctuation">.</span>unixtime <span class="token operator">-</span> slave<span class="token operator">-></span>repl_last_partial_write<span class="token punctuation">)</span> <span class="token operator">></span> server<span class="token punctuation">.</span>repl_timeout<span class="token punctuation">)</span>
+                <span class="token punctuation">&#123;</span>
+                    <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span> <span class="token string">"Disconnecting timedout replica (full sync): %s"</span><span class="token punctuation">,</span>
+                          <span class="token function">replicationGetSlaveName</span><span class="token punctuation">(</span>slave<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token function">freeClient</span><span class="token punctuation">(</span>slave<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">continue</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* If this is a master without attached slaves and there is a replication
+     * backlog active, in order to reclaim memory we can free it after some
+     * (configured) time. Note that this cannot be done for slaves: slaves
+     * without sub-slaves attached should still accumulate data into the
+     * backlog, in order to reply to PSYNC queries if they are turned into
+     * masters after a failover. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>repl_backlog_time_limit <span class="token operator">&amp;&amp;</span>
+        server<span class="token punctuation">.</span>repl_backlog <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>masterhost <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token class-name">time_t</span> idle <span class="token operator">=</span> server<span class="token punctuation">.</span>unixtime <span class="token operator">-</span> server<span class="token punctuation">.</span>repl_no_slaves_since<span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>idle <span class="token operator">></span> server<span class="token punctuation">.</span>repl_backlog_time_limit<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* When we free the backlog, we always use a new
+             * replication ID and clear the ID2. This is needed
+             * because when there is no backlog, the master_repl_offset
+             * is not updated, but we would still retain our replication
+             * ID, leading to the following problem:
+             *
+             * 1. We are a master instance.
+             * 2. Our slave is promoted to master. It's repl-id-2 will
+             *    be the same as our repl-id.
+             * 3. We, yet as master, receive some updates, that will not
+             *    increment the master_repl_offset.
+             * 4. Later we are turned into a slave, connect to the new
+             *    master that will accept our PSYNC request by second
+             *    replication ID, but there will be data inconsistency
+             *    because we received writes. */</span>
+            <span class="token function">changeReplicationId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">clearReplicationId2</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">freeReplicationBacklog</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span>
+                <span class="token string">"Replication backlog freed after %d seconds "</span>
+                <span class="token string">"without connected replicas."</span><span class="token punctuation">,</span>
+                <span class="token punctuation">(</span><span class="token keyword">int</span><span class="token punctuation">)</span> server<span class="token punctuation">.</span>repl_backlog_time_limit<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* If AOF is disabled and we no longer have attached slaves, we can
+     * free our Replication Script Cache as there is no need to propagate
+     * EVALSHA at all. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span>
+        server<span class="token punctuation">.</span>aof_state <span class="token operator">==</span> AOF_OFF <span class="token operator">&amp;&amp;</span>
+        <span class="token function">listLength</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_scriptcache_fifo<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token function">replicationScriptCacheFlush</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Start a BGSAVE good for replication if we have slaves in
+     * WAIT_BGSAVE_START state.
+     *
+     * In case of diskless replication, we make sure to wait the specified
+     * number of seconds (according to configuration) so that other slaves
+     * have the time to arrive before we start streaming. */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">hasActiveChildProcess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">time_t</span> idle<span class="token punctuation">,</span> max_idle <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">int</span> slaves_waiting <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">int</span> mincapa <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+        listNode <span class="token operator">*</span>ln<span class="token punctuation">;</span>
+        listIter li<span class="token punctuation">;</span>
+
+        <span class="token function">listRewind</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>slaves<span class="token punctuation">,</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ln <span class="token operator">=</span> <span class="token function">listNext</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>li<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            client <span class="token operator">*</span>slave <span class="token operator">=</span> ln<span class="token operator">-></span>value<span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>slave<span class="token operator">-></span>replstate <span class="token operator">==</span> SLAVE_STATE_WAIT_BGSAVE_START<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                idle <span class="token operator">=</span> server<span class="token punctuation">.</span>unixtime <span class="token operator">-</span> slave<span class="token operator">-></span>lastinteraction<span class="token punctuation">;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>idle <span class="token operator">></span> max_idle<span class="token punctuation">)</span> max_idle <span class="token operator">=</span> idle<span class="token punctuation">;</span>
+                slaves_waiting<span class="token operator">++</span><span class="token punctuation">;</span>
+                mincapa <span class="token operator">=</span> <span class="token punctuation">(</span>mincapa <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">?</span> slave<span class="token operator">-></span>slave_capa <span class="token operator">:</span>
+                                            <span class="token punctuation">(</span>mincapa <span class="token operator">&amp;</span> slave<span class="token operator">-></span>slave_capa<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>slaves_waiting <span class="token operator">&amp;&amp;</span>
+            <span class="token punctuation">(</span><span class="token operator">!</span>server<span class="token punctuation">.</span>repl_diskless_sync <span class="token operator">||</span>
+             max_idle <span class="token operator">></span> server<span class="token punctuation">.</span>repl_diskless_sync_delay<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token punctuation">&#123;</span>
+            <span class="token comment">/* Start the BGSAVE. The called function may start a
+             * BGSAVE with socket target or disk target depending on the
+             * configuration and slaves capabilities. */</span>
+            <span class="token function">startBgsaveForReplication</span><span class="token punctuation">(</span>mincapa<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Remove the RDB file used for replication if Redis is not running
+     * with any persistence. */</span>
+    <span class="token function">removeRDBUsedToSyncReplicas</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">/* Refresh the number of slaves with lag &lt;= min-slaves-max-lag. */</span>
+    <span class="token function">refreshGoodSlavesCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    replication_cron_loops<span class="token operator">++</span><span class="token punctuation">;</span> <span class="token comment">/* Incremented with frequency 1 HZ. */</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 
+ */</span>
+<span class="token keyword">int</span> <span class="token function">connectWithMaster</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// </span>
+    server<span class="token punctuation">.</span>repl_transfer_s <span class="token operator">=</span> server<span class="token punctuation">.</span>tls_replication <span class="token operator">?</span> <span class="token function">connCreateTLS</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token function">connCreateSocket</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">connConnect</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_transfer_s<span class="token punctuation">,</span> server<span class="token punctuation">.</span>masterhost<span class="token punctuation">,</span> server<span class="token punctuation">.</span>masterport<span class="token punctuation">,</span>
+                NET_FIRST_BIND_ADDR<span class="token punctuation">,</span> syncWithMaster<span class="token punctuation">)</span> <span class="token operator">==</span> C_ERR<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Unable to connect to MASTER: %s"</span><span class="token punctuation">,</span>
+                <span class="token function">connGetLastError</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_transfer_s<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">connClose</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_transfer_s<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span>repl_transfer_s <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+
+    <span class="token comment">//  </span>
+    server<span class="token punctuation">.</span>repl_transfer_lastio <span class="token operator">=</span> server<span class="token punctuation">.</span>unixtime<span class="token punctuation">;</span>
+    <span class="token comment">// 连接建立后，将状态机设置为REPL_STATE_CONNECTING</span>
+    server<span class="token punctuation">.</span>repl_state <span class="token operator">=</span> REPL_STATE_CONNECTING<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="4-3-主从握手并判断复制类型"><a href="#4-3-主从握手并判断复制类型" class="headerlink" title="(4.3) 主从握手并判断复制类型"></a>(4.3) 主从握手并判断复制类型</h2><p>  从库建立TCP连接后，从库实例其实并没有立即开始进行数据同步，而是会先和主库之间进行握手通信。</p>
+<p>  握手通信的目的，主要包括从库和主库进行验证，以及从库将自身的 IP 和端口号发给主库。</p>
+<h2 id="4-4-复制类型判断与执行"><a href="#4-4-复制类型判断与执行" class="headerlink" title="(4.4) 复制类型判断与执行"></a>(4.4) 复制类型判断与执行</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Try a partial resynchronization with the master if we are about to reconnect.
+ * If there is no cached master structure, at least try to issue a
+ * "PSYNC ? -1" command in order to trigger a full resync using the PSYNC
+ * command in order to obtain the master replid and the master replication
+ * global offset.
+ *
+ * This function is designed to be called from syncWithMaster(), so the
+ * following assumptions are made:
+ *
+ * 1) We pass the function an already connected socket "fd".
+ * 2) This function does not close the file descriptor "fd". However in case
+ *    of successful partial resynchronization, the function will reuse
+ *    'fd' as file descriptor of the server.master client structure.
+ *
+ * The function is split in two halves: if read_reply is 0, the function
+ * writes the PSYNC command on the socket, and a new function call is
+ * needed, with read_reply set to 1, in order to read the reply of the
+ * command. This is useful in order to support non blocking operations, so
+ * that we write, return into the event loop, and read when there are data.
+ *
+ * When read_reply is 0 the function returns PSYNC_WRITE_ERR if there
+ * was a write error, or PSYNC_WAIT_REPLY to signal we need another call
+ * with read_reply set to 1. However even when read_reply is set to 1
+ * the function may return PSYNC_WAIT_REPLY again to signal there were
+ * insufficient data to read to complete its work. We should re-enter
+ * into the event loop and wait in such a case.
+ *
+ * The function returns:
+ *
+ * PSYNC_CONTINUE: If the PSYNC command succeeded and we can continue.
+ * PSYNC_FULLRESYNC: If PSYNC is supported but a full resync is needed.
+ *                   In this case the master replid and global replication
+ *                   offset is saved.
+ * PSYNC_NOT_SUPPORTED: If the server does not understand PSYNC at all and
+ *                      the caller should fall back to SYNC.
+ * PSYNC_WRITE_ERROR: There was an error writing the command to the socket.
+ * PSYNC_WAIT_REPLY: Call again the function with read_reply set to 1.
+ * PSYNC_TRY_LATER: Master is currently in a transient error condition.
+ *
+ * Notable side effects:
+ *
+ * 1) As a side effect of the function call the function removes the readable
+ *    event handler from "fd", unless the return value is PSYNC_WAIT_REPLY.
+ * 2) server.master_initial_offset is set to the right value according
+ *    to the master reply. This will be used to populate the 'server.master'
+ *    structure replication offset.
+ */</span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">PSYNC_WRITE_ERROR</span> <span class="token expression"><span class="token number">0</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">PSYNC_WAIT_REPLY</span> <span class="token expression"><span class="token number">1</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">PSYNC_CONTINUE</span> <span class="token expression"><span class="token number">2</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">PSYNC_FULLRESYNC</span> <span class="token expression"><span class="token number">3</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">PSYNC_NOT_SUPPORTED</span> <span class="token expression"><span class="token number">4</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">PSYNC_TRY_LATER</span> <span class="token expression"><span class="token number">5</span></span></span>
+
+<span class="token comment">/*
+ */</span>
+<span class="token keyword">int</span> <span class="token function">slaveTryPartialResynchronization</span><span class="token punctuation">(</span>connection <span class="token operator">*</span>conn<span class="token punctuation">,</span> <span class="token keyword">int</span> read_reply<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>psync_replid<span class="token punctuation">;</span>
+    <span class="token keyword">char</span> psync_offset<span class="token punctuation">[</span><span class="token number">32</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    sds reply<span class="token punctuation">;</span>
+
+    <span class="token comment">/* Writing half */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>read_reply<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* Initially set master_initial_offset to -1 to mark the current
+         * master replid and offset as not valid. Later if we'll be able to do
+         * a FULL resync using the PSYNC command we'll set the offset at the
+         * right value, so that this information will be propagated to the
+         * client structure representing the master into server.master. */</span>
+        server<span class="token punctuation">.</span>master_initial_offset <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>cached_master<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            psync_replid <span class="token operator">=</span> server<span class="token punctuation">.</span>cached_master<span class="token operator">-></span>replid<span class="token punctuation">;</span>
+            <span class="token function">snprintf</span><span class="token punctuation">(</span>psync_offset<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>psync_offset<span class="token punctuation">)</span><span class="token punctuation">,</span><span class="token string">"%lld"</span><span class="token punctuation">,</span> server<span class="token punctuation">.</span>cached_master<span class="token operator">-></span>reploff<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"Trying a partial resynchronization (request %s:%s)."</span><span class="token punctuation">,</span> psync_replid<span class="token punctuation">,</span> psync_offset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"Partial resynchronization not possible (no cached master)"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            psync_replid <span class="token operator">=</span> <span class="token string">"?"</span><span class="token punctuation">;</span>
+            <span class="token function">memcpy</span><span class="token punctuation">(</span>psync_offset<span class="token punctuation">,</span><span class="token string">"-1"</span><span class="token punctuation">,</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">/* Issue the PSYNC command */</span>
+        reply <span class="token operator">=</span> <span class="token function">sendSynchronousCommand</span><span class="token punctuation">(</span>SYNC_CMD_WRITE<span class="token punctuation">,</span>conn<span class="token punctuation">,</span><span class="token string">"PSYNC"</span><span class="token punctuation">,</span>psync_replid<span class="token punctuation">,</span>psync_offset<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>reply <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Unable to send PSYNC to master: %s"</span><span class="token punctuation">,</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">sdsfree</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">connSetReadHandler</span><span class="token punctuation">(</span>conn<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span> PSYNC_WRITE_ERROR<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span> PSYNC_WAIT_REPLY<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* Reading half */</span>
+    reply <span class="token operator">=</span> <span class="token function">sendSynchronousCommand</span><span class="token punctuation">(</span>SYNC_CMD_READ<span class="token punctuation">,</span>conn<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">sdslen</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* The master may send empty newlines after it receives PSYNC
+         * and before to reply, just to keep the connection alive. */</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> PSYNC_WAIT_REPLY<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token function">connSetReadHandler</span><span class="token punctuation">(</span>conn<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">strncmp</span><span class="token punctuation">(</span>reply<span class="token punctuation">,</span><span class="token string">"+FULLRESYNC"</span><span class="token punctuation">,</span><span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">char</span> <span class="token operator">*</span>replid <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">,</span> <span class="token operator">*</span>offset <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* FULL RESYNC, parse the reply in order to extract the replid
+         * and the replication offset. */</span>
+        replid <span class="token operator">=</span> <span class="token function">strchr</span><span class="token punctuation">(</span>reply<span class="token punctuation">,</span><span class="token char">' '</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>replid<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            replid<span class="token operator">++</span><span class="token punctuation">;</span>
+            offset <span class="token operator">=</span> <span class="token function">strchr</span><span class="token punctuation">(</span>replid<span class="token punctuation">,</span><span class="token char">' '</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>offset<span class="token punctuation">)</span> offset<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>replid <span class="token operator">||</span> <span class="token operator">!</span>offset <span class="token operator">||</span> <span class="token punctuation">(</span>offset<span class="token operator">-</span>replid<span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">!=</span> CONFIG_RUN_ID_SIZE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span>
+                <span class="token string">"Master replied with wrong +FULLRESYNC syntax."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">/* This is an unexpected condition, actually the +FULLRESYNC
+             * reply means that the master supports PSYNC, but the reply
+             * format seems wrong. To stay safe we blank the master
+             * replid to make sure next PSYNCs will fail. */</span>
+            <span class="token function">memset</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>master_replid<span class="token punctuation">,</span><span class="token number">0</span><span class="token punctuation">,</span>CONFIG_RUN_ID_SIZE<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">memcpy</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>master_replid<span class="token punctuation">,</span> replid<span class="token punctuation">,</span> offset<span class="token operator">-</span>replid<span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            server<span class="token punctuation">.</span>master_replid<span class="token punctuation">[</span>CONFIG_RUN_ID_SIZE<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token char">'\0'</span><span class="token punctuation">;</span>
+            server<span class="token punctuation">.</span>master_initial_offset <span class="token operator">=</span> <span class="token function">strtoll</span><span class="token punctuation">(</span>offset<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">,</span><span class="token number">10</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span><span class="token string">"Full resync from master: %s:%lld"</span><span class="token punctuation">,</span>
+                server<span class="token punctuation">.</span>master_replid<span class="token punctuation">,</span>
+                server<span class="token punctuation">.</span>master_initial_offset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">/* We are going to full resync, discard the cached master structure. */</span>
+        <span class="token function">replicationDiscardCachedMaster</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> PSYNC_FULLRESYNC<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">strncmp</span><span class="token punctuation">(</span>reply<span class="token punctuation">,</span><span class="token string">"+CONTINUE"</span><span class="token punctuation">,</span><span class="token number">9</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* Partial resync was accepted. */</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span>
+            <span class="token string">"Successful partial resynchronization with master."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Check the new replication ID advertised by the master. If it
+         * changed, we need to set the new ID as primary ID, and set or
+         * secondary ID as the old master ID up to the current offset, so
+         * that our sub-slaves will be able to PSYNC with us after a
+         * disconnection. */</span>
+        <span class="token keyword">char</span> <span class="token operator">*</span>start <span class="token operator">=</span> reply<span class="token operator">+</span><span class="token number">10</span><span class="token punctuation">;</span>
+        <span class="token keyword">char</span> <span class="token operator">*</span>end <span class="token operator">=</span> reply<span class="token operator">+</span><span class="token number">9</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span><span class="token punctuation">(</span>end<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token char">'\r'</span> <span class="token operator">&amp;&amp;</span> end<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token char">'\n'</span> <span class="token operator">&amp;&amp;</span> end<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token char">'\0'</span><span class="token punctuation">)</span> end<span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>end<span class="token operator">-</span>start <span class="token operator">==</span> CONFIG_RUN_ID_SIZE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">char</span> new<span class="token punctuation">[</span>CONFIG_RUN_ID_SIZE<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+            <span class="token function">memcpy</span><span class="token punctuation">(</span>new<span class="token punctuation">,</span>start<span class="token punctuation">,</span>CONFIG_RUN_ID_SIZE<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            new<span class="token punctuation">[</span>CONFIG_RUN_ID_SIZE<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token char">'\0'</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">strcmp</span><span class="token punctuation">(</span>new<span class="token punctuation">,</span>server<span class="token punctuation">.</span>cached_master<span class="token operator">-></span>replid<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">/* Master ID changed. */</span>
+                <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Master replication ID changed to %s"</span><span class="token punctuation">,</span>new<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">/* Set the old ID as our ID2, up to the current offset+1. */</span>
+                <span class="token function">memcpy</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>replid2<span class="token punctuation">,</span>server<span class="token punctuation">.</span>cached_master<span class="token operator">-></span>replid<span class="token punctuation">,</span>
+                    <span class="token keyword">sizeof</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>replid2<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                server<span class="token punctuation">.</span>second_replid_offset <span class="token operator">=</span> server<span class="token punctuation">.</span>master_repl_offset<span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">;</span>
+
+                <span class="token comment">/* Update the cached master ID and our own primary ID to the
+                 * new one. */</span>
+                <span class="token function">memcpy</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>replid<span class="token punctuation">,</span>new<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>replid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token function">memcpy</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>cached_master<span class="token operator">-></span>replid<span class="token punctuation">,</span>new<span class="token punctuation">,</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>replid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">/* Disconnect all the sub-slaves: they need to be notified. */</span>
+                <span class="token function">disconnectSlaves</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">/* Setup the replication to continue. */</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">replicationResurrectCachedMaster</span><span class="token punctuation">(</span>conn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* If this instance was restarted and we read the metadata to
+         * PSYNC from the persistence file, our replication backlog could
+         * be still not initialized. Create it. */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>repl_backlog <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token function">createReplicationBacklog</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> PSYNC_CONTINUE<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/* If we reach this point we received either an error (since the master does
+     * not understand PSYNC or because it is in a special state and cannot
+     * serve our request), or an unexpected reply from the master.
+     *
+     * Return PSYNC_NOT_SUPPORTED on errors we don't understand, otherwise
+     * return PSYNC_TRY_LATER if we believe this is a transient error. */</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">strncmp</span><span class="token punctuation">(</span>reply<span class="token punctuation">,</span><span class="token string">"-NOMASTERLINK"</span><span class="token punctuation">,</span><span class="token number">13</span><span class="token punctuation">)</span> <span class="token operator">||</span>
+        <span class="token operator">!</span><span class="token function">strncmp</span><span class="token punctuation">(</span>reply<span class="token punctuation">,</span><span class="token string">"-LOADING"</span><span class="token punctuation">,</span><span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span>
+            <span class="token string">"Master is currently unable to PSYNC "</span>
+            <span class="token string">"but should be in the future: %s"</span><span class="token punctuation">,</span> reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">sdsfree</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> PSYNC_TRY_LATER<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">strncmp</span><span class="token punctuation">(</span>reply<span class="token punctuation">,</span><span class="token string">"-ERR"</span><span class="token punctuation">,</span><span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* If it's not an error, log the unexpected event. */</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span>
+            <span class="token string">"Unexpected reply to PSYNC from master: %s"</span><span class="token punctuation">,</span> reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_NOTICE<span class="token punctuation">,</span>
+            <span class="token string">"Master does not support PSYNC or is in "</span>
+            <span class="token string">"error state (reply: %s)"</span><span class="token punctuation">,</span> reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">sdsfree</span><span class="token punctuation">(</span>reply<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">replicationDiscardCachedMaster</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> PSYNC_NOT_SUPPORTED<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/420285">Redis 源码剖析与实战 - 21 | 主从复制：基于状态机的设计与实现</a></p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="reward-container">
+  <div></div>
+  <button>
+    赞赏
+  </button>
+  <div class="post-reward">
+      <div>
+        <img src="/images/wechatpay.png" alt="WKQ 微信">
+        <span>微信</span>
+      </div>
+      <div>
+        <img src="/images/alipay.png" alt="WKQ 支付宝">
+        <span>支付宝</span>
+      </div>
+
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/02/05/redis-multi-io-thread/" rel="prev" title="Redis IO多线程">
+                  <i class="fa fa-chevron-left"></i> Redis IO多线程
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">WKQ</span>
+</div>
+<div class="busuanzi-count">
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://unpkg.com/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+
+  
+<script src="https://unpkg.com/hexo-generator-searchdb@1.4.1/dist/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>
