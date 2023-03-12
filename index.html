@@ -213,7 +213,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/02/12/redis-main-subordinate-replication/">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/02/12/redis-principal-subordinate-replication/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
@@ -227,7 +227,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/2023/02/12/redis-main-subordinate-replication/" class="post-title-link" itemprop="url">Redis主从复制</a>
+            <a href="/2023/02/12/redis-principal-subordinate-replication/" class="post-title-link" itemprop="url">Redis主从数据同步</a>
         </h2>
 
         <div class="post-meta">
@@ -236,10 +236,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2023-02-12 22:43:05 / 修改时间：23:00:03" itemprop="dateCreated datePublished" datetime="2023-02-12T22:43:05+08:00">2023-02-12</time>
+              <time title="创建时间：2023-02-12 22:43:05" itemprop="dateCreated datePublished" datetime="2023-02-12T22:43:05+08:00">2023-02-12</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-02-26 23:12:46" itemprop="dateModified" datetime="2023-02-26T23:12:46+08:00">2023-02-26</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -251,7 +257,7 @@
             </span>
 
           
-            <span id="/2023/02/12/redis-main-subordinate-replication/" class="post-meta-item leancloud_visitors" data-flag-title="Redis主从复制" title="阅读次数">
+            <span id="/2023/02/12/redis-principal-subordinate-replication/" class="post-meta-item leancloud_visitors" data-flag-title="Redis主从数据同步" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -266,8 +272,8 @@
       </span>
       <span class="post-meta-item-text">Valine：</span>
     
-    <a title="valine" href="/2023/02/12/redis-main-subordinate-replication/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2023/02/12/redis-main-subordinate-replication/" itemprop="commentCount"></span>
+    <a title="valine" href="/2023/02/12/redis-principal-subordinate-replication/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2023/02/12/redis-principal-subordinate-replication/" itemprop="commentCount"></span>
     </a>
   </span>
   
@@ -277,14 +283,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>20k</span>
+              <span>22k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>18 分钟</span>
+              <span>20 分钟</span>
             </span>
 
         </div>
@@ -296,16 +302,31 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>  Redis 是如何实现主从复制的？</p>
-<h1 id="1-Redis主从复制"><a href="#1-Redis主从复制" class="headerlink" title="(1) Redis主从复制"></a>(1) Redis主从复制</h1><p>从原理上来说，Redis 的主从复制主要包括了全量复制、增量复制和长连接同步三种情况。</p>
+          <p>  有一个常见的问题，Redis是如何实现高可用的？</p>
+<h1 id="1-如何实现高可用"><a href="#1-如何实现高可用" class="headerlink" title="(1) 如何实现高可用"></a>(1) 如何实现高可用</h1><p>  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。</p>
+<p>  Redis主从是冗余的一种体现。</p>
+<p>  Redis的高可用是通过<code>主从</code>、<code>哨兵</code>来保障的。在主库挂了以后，<code>哨兵</code>可以把流量切到<code>从库</code>，让从库顶上去，来保障服务可用。</p>
+<p>  那就有一个问题了，顶上去的从库的数据和主库数据一样吗？还有Redis是如何实现主从数据同步的？</p>
+<br>
+
+
+
+<h1 id="2-Redis主从数据同步"><a href="#2-Redis主从数据同步" class="headerlink" title="(2) Redis主从数据同步"></a>(2) Redis主从数据同步</h1><p>  Redis多个副本(主库和从库)之间的数据如何保持一致呢？<br>  数据读写操作可以发给所有的实例吗？</p>
+<h2 id="2-1-新增数据是如何保存到Redis副本"><a href="#2-1-新增数据是如何保存到Redis副本" class="headerlink" title="(2.1) 新增数据是如何保存到Redis副本"></a>(2.1) 新增数据是如何保存到Redis副本</h2><p>  Redis是通过读写分离的方式，通过主从库模式来保障多个副本数据一致。 (MySQL、Kafka也是类似)</p>
+<p>  为什么要采用读写分离的方式呢？<br>  set key v1<br>  set key v2</p>
+<p>  <img src=""></p>
+<p>  如果允许所有副本接收写操作(新增 修改 删除)，数据在这多个副本可能就不一致了(分别是 v1 和 v2）。</p>
+<p>  如果必须保障新增的数据在多个副本上一致，就要涉及到<code>加锁</code>、<code>实例间协商是否完成修改</code>等一系列操作，但这会带来巨额的开销，当然是不太能接受的。</p>
+<h2 id="2-2-Redis主从库模式"><a href="#2-2-Redis主从库模式" class="headerlink" title="(2.2) Redis主从库模式"></a>(2.2) Redis主从库模式</h2><p>Redis 提供了主从库模式，以保证数据副本的一致，主从库之间采用的是读写分离的方式。<br>读操作：主库、从库都可以接收；<br>写操作：首先到主库执行，然后，主库将写操作同步给从库。</p>
+<h2 id="2-3-Redis主从数据同步流程"><a href="#2-3-Redis主从数据同步流程" class="headerlink" title="(2.3) Redis主从数据同步流程"></a>(2.3) Redis主从数据同步流程</h2><p>从原理上来说，Redis 的主从数据同步主要包括了<code>全量复制</code>、<code>增量复制</code>和<code>长连接同步</code>三种情况。</p>
 <ol>
-<li>全量复制传输 RDB 文件；</li>
-<li>增量复制传输主从断连期间的命令；</li>
-<li>长连接同步则是把主节点正常收到的请求传输给从节点。</li>
+<li><code>全量复制</code>传输 RDB 文件；</li>
+<li><code>增量复制</code>传输主从断连期间的命令；</li>
+<li><code>长连接同步</code>则是把主节点正常收到的请求传输给从节点。</li>
 </ol>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2023/02/12/redis-main-subordinate-replication/#more" rel="contents">
+              <a class="btn" href="/2023/02/12/redis-principal-subordinate-replication/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1444,7 +1465,7 @@
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/31/">31</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/32/">32</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1510,20 +1531,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">310</span>
+          <span class="site-state-item-count">313</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-count">17</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">59</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

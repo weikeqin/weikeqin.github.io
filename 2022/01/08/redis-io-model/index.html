@@ -32,11 +32,11 @@
 <meta property="og:image" content="http://weikeqin.com/img/linux/network/tcp-server-work-process-simple.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/io-model/redis-io-model-detail.png">
 <meta property="article:published_time" content="2022-01-08T00:56:06.000Z">
-<meta property="article:modified_time" content="2023-02-12T11:06:15.051Z">
+<meta property="article:modified_time" content="2023-02-26T08:03:40.608Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="io">
-<meta property="article:tag" content="database">
 <meta property="article:tag" content="redis">
+<meta property="article:tag" content="database">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://weikeqin.com/img/database/redis/io-model/linux-io-multiplexing-epoll.png">
 
@@ -253,7 +253,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-02-12 19:06:15" itemprop="dateModified" datetime="2023-02-12T19:06:15+08:00">2023-02-12</time>
+                <time title="修改时间：2023-02-26 16:03:40" itemprop="dateModified" datetime="2023-02-26T16:03:40+08:00">2023-02-26</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -1623,7 +1623,7 @@ client <span class="token operator">*</span><span class="token function">createC
 
 
 <h1 id="5-思考"><a href="#5-思考" class="headerlink" title="(5) 思考"></a>(5) 思考</h1><h2 id="5-1-Redis有哪些潜在的性能瓶颈"><a href="#5-1-Redis有哪些潜在的性能瓶颈" class="headerlink" title="(5.1) Redis有哪些潜在的性能瓶颈"></a>(5.1) Redis有哪些潜在的性能瓶颈</h2><p>Redis单线程处理IO请求性能瓶颈主要包括2个方面：</p>
-<p>1、任意一个请求在server中一旦发生耗时，都会影响整个server的性能，也就是说后面的请求都要等前面这个耗时请求处理完成，自己才能被处理到。<br>2、并发量非常大时，单线程读写客户端IO数据存在性能瓶颈，虽然采用IO多路复用机制，但是读写客户端数据依旧是同步IO，只能单线程依次读取客户端的数据，无法利用到CPU多核。</p>
+<p>1、任意一个请求在server中一旦发生耗时，都会影响整个server的性能，也就是说后面的请求都要等前面这个耗时请求处理完成，自己才能被处理到。<br>2、并发量非常大时，单线程读写客户端IO数据存在性能瓶颈，虽然采用IO多路复用机制，但是读写客户端数据时从内核缓冲区中拷贝数据的操作是同步操作，只能单线程依次读取客户端的数据，无法利用到CPU多核。</p>
 <p>耗时的操作包括以下几种：<br>  a、操作bigkey：写入一个bigkey在分配内存时需要消耗更多的时间，同样，删除bigkey释放内存同样会产生耗时；<br>  b、使用复杂度过高的命令：例如SORT/SUNION/ZUNIONSTORE，或者O(N)命令，但是N很大，例如lrange key 0 -1一次查询全量数据；<br>  c、大量key集中过期：Redis的过期机制也是在主线程中执行的，大量key集中过期会导致处理一个请求时，耗时都在删除过期key，耗时变长；<br>  d、淘汰策略：淘汰策略也是在主线程执行的，当内存超过Redis内存上限后，每次写入都需要淘汰一些key，也会造成耗时变长；<br>  e、AOF刷盘开启always机制：每次写入都需要把这个操作刷到磁盘，写磁盘的速度远比写内存慢，会拖慢Redis的性能；<br>  f、主从全量同步生成RDB：虽然采用fork子进程生成数据快照，但fork这一瞬间也是会阻塞整个线程的，实例越大，阻塞时间越久；</p>
 <p>针对问题1，一方面需要业务人员去规避，一方面Redis在4.0推出了lazy-free机制，把bigkey释放内存的耗时操作放在了异步线程中执行，降低对主线程的影响。</p>
 <p>针对问题2，Redis在6.0推出了多线程，可以在高并发场景下利用CPU多核多线程读写客户端数据，进一步提升server性能，当然，只是针对客户端的读写是并行的，每个命令的真正操作依旧是单线程的。</p>
@@ -1645,8 +1645,8 @@ client <span class="token operator">*</span><span class="token function">createC
       <footer class="post-footer">
           <div class="post-tags">
               <a href="/tags/io/" rel="tag"># io</a>
-              <a href="/tags/database/" rel="tag"># database</a>
               <a href="/tags/redis/" rel="tag"># redis</a>
+              <a href="/tags/database/" rel="tag"># database</a>
           </div>
 
         
@@ -1735,20 +1735,20 @@ client <span class="token operator">*</span><span class="token function">createC
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">310</span>
+          <span class="site-state-item-count">313</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-count">17</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">59</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

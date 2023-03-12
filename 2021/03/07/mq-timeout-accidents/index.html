@@ -20,24 +20,30 @@
     var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="事故简述：  MQ某共享集群部分机器过保(过了保修期)，集群全部nameserver节点均过保，替换过程中，部分业务出现生产消费流量突降；  支付调用MQ sdk向MQ写消息超时(共耗时8秒)，虽然MQ不是强依赖，但导致了上游发起支付超时，最终支付失败; (1) 事故时间线  02-24 16:02 MQ共享集群部分机器过保  02-24 16:02 MQ研发用新机器替换已经过保的nameserv">
+  <meta name="description" content="事故简述：  MQ更换机器，替换过程中出现问题  支付流程中依赖MQ，发MQ超时导致支付-预付单接口超时。 (1) 事故描述  背景  MQ某共享集群部分机器过保(过了保修期)，集群全部nameserver节点均过保，替换过程中，部分业务出现生产消费流量突降；  支付调用MQ sdk向MQ写消息超时(共耗时8秒)，虽然MQ不是强依赖，但导致了上游发起支付超时，最终支付失败;     (1.1) 事">
 <meta property="og:type" content="article">
-<meta property="og:title" content="那些年我们在商城奋斗的光辉岁月 - MQ超时导致的事故">
+<meta property="og:title" content="那些年在商城奋斗的光辉岁月 - MQ超时导致的事故">
 <meta property="og:url" content="http://weikeqin.com/2021/03/07/mq-timeout-accidents/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="事故简述：  MQ某共享集群部分机器过保(过了保修期)，集群全部nameserver节点均过保，替换过程中，部分业务出现生产消费流量突降；  支付调用MQ sdk向MQ写消息超时(共耗时8秒)，虽然MQ不是强依赖，但导致了上游发起支付超时，最终支付失败; (1) 事故时间线  02-24 16:02 MQ共享集群部分机器过保  02-24 16:02 MQ研发用新机器替换已经过保的nameserv">
+<meta property="og:description" content="事故简述：  MQ更换机器，替换过程中出现问题  支付流程中依赖MQ，发MQ超时导致支付-预付单接口超时。 (1) 事故描述  背景  MQ某共享集群部分机器过保(过了保修期)，集群全部nameserver节点均过保，替换过程中，部分业务出现生产消费流量突降；  支付调用MQ sdk向MQ写消息超时(共耗时8秒)，虽然MQ不是强依赖，但导致了上游发起支付超时，最终支付失败;     (1.1) 事">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/pay-sequence.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/pay_error-20210224-1.jpg">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/image_1614154587516.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/trade/order-pre-pay-flow-chart.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/pay-sequence.png">
+<meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/user-pay-flow.png">
 <meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/2021-3-1_21-49-3.png">
 <meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/mq-rollback-fail.png">
 <meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/pay-sequence.png">
 <meta property="og:image" content="http://weikeqin.com/img/business/stability/20210224/user-pay-flow.png">
 <meta property="article:published_time" content="2021-03-07T07:26:50.000Z">
-<meta property="article:modified_time" content="2023-02-12T11:17:50.059Z">
+<meta property="article:modified_time" content="2023-03-12T11:26:44.085Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="stability">
 <meta property="article:tag" content="trade">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://weikeqin.com/img/business/stability/20210224/2021-3-1_21-49-3.png">
+<meta name="twitter:image" content="http://weikeqin.com/img/business/stability/20210224/pay-sequence.png">
 
 <link rel="canonical" href="http://weikeqin.com/2021/03/07/mq-timeout-accidents/">
 
@@ -52,7 +58,7 @@
   };
 </script>
 
-  <title>那些年我们在商城奋斗的光辉岁月 - MQ超时导致的事故 | 天道酬勤</title>
+  <title>那些年在商城奋斗的光辉岁月 - MQ超时导致的事故 | 天道酬勤</title>
   
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
     <script>
@@ -235,7 +241,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          那些年我们在商城奋斗的光辉岁月 - MQ超时导致的事故
+          那些年在商城奋斗的光辉岁月 - MQ超时导致的事故
         </h1>
 
         <div class="post-meta">
@@ -252,7 +258,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-02-12 19:17:50" itemprop="dateModified" datetime="2023-02-12T19:17:50+08:00">2023-02-12</time>
+                <time title="修改时间：2023-03-12 19:26:44" itemprop="dateModified" datetime="2023-03-12T19:26:44+08:00">2023-03-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -265,7 +271,7 @@
             </span>
 
           
-            <span id="/2021/03/07/mq-timeout-accidents/" class="post-meta-item leancloud_visitors" data-flag-title="那些年我们在商城奋斗的光辉岁月 - MQ超时导致的事故" title="阅读次数">
+            <span id="/2021/03/07/mq-timeout-accidents/" class="post-meta-item leancloud_visitors" data-flag-title="那些年在商城奋斗的光辉岁月 - MQ超时导致的事故" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -298,7 +304,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>4.7k</span>
+              <span>4.5k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -317,10 +323,12 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>事故简述：<br>  MQ某共享集群部分机器过保(过了保修期)，集群全部nameserver节点均过保，替换过程中，部分业务出现生产消费流量突降；<br>  支付调用MQ sdk向MQ写消息超时(共耗时8秒)，虽然MQ不是强依赖，但导致了上游发起支付超时，最终支付失败;</p>
-<h1 id="1-事故时间线"><a href="#1-事故时间线" class="headerlink" title="(1) 事故时间线"></a>(1) 事故时间线</h1><p>  02-24 16:02 MQ共享集群部分机器过保<br>  02-24 16:02 MQ研发用新机器替换已经过保的nameserver机器；<br>  02-24 16:02 MQ开始发生故障 <strong>事故开始</strong><br>  02-24 16:03 MQ研发操作同学观察流量，发现消费侧流量有下降；<br>  02-24 16:03 优选-微信小程序发起支付失败<br>  02-24 16:04 MQ研发回滚Proxy模块配置，Proxy中添加nameserver地址。流量未恢复，开始登陆机器排查；（事后确定是导致生产失败的原因）</p>
-<p>  02-24 16:04 MQ消防群有业务一级报警、支付收银监控图上曲线异常<br>  02-24 16:05 收银研发开始排查，收银请求支付createPayOrder接口报错增多；支付收到错误日志报警<br>  02-24 16:07 收银研发发现报错原因是proxy模块发MQ消息失败，因为该消息是弱依赖，未继续排查其他MQ消息失败的原因，通知组内同学共同排查。<br>  02-24 16:07 MQ研发根据日志分析，路由信息没有拿到，但ns上没有问题，启动重启proxy操作，操作节点流量有上升。<br>  02-24 16:07 发现生产侧流量急剧下降。<br>  02-24 16:07 收银开始收到多个一级报警。排查问题，现象是收银请求支付下单超时。收银有上线，操作回滚（事后结论：与本次事故无关）<br>  02-24 16:08 收银研发在稳定性群通报一级报警，@支付稳定性接口人排查<br>  02-24 16:09 收银研发回滚上线单，机器比较多，期间在操作回滚，同时排查phoenix超时的原因，回复群里的问题。因优选等强依赖支付，没有操作降级支付。<br>  02-24 16:10 phoenix监控发起成功率正常，回调下跌，且多支付渠道均下跌，联系sre排查回调网络问题。<br>  02-24 16:13 收银研发查看日志发现支付cashier模块createPayOrder接口发MQ消息超时过大(3S)会导致接口整体超时，影响支付。<br>  02-24 16:16 收银研发看代码找到降级开关，并开始操作降级。<br>  02-24 16:16 MQ研发定位到broker上报的问题，在broker中启用老的ns地址，流量全部恢复；<br>  02-24 16:16 监控曲线已恢复(MQ回滚)<br>  02-24 16:17 完全恢复</p>
-<p>【事故处理及时性总结】<br>发现时间：2分钟（发生-&gt;发现）<br>定位时间：8分钟（发现→定位）<br>止损时间（核心指标开始恢复）：3分钟（定位-&gt;止损）<br>修复时间（故障完全恢复）：分钟（止损→修复）</p>
+        <p>事故简述：<br>  MQ更换机器，替换过程中出现问题<br>  支付流程中依赖MQ，发MQ超时导致支付-预付单接口超时。</p>
+<h1 id="1-事故描述"><a href="#1-事故描述" class="headerlink" title="(1) 事故描述"></a>(1) 事故描述</h1><p>  背景<br>  MQ某共享集群部分机器过保(过了保修期)，集群全部nameserver节点均过保，替换过程中，部分业务出现生产消费流量突降；<br>  支付调用MQ sdk向MQ写消息超时(共耗时8秒)，虽然MQ不是强依赖，但导致了上游发起支付超时，最终支付失败;</p>
+<p>  <img alt="支付时序图" src="/img/business/stability/20210224/pay-sequence.png" width=60% /> <br></p>
+<h2 id="1-1-事故时间线"><a href="#1-1-事故时间线" class="headerlink" title="(1.1) 事故时间线"></a>(1.1) 事故时间线</h2><p>  02-24 16:02 MQ共享集群部分机器过保，研发用新机器替换已经过保的nameserver机器；<br>  02-24 16:02 MQ开始发生故障 <strong>事故开始</strong><br>  02-24 16:03 MQ研发操作同学观察流量，发现消费侧流量有下降；<br>  02-24 16:03 优选-微信小程序发起支付失败<br>  02-24 16:04 MQ研发回滚Proxy模块配置，Proxy中添加nameserver地址。流量未恢复，开始登陆机器排查；（事后确定是导致生产失败的原因）</p>
+<p>  02-24 16:04 MQ消防群有业务一级报警、支付收银监控图上曲线异常<br>  02-24 16:05 支付研发开始排查，收银请求支付createPayOrder接口报错增多；支付收到错误日志报警<br>  02-24 16:07 支付研发发现报错原因是proxy模块发MQ消息失败，因为该消息是弱依赖，未继续排查其他MQ消息失败的原因，通知组内同学共同排查。<br>  02-24 16:07 MQ研发根据日志分析，路由信息没有拿到，但ns上没有问题，启动重启proxy操作，操作节点流量有上升。<br>  02-24 16:07 发现生产侧流量急剧下降。 <strong>事故严重</strong><br>  02-24 16:07 支付开始收到多个一级报警。排查问题，现象是支付-收银请求支付下单超时。支付-收银有上线，操作回滚（事后结论：与本次事故无关）<br>  02-24 16:10 支付监控发起成功率正常，回调下跌，且多支付渠道均下跌，联系sre排查回调网络问题。<br>  02-24 16:13 支付研发查看日志发现支付createPayOrder接口发MQ消息超时过大(3S)会导致接口整体超时，影响支付。 <strong>发现原因</strong><br>  02-24 16:16 找到降级开关，并开始操作降级。<br>  02-24 16:16 MQ研发定位到broker上报的问题，在broker中启用老的ns地址，流量全部恢复； <strong>恢复</strong><br>  02-24 16:16 监控曲线已恢复(MQ回滚)<br>  02-24 16:17 完全恢复</p>
+<h2 id="1-2-事故关键时间点"><a href="#1-2-事故关键时间点" class="headerlink" title="(1.2) 事故关键时间点"></a>(1.2) 事故关键时间点</h2><p>【事故处理及时性总结】<br>发现时间：2分钟（发生-&gt;发现）<br>定位时间：8分钟（发现→定位）<br>止损时间（核心指标开始恢复）：3分钟（定位-&gt;止损）<br>修复时间（故障完全恢复）：分钟（止损→修复）</p>
 <p>发现时间：1分钟（发生-&gt;发现）<br>定位时间：0分钟（发现→定位）<br>止损时间（核心指标开始恢复）：13分钟（定位-&gt;止损）<br>修复时间（故障完全恢复）：0分钟（止损→修复）</p>
 <h1 id="2-事故影响"><a href="#2-事故影响" class="headerlink" title="(2) 事故影响"></a>(2) 事故影响</h1><p>优选(实时支付业务)<br>影响用户数量：数万<br>影响订单量：数万<br>影响商品: 数十万<br>影响支付金额：数十万</p>
 <p>事故期间支付完单量下跌比例: &gt;80% (也就是支付成功的订单&lt;20%)</p>
@@ -391,23 +399,27 @@ MQ影响：
 -->
 
 
-<h2 id="2-1-事故期间用户反馈"><a href="#2-1-事故期间用户反馈" class="headerlink" title="(2.1) 事故期间用户反馈"></a>(2.1) 事故期间用户反馈</h2><p>  <img src=""> </p>
-<p>  <img src=""></p>
+<h2 id="2-1-事故期间用户反馈"><a href="#2-1-事故期间用户反馈" class="headerlink" title="(2.1) 事故期间用户反馈"></a>(2.1) 事故期间用户反馈</h2><p>  <img alt="提单页支付失败" src="/img/business/stability/20210224/pay_error-20210224-1.jpg" width=20% /> <br></p>
+<p>  <img alt="订单列表支付失败" src="/img/business/stability/20210224/image_1614154587516.png" width=20% /> <br></p>
 <br>
 
 
 
-<h1 id="3-问题分析"><a href="#3-问题分析" class="headerlink" title="(3) 问题分析"></a>(3) 问题分析</h1><h2 id="3-1-问题直接原因"><a href="#3-1-问题直接原因" class="headerlink" title="(3.1) 问题直接原因"></a>(3.1) 问题直接原因</h2><ol>
+<h1 id="3-问题分析"><a href="#3-问题分析" class="headerlink" title="(3) 问题分析"></a>(3) 问题分析</h1><p>  优选业务下单 + 集团支付 + 微信支付 整体流程<br>  <img alt="业务下单+集团支付+微信支付" src="/img/business/trade/order-pre-pay-flow-chart.png" width=30% /> <br></p>
+<p>  <strong>出问题的是 107 108 这两步中间发mq的部分</strong></p>
+<p>  集团支付时序图<br>  <img alt="支付时序图" src="/img/business/stability/20210224/pay-sequence.png" width=60% /> <br></p>
+<p>  集团支付流程细节<br>  <img alt="支付流程" src="/img/business/stability/20210224/user-pay-flow.png" width=30% /> <br></p>
+<h2 id="3-1-问题直接原因"><a href="#3-1-问题直接原因" class="headerlink" title="(3.1) 问题直接原因"></a>(3.1) 问题直接原因</h2><ol>
 <li>MQ在更换nameserver机器时，client端(producer)的nameserver地址(ip:port)没有生效， client -&gt; broker 异常</li>
 <li>收银支付服务创建收银支付订单时发MQ异常，导致预支付接口超时。</li>
 <li>业务方调用预收银支付接口(prepay)失败，导致支付流程异常，用户无法支付。</li>
 </ol>
 <h2 id="3-2-问题原因"><a href="#3-2-问题原因" class="headerlink" title="(3.2) 问题原因"></a>(3.2) 问题原因</h2><h3 id="3-2-1-为什么MQ的client端nameserver地址没有生效？"><a href="#3-2-1-为什么MQ的client端nameserver地址没有生效？" class="headerlink" title="(3.2.1) 为什么MQ的client端nameserver地址没有生效？"></a>(3.2.1) 为什么MQ的client端nameserver地址没有生效？</h3><p>  MQ服务 client、broker代码没变，以前也有类似更换，以前怎么没问题？</p>
 <h4 id="3-2-1-1-MQ更换nameserver流程"><a href="#3-2-1-1-MQ更换nameserver流程" class="headerlink" title="(3.2.1.1) MQ更换nameserver流程"></a>(3.2.1.1) MQ更换nameserver流程</h4><p>  本次过保机器替换，主要是存储元数据的nameserver，涉及broker和proxy模块，broker(存储模块)向nameserver上报涉及自己的元数据，proxy向nameserver请求，获取元数据信息，具体替换流程如下：</p>
-<p>  <img src="/img/business/stability/20210224/2021-3-1_21-49-3.png"></p>
+<p>  <img alt="MQ更换nameserver流程" src="/img/business/stability/20210224/2021-3-1_21-49-3.png" width=50% /> <br></p>
 <p>  1.扩容新节点，并把新扩容的节点通知给broker，让其上报元数据；<br>  2.待新老节点元数据一致后，将新节点下发给proxy，proxy内部重启开源版本的client，更新nameserver地址;<br>  3.同时更新给broker的nameserver地址，去除老节点，只保留新节点；</p>
 <p>回滚失效<br>  在16:04的回滚流程中，正常应该是上面流程中的逆流程，在实际操作中，遗漏第三步，会导致proxy去请求没有元数据的nameserver，依旧获取不到元数据，如下图，导致流量没有恢复，并对后续排查方向有一定的误导；  </p>
-<p>  <img src="/img/business/stability/20210224/mq-rollback-fail.png"></p>
+<p>  <img alt="MQ回滚流程" src="/img/business/stability/20210224/mq-rollback-fail.png" width=50% /> <br></p>
 <h4 id="3-2-1-2-消费下降原因"><a href="#3-2-1-2-消费下降原因" class="headerlink" title="(3.2.1.2) 消费下降原因"></a>(3.2.1.2) 消费下降原因</h4><p>  下降主要原因是在第二部，新的nameserver地址下发给proxy，proxy内部的rocketmq client也进行了重启，但是新的nameserver地址没有生效；</p>
 <p>  <a target="_blank" rel="noopener" href="https://github.com/apache/rocketmq/blob/main/client/src/main/java/org/apache/rocketmq/client/impl/MQClientManager.java#L47">https://github.com/apache/rocketmq/blob/main/client/src/main/java/org/apache/rocketmq/client/impl/MQClientManager.java#L47</a></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">MQClientInstance</span> <span class="token function">getOrCreateMQClientInstance</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">ClientConfig</span> clientConfig<span class="token punctuation">,</span> <span class="token class-name">RPCHook</span> rpcHook<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -452,7 +464,7 @@ MQ影响：
 <p>  <img src="/img/business/stability/20210224/user-pay-flow.png" alt="收银支付流程"></p>
 <p>支付Cashier收到发起支付请求之后做两件事：<br>  1.调用渠道网关向指定的三方支付渠道发起支付（如微信、支付宝等）<br>  2.再调用Scheduler向MQ发送一条消息（本case耗时8秒严重超时），注册延时任务，目的是在一定时间后主动调用渠道查询支付状态。（弱依赖 可降级，如果没有的话，就靠用户手动查）</p>
 <p>  8秒 = 4次 * (每次 获取连接1s + 写MQ消息1s)</p>
-<p>  <a target="_blank" rel="noopener" href="https://github.com/didi/DDMQ/blob/master/carrera-sdk/producer/java/carrera-producer-sdk-example/src/main/java/com/xiaojukeji/carrera/producer/examples/CarreraProducerExample.java">https://github.com/didi/DDMQ/blob/master/carrera-sdk/producer/java/carrera-producer-sdk-example/src/main/java/com/xiaojukeji/carrera/producer/examples/CarreraProducerExample.java</a></p>
+<p>  /carrera/producer/examples/CarreraProducerExample.java</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">CarreraConfig</span> config <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CarreraConfig</span><span class="token punctuation">(</span><span class="token class-name">Env<span class="token punctuation">.</span>Test</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 config<span class="token punctuation">.</span><span class="token function">setCarreraProxyTimeout</span><span class="token punctuation">(</span><span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 config<span class="token punctuation">.</span><span class="token function">setCarreraClientTimeout</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -498,8 +510,8 @@ Java SDK 生产  https://base.xiaojukeji.com/docs/ddmq/529
       <i class="fa fa-chevron-left"></i> Redis使用lua脚本
     </a></div>
       <div class="post-nav-item">
-    <a href="/2021/04/04/trade-accident-caused-by-optical-fiber-cut/" rel="next" title="那些年我们在商城奋斗的光辉岁月 - 光纤挖断导致商城交易系统-支付不可用">
-      那些年我们在商城奋斗的光辉岁月 - 光纤挖断导致商城交易系统-支付不可用 <i class="fa fa-chevron-right"></i>
+    <a href="/2021/03/28/network-accidents/" rel="next" title="那些年在商城奋斗的光辉岁月 - 网络丢包事故">
+      那些年在商城奋斗的光辉岁月 - 网络丢包事故 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -560,7 +572,7 @@ Java SDK 生产  https://base.xiaojukeji.com/docs/ddmq/529
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%BA%8B%E6%95%85%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">1.</span> <span class="nav-text">(1) 事故时间线</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%BA%8B%E6%95%85%E5%BD%B1%E5%93%8D"><span class="nav-number">2.</span> <span class="nav-text">(2) 事故影响</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E4%BA%8B%E6%95%85%E6%9C%9F%E9%97%B4%E7%94%A8%E6%88%B7%E5%8F%8D%E9%A6%88"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 事故期间用户反馈</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">(3) 问题分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E9%97%AE%E9%A2%98%E7%9B%B4%E6%8E%A5%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 问题直接原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E9%97%AE%E9%A2%98%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 问题原因</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-%E4%B8%BA%E4%BB%80%E4%B9%88MQ%E7%9A%84client%E7%AB%AFnameserver%E5%9C%B0%E5%9D%80%E6%B2%A1%E6%9C%89%E7%94%9F%E6%95%88%EF%BC%9F"><span class="nav-number">3.2.1.</span> <span class="nav-text">(3.2.1) 为什么MQ的client端nameserver地址没有生效？</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-1-MQ%E6%9B%B4%E6%8D%A2nameserver%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">(3.2.1.1) MQ更换nameserver流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-2-%E6%B6%88%E8%B4%B9%E4%B8%8B%E9%99%8D%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.1.2.</span> <span class="nav-text">(3.2.1.2) 消费下降原因</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-3-%E7%94%9F%E4%BA%A7%E4%B8%8B%E9%99%8D%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.1.3.</span> <span class="nav-text">(3.2.1.3) 生产下降原因</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-4-%E7%BB%BC%E5%90%88%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.1.4.</span> <span class="nav-text">(3.2.1.4) 综合原因</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%94%B6%E9%93%B6%E6%94%AF%E4%BB%98%E6%9C%8D%E5%8A%A1%E7%9A%84%E9%A2%84%E6%94%AF%E4%BB%98%E6%8E%A5%E5%8F%A3%E8%B6%85%E6%97%B6%EF%BC%9F"><span class="nav-number">3.2.2.</span> <span class="nav-text">(3.2.2) 为什么收银支付服务的预支付接口超时？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-3-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%9A%E5%8A%A1%E6%96%B9%E8%B0%83%E7%94%A8%E9%A2%84%E6%94%B6%E9%93%B6%E6%94%AF%E4%BB%98%E6%8E%A5%E5%8F%A3-prepay-%E5%A4%B1%E8%B4%A5%EF%BC%9F"><span class="nav-number">3.2.3.</span> <span class="nav-text">(3.2.3) 为什么业务方调用预收银支付接口(prepay)失败？</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E4%BA%8B%E6%95%85%E6%8F%8F%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">(1) 事故描述</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%BA%8B%E6%95%85%E6%97%B6%E9%97%B4%E7%BA%BF"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 事故时间线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E4%BA%8B%E6%95%85%E5%85%B3%E9%94%AE%E6%97%B6%E9%97%B4%E7%82%B9"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 事故关键时间点</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%BA%8B%E6%95%85%E5%BD%B1%E5%93%8D"><span class="nav-number">2.</span> <span class="nav-text">(2) 事故影响</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E4%BA%8B%E6%95%85%E6%9C%9F%E9%97%B4%E7%94%A8%E6%88%B7%E5%8F%8D%E9%A6%88"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 事故期间用户反馈</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">(3) 问题分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E9%97%AE%E9%A2%98%E7%9B%B4%E6%8E%A5%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 问题直接原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E9%97%AE%E9%A2%98%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 问题原因</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-%E4%B8%BA%E4%BB%80%E4%B9%88MQ%E7%9A%84client%E7%AB%AFnameserver%E5%9C%B0%E5%9D%80%E6%B2%A1%E6%9C%89%E7%94%9F%E6%95%88%EF%BC%9F"><span class="nav-number">3.2.1.</span> <span class="nav-text">(3.2.1) 为什么MQ的client端nameserver地址没有生效？</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-1-MQ%E6%9B%B4%E6%8D%A2nameserver%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.1.1.</span> <span class="nav-text">(3.2.1.1) MQ更换nameserver流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-2-%E6%B6%88%E8%B4%B9%E4%B8%8B%E9%99%8D%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.1.2.</span> <span class="nav-text">(3.2.1.2) 消费下降原因</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-3-%E7%94%9F%E4%BA%A7%E4%B8%8B%E9%99%8D%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.1.3.</span> <span class="nav-text">(3.2.1.3) 生产下降原因</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-4-%E7%BB%BC%E5%90%88%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.1.4.</span> <span class="nav-text">(3.2.1.4) 综合原因</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%94%B6%E9%93%B6%E6%94%AF%E4%BB%98%E6%9C%8D%E5%8A%A1%E7%9A%84%E9%A2%84%E6%94%AF%E4%BB%98%E6%8E%A5%E5%8F%A3%E8%B6%85%E6%97%B6%EF%BC%9F"><span class="nav-number">3.2.2.</span> <span class="nav-text">(3.2.2) 为什么收银支付服务的预支付接口超时？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-3-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%9A%E5%8A%A1%E6%96%B9%E8%B0%83%E7%94%A8%E9%A2%84%E6%94%B6%E9%93%B6%E6%94%AF%E4%BB%98%E6%8E%A5%E5%8F%A3-prepay-%E5%A4%B1%E8%B4%A5%EF%BC%9F"><span class="nav-number">3.2.3.</span> <span class="nav-text">(3.2.3) 为什么业务方调用预收银支付接口(prepay)失败？</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -574,20 +586,20 @@ Java SDK 生产  https://base.xiaojukeji.com/docs/ddmq/529
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">310</span>
+          <span class="site-state-item-count">313</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-count">17</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">59</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
