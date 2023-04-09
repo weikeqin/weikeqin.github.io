@@ -20,12 +20,12 @@
     var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。 (1) SDS是什么  SDS结构里包含了一个字符数组 buf[]，">
+  <meta name="description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。 (1) SDS是什么  Redis 是 Simple Dynamic">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis 数据结构 简单动态字符串(SDS)">
 <meta property="og:url" content="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。 (1) SDS是什么  SDS结构里包含了一个字符数组 buf[]，">
+<meta property="og:description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。 (1) SDS是什么  Redis 是 Simple Dynamic">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-struct.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/c-string.png">
@@ -35,7 +35,7 @@
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-memory.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-all.svg">
 <meta property="article:published_time" content="2023-01-01T07:55:11.000Z">
-<meta property="article:modified_time" content="2023-02-05T13:42:24.091Z">
+<meta property="article:modified_time" content="2023-03-25T14:09:38.979Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta property="article:tag" content="database">
@@ -255,7 +255,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-02-05 21:42:24" itemprop="dateModified" datetime="2023-02-05T21:42:24+08:00">2023-02-05</time>
+                <time title="修改时间：2023-03-25 22:09:38" itemprop="dateModified" datetime="2023-03-25T22:09:38+08:00">2023-03-25</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -308,7 +308,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>9 分钟</span>
+              <span>10 分钟</span>
             </span>
 
         </div>
@@ -322,7 +322,8 @@
       
         <p>  Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？</p>
 <p>  Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。</p>
-<h1 id="1-SDS是什么"><a href="#1-SDS是什么" class="headerlink" title="(1) SDS是什么"></a>(1) SDS是什么</h1><p>  SDS结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
+<h1 id="1-SDS是什么"><a href="#1-SDS是什么" class="headerlink" title="(1) SDS是什么"></a>(1) SDS是什么</h1><p>  Redis 是 Simple Dynamic String 的缩写，中文是<code>简单动态字符串</code></p>
+<p>  SDS结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
 <p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构"> </p>
 <span id="more"></span>
 
@@ -351,49 +352,13 @@
 
 <h1 id="2-为什么要用SDS"><a href="#2-为什么要用SDS" class="headerlink" title="(2) 为什么要用SDS"></a>(2) 为什么要用SDS</h1><ol>
 <li>能支持丰富且高效的字符串操作，比如字符串追加、拷贝、比较、获取长度等；</li>
-<li>能保存二进制数据，比如byte[]等；</li>
+<li>能保存二进制数据，比如<code>byte[]</code>等；</li>
 <li>节省内存开销。</li>
 </ol>
 <br>
 
-<h1 id="3-SDS源码解析"><a href="#3-SDS源码解析" class="headerlink" title="(3) SDS源码解析"></a>(3) SDS源码解析</h1><p>  redis 6.0版本源码  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/sds.c">https://github.com/redis/redis/blob/6.0/src/sds.c</a> </p>
-<h2 id="3-1-SDS定义"><a href="#3-1-SDS定义" class="headerlink" title="(3.1) SDS定义"></a>(3.1) SDS定义</h2><p>  SDS 结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
-<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构">  </p>
-<p>  Redis里SDS定义，可以看到定义了4种sds，分别是<code>sdshdr8</code>、<code>sdshdr16</code>、<code>sdshdr32</code>、<code>sdshdr64</code></p>
-<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">char</span> <span class="token operator">*</span>sds<span class="token punctuation">;</span>
 
-<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr8</span> <span class="token punctuation">&#123;</span>
-    <span class="token class-name">uint8_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint8_t占用内存空间1字节</span>
-    <span class="token class-name">uint8_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint8_t占用内存空间1字节</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>  <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
-    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">// 字节数组  实际存储的数据</span>
-<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
-
-<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr16</span> <span class="token punctuation">&#123;</span>
-    <span class="token class-name">uint16_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint16_t占用内存空间2字节</span>
-    <span class="token class-name">uint16_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint16_t占用内存空间2字节</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>    <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
-    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">// 字节数组  实际存储的数据</span>
-<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
-
-<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr32</span> <span class="token punctuation">&#123;</span>
-    <span class="token class-name">uint32_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint32_t占用内存空间3字节</span>
-    <span class="token class-name">uint32_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint32_t占用内存空间3字节</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>    <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
-    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">// 字节数组  实际存储的数据</span>
-<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
-
-<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr64</span> <span class="token punctuation">&#123;</span>
-    <span class="token class-name">uint64_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint64_t占用内存空间4字节</span>
-    <span class="token class-name">uint64_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint64_t占用内存空间4字节</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>  <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
-    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>  <span class="token comment">// 字节数组  实际存储的数据</span>
-<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  类型 <code>sds</code> 是 <code>char*</code> 的别名（alias）<br>  结构 <code>sdshdr</code> 则保存了 <code>len</code> 、 <code>alloc</code> <code>flags</code>和 <code>buf[]</code> 四个属性</p>
-<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
-<p>  SDS 本质还是字符数组，只是在字符数组基础上增加了额外的元数据。<br>  在 Redis 中需要用到字符数组时，就直接使用 sds 这个别名。</p>
-<h2 id="3-2-SDS函数列表"><a href="#3-2-SDS函数列表" class="headerlink" title="(3.2) SDS函数列表"></a>(3.2) SDS函数列表</h2><table>
+<h1 id="3-SDS提供的功能"><a href="#3-SDS提供的功能" class="headerlink" title="(3) SDS提供的功能"></a>(3) SDS提供的功能</h1><table>
 <thead>
 <tr>
 <th>函数</th>
@@ -487,7 +452,49 @@
 <td>O(N)</td>
 </tr>
 </tbody></table>
-<h2 id="3-3-创建字符串"><a href="#3-3-创建字符串" class="headerlink" title="(3.3) 创建字符串"></a>(3.3) 创建字符串</h2><p>  在创建新的字符串时，Redis 会调用 SDS 创建函数 sdsnewlen。</p>
+<h1 id="4-SDS原理"><a href="#4-SDS原理" class="headerlink" title="(4) SDS原理"></a>(4) SDS原理</h1><p>  redis 6.0版本源码  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/sds.c">https://github.com/redis/redis/blob/6.0/src/sds.c</a> </p>
+<h2 id="4-1-SDS定义"><a href="#4-1-SDS定义" class="headerlink" title="(4.1) SDS定义"></a>(4.1) SDS定义</h2><p>  SDS 结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构">  </p>
+<p>  Redis里SDS定义，可以看到定义了4种sds，分别是<code>sdshdr8</code>、<code>sdshdr16</code>、<code>sdshdr32</code>、<code>sdshdr64</code></p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">char</span> <span class="token operator">*</span>sds<span class="token punctuation">;</span>
+
+<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr8</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">uint8_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint8_t占用内存空间1字节</span>
+    <span class="token class-name">uint8_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint8_t占用内存空间1字节</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>  <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
+    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">// 字节数组  实际存储的数据</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr16</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">uint16_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint16_t占用内存空间2字节</span>
+    <span class="token class-name">uint16_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint16_t占用内存空间2字节</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>    <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
+    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">// 字节数组  实际存储的数据</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr32</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">uint32_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint32_t占用内存空间3字节</span>
+    <span class="token class-name">uint32_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint32_t占用内存空间3字节</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>    <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
+    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">// 字节数组  实际存储的数据</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+<span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr64</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">uint64_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint64_t占用内存空间4字节</span>
+    <span class="token class-name">uint64_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint64_t占用内存空间4字节</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> flags<span class="token punctuation">;</span>  <span class="token comment">// SDS类型 占用一字节 实际使用了3bit，5bit未使用</span>
+    <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>  <span class="token comment">// 字节数组  实际存储的数据</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  类型 <code>sds</code> 是 <code>char*</code> 的别名（alias）<br>  结构 <code>sdshdr</code> 则保存了 <code>len</code> 、 <code>alloc</code> <code>flags</code>和 <code>buf[]</code> 四个属性</p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
+<p>  SDS 本质还是字符数组，只是在字符数组基础上增加了额外的元数据。<br>  在 Redis 中需要用到字符数组时，就直接使用 sds 这个别名。</p>
+<br>
+
+
+
+<h1 id="5-SDS源码解读"><a href="#5-SDS源码解读" class="headerlink" title="(5) SDS源码解读"></a>(5) SDS源码解读</h1><p>  redis 6.0版本源码  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/sds.c">https://github.com/redis/redis/blob/6.0/src/sds.c</a> </p>
+<h2 id="5-1-创建字符串"><a href="#5-1-创建字符串" class="headerlink" title="(5.1) 创建字符串"></a>(5.1) 创建字符串</h2><p>  在创建新的字符串时，Redis 会调用 SDS 创建函数 sdsnewlen。</p>
 <p>  <img src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
  * 使用“init”指针和“initlen”指定的内容创建一个新的 sds 字符串。
@@ -568,7 +575,7 @@ sds <span class="token function">sdsempty</span><span class="token punctuation">
 
 
 
-<h2 id="3-4-删除"><a href="#3-4-删除" class="headerlink" title="(3.4) 删除"></a>(3.4) 删除</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+<h2 id="5-2-SDS释放"><a href="#5-2-SDS释放" class="headerlink" title="(5.2) SDS释放"></a>(5.2) SDS释放</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
  * 释放 sds 字符串。
  * 如果“s”为 NULL，则不执行任何操作。
  */</span>
@@ -580,7 +587,9 @@ sds <span class="token function">sdsempty</span><span class="token punctuation">
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h2 id="3-5-SDS修改"><a href="#3-5-SDS修改" class="headerlink" title="(3.5) SDS修改"></a>(3.5) SDS修改</h2><p>  SDS 结构中记录了字符数组已占用的空间和被分配的空间，这就比传统 C 语言实现的字符串能带来更高的操作效率。</p>
+
+
+<h2 id="5-3-SDS修改"><a href="#5-3-SDS修改" class="headerlink" title="(5.3) SDS修改"></a>(5.3) SDS修改</h2><p>  SDS 结构中记录了字符数组已占用的空间和被分配的空间，这就比传统 C 语言实现的字符串能带来更高的操作效率。</p>
 <p>以字符串追加操作为例。Redis 中实现字符串追加的函数是 sds.c 文件中的 sdscatlen 函数。这个函数的参数一共有三个，分别是目标字符串 s、源字符串 t 和要追加的长度 len，源码如下所示：</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
  * 将由“t”（共“len”个字节）指向的指定二进制安全字符串附加到指定的 sds 字符串“s”的末尾。
@@ -611,7 +620,7 @@ sds <span class="token function">sdscatlen</span><span class="token punctuation"
 <br>
 
 
-<h2 id="3-6-查询"><a href="#3-6-查询" class="headerlink" title="(3.6) 查询"></a>(3.6) 查询</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+<h2 id="5-4-获取字符串长度"><a href="#5-4-获取字符串长度" class="headerlink" title="(5.4) 获取字符串长度"></a>(5.4) 获取字符串长度</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
  * 已使用字符数据的长度
  */</span>
 <span class="token keyword">static</span> <span class="token keyword">inline</span> <span class="token class-name">size_t</span> <span class="token function">sdslen</span><span class="token punctuation">(</span><span class="token keyword">const</span> sds s<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -682,7 +691,8 @@ sds <span class="token function">sdscatlen</span><span class="token punctuation"
 <br>
 
 
-<h2 id="3-7-内存预分配"><a href="#3-7-内存预分配" class="headerlink" title="(3.7) 内存预分配"></a>(3.7) 内存预分配</h2><p>  <img src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
+
+<h2 id="5-5-内存预分配"><a href="#5-5-内存预分配" class="headerlink" title="(5.5) 内存预分配"></a>(5.5) 内存预分配</h2><p>  <img src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file:  src/sds.c</span>
 
 <span class="token comment">/* 
@@ -759,7 +769,8 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
 <br>
 
 
-<h1 id="4-SDS内存优化"><a href="#4-SDS内存优化" class="headerlink" title="(4) SDS内存优化"></a>(4) SDS内存优化</h1><h2 id="4-1-紧凑型设计"><a href="#4-1-紧凑型设计" class="headerlink" title="(4.1) 紧凑型设计"></a>(4.1) 紧凑型设计</h2><p>  SDS 结构中有一个元数据 flags，表示的是 SDS 类型。<br>  事实上，SDS 一共设计了 5 种类型，分别是 sdshdr5、sdshdr8、sdshdr16、sdshdr32 和 sdshdr64。<br>  这 5 种类型的主要区别就在于，它们数据结构中的字符数组现有长度 len 和分配空间长度 alloc，这两个元数据的数据类型不同。</p>
+<h1 id="6-SDS内存优化"><a href="#6-SDS内存优化" class="headerlink" title="(6) SDS内存优化"></a>(6) SDS内存优化</h1><p>  SDS在内存上做了哪些优化？</p>
+<h2 id="6-1-紧凑型设计"><a href="#6-1-紧凑型设计" class="headerlink" title="(6.1) 紧凑型设计"></a>(6.1) 紧凑型设计</h2><p>  SDS 结构中有一个元数据 flags，表示的是 SDS 类型。<br>  事实上，SDS 一共设计了 5 种类型，分别是 sdshdr5、sdshdr8、sdshdr16、sdshdr32 和 sdshdr64。<br>  这 5 种类型的主要区别就在于，它们数据结构中的字符数组现有长度 len 和分配空间长度 alloc，这两个元数据的数据类型不同。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">struct</span> <span class="token keyword">__attribute__</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>__packed__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token class-name">sdshdr8</span> <span class="token punctuation">&#123;</span>
     <span class="token class-name">uint8_t</span> len<span class="token punctuation">;</span>  <span class="token comment">// 字符数组已使用长度  uint8_t占用内存空间1字节</span>
     <span class="token class-name">uint8_t</span> alloc<span class="token punctuation">;</span>  <span class="token comment">// 字符数组的已分配空间，不包括结构体和结束字符  uint8_t占用内存空间1字节</span>
@@ -791,7 +802,7 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
 <p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
 <p>  元数据各自占用的内存空间在 <code>sdshdr8</code>、<code>sdshdr16</code>、<code>sdshdr32</code>、<code>sdshdr64</code> 类型中，则分别是 1字节、2字节、4字节 和 8字节。</p>
 <p>  SDS之所以设计不同的结构头（即不同类型），是为了能灵活保存不同大小的字符串，从而有效节省内存空间。<br>  因为在保存不同大小的字符串时，结构头占用的内存空间也不一样，这样一来，在保存小字符串时，结构头占用空间也比较少。</p>
-<h2 id="4-2-编译优化"><a href="#4-2-编译优化" class="headerlink" title="(4.2) 编译优化"></a>(4.2) 编译优化</h2><p>  Redis 在编程上还使用了专门的编译优化来节省内存空间。<br><code>struct __attribute__ ((__packed__)) sdshdr64</code>  ，attribute ((packed))的作用就是告诉编译器，在编译 sdshdr64 结构时，不要使用字节对齐的方式，而是采用紧凑的方式分配内存。</p>
+<h2 id="6-2-编译优化"><a href="#6-2-编译优化" class="headerlink" title="(6.2) 编译优化"></a>(6.2) 编译优化</h2><p>  Redis 在编程上还使用了专门的编译优化来节省内存空间。<br><code>struct __attribute__ ((__packed__)) sdshdr64</code>  ，attribute ((packed))的作用就是告诉编译器，在编译 sdshdr64 结构时，不要使用字节对齐的方式，而是采用紧凑的方式分配内存。</p>
 <p>  这是因为在默认情况下，编译器会按照 8 字节对齐的方式，给变量分配内存。也就是说，即使一个变量的大小不到 8 个字节，编译器也会给它分配 8 个字节。<br>  Redis采用了<code>__attribute__ ((packed))</code>属性定义结构体，结构体实际占用多少内存空间，编译器就分配多少空间。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">include</span> <span class="token string">&lt;stdio.h></span></span>
 <span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -807,7 +818,7 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
 <br>
 
 
-<h1 id="5-使用SDS字符串的地方"><a href="#5-使用SDS字符串的地方" class="headerlink" title="(5) 使用SDS字符串的地方"></a>(5) 使用SDS字符串的地方</h1><ol>
+<h1 id="7-使用SDS字符串的地方"><a href="#7-使用SDS字符串的地方" class="headerlink" title="(7) 使用SDS字符串的地方"></a>(7) 使用SDS字符串的地方</h1><ol>
 <li>server.h 文件中的 <code>redisObject</code> 对象，key 和 value 都是对象，key （键对象）都是 SDS 简单动态字符串对象</li>
 <li>cluter.c 的 clusterGenNodesDescription 函数中。这个函数代表以 csv 格式记录当前节点已知所有节点的信息。</li>
 <li>client.h 的 clusterLink 结构体中。clusterLink 包含了与其他节点进行通讯所需的全部信息，用 SDS 来存储输出缓冲区和输入缓冲区。</li>
@@ -908,7 +919,7 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-SDS%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) SDS是什么</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E9%87%8C%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8D%E7%94%A8char-%EF%BC%9F"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 为什么Redis里的字符串不用char*？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-SDS%E4%BC%98%E5%8A%BF"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) SDS优势</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8SDS"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用SDS</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-SDS%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">(3) SDS源码解析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-SDS%E5%AE%9A%E4%B9%89"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) SDS定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-SDS%E5%87%BD%E6%95%B0%E5%88%97%E8%A1%A8"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) SDS函数列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E5%88%9B%E5%BB%BA%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 创建字符串</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E5%88%A0%E9%99%A4"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 删除</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-SDS%E4%BF%AE%E6%94%B9"><span class="nav-number">3.5.</span> <span class="nav-text">(3.5) SDS修改</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-6-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.6.</span> <span class="nav-text">(3.6) 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-7-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-number">3.7.</span> <span class="nav-text">(3.7) 内存预分配</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-SDS%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">4.</span> <span class="nav-text">(4) SDS内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E7%B4%A7%E5%87%91%E5%9E%8B%E8%AE%BE%E8%AE%A1"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 紧凑型设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) 编译优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E4%BD%BF%E7%94%A8SDS%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%9C%B0%E6%96%B9"><span class="nav-number">5.</span> <span class="nav-text">(5) 使用SDS字符串的地方</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-SDS%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) SDS是什么</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E9%87%8C%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8D%E7%94%A8char-%EF%BC%9F"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 为什么Redis里的字符串不用char*？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-SDS%E4%BC%98%E5%8A%BF"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) SDS优势</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8SDS"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用SDS</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-SDS%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">3.</span> <span class="nav-text">(3) SDS提供的功能</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-SDS%E5%8E%9F%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">(4) SDS原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-SDS%E5%AE%9A%E4%B9%89"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) SDS定义</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-SDS%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">5.</span> <span class="nav-text">(5) SDS源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E5%88%9B%E5%BB%BA%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) 创建字符串</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-SDS%E9%87%8A%E6%94%BE"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) SDS释放</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-SDS%E4%BF%AE%E6%94%B9"><span class="nav-number">5.3.</span> <span class="nav-text">(5.3) SDS修改</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-%E8%8E%B7%E5%8F%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E9%95%BF%E5%BA%A6"><span class="nav-number">5.4.</span> <span class="nav-text">(5.4) 获取字符串长度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-5-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-number">5.5.</span> <span class="nav-text">(5.5) 内存预分配</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-SDS%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">6.</span> <span class="nav-text">(6) SDS内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1-%E7%B4%A7%E5%87%91%E5%9E%8B%E8%AE%BE%E8%AE%A1"><span class="nav-number">6.1.</span> <span class="nav-text">(6.1) 紧凑型设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96"><span class="nav-number">6.2.</span> <span class="nav-text">(6.2) 编译优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E4%BD%BF%E7%94%A8SDS%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%9C%B0%E6%96%B9"><span class="nav-number">7.</span> <span class="nav-text">(7) 使用SDS字符串的地方</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">8.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -922,20 +933,20 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">313</span>
+          <span class="site-state-item-count">318</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-count">59</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

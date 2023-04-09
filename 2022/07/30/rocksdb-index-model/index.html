@@ -20,19 +20,21 @@
     var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="(1) RocksDB是什么  RocksDB是 Facebook 开源的一个高性能持久化 KV 存储。   越来越多的新生代数据库，都不约而同地选择 RocksDB 作为它们的存储引擎。  比如 CockroachDB 用到了 RocksDB 作为它的存储引擎;  MyRocks项目用 RocksDB 给 MySQL 做存储引擎，目的是取代现有的 InnoDB 存储引擎。 为什么要用RocksD">
+  <meta name="description" content="(1) RocksDB是什么  RocksDB是 Facebook 开源的一个高性能持久化 KV 存储。   RocksDB是一个基于LSM树的键值存储引擎，旨在提供高性能、可扩展性和可靠性。  它的核心思想是将数据分为多个层级，每个层级使用不同的数据结构来存储数据。   在写入时，数据首先被写入内存中的MemTable，然后根据大小和数量的限制，MemTable会被转换为一个SSTable文件并">
 <meta property="og:type" content="article">
 <meta property="og:title" content="RocksDB索引模型">
 <meta property="og:url" content="http://weikeqin.com/2022/07/30/rocksdb-index-model/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="(1) RocksDB是什么  RocksDB是 Facebook 开源的一个高性能持久化 KV 存储。   越来越多的新生代数据库，都不约而同地选择 RocksDB 作为它们的存储引擎。  比如 CockroachDB 用到了 RocksDB 作为它的存储引擎;  MyRocks项目用 RocksDB 给 MySQL 做存储引擎，目的是取代现有的 InnoDB 存储引擎。 为什么要用RocksD">
+<meta property="og:description" content="(1) RocksDB是什么  RocksDB是 Facebook 开源的一个高性能持久化 KV 存储。   RocksDB是一个基于LSM树的键值存储引擎，旨在提供高性能、可扩展性和可靠性。  它的核心思想是将数据分为多个层级，每个层级使用不同的数据结构来存储数据。   在写入时，数据首先被写入内存中的MemTable，然后根据大小和数量的限制，MemTable会被转换为一个SSTable文件并">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/storage-engine/rocketsdb/sstable.png">
 <meta property="article:published_time" content="2022-07-30T03:43:18.000Z">
-<meta property="article:modified_time" content="2023-01-30T15:12:21.396Z">
+<meta property="article:modified_time" content="2023-04-09T15:03:44.372Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="storage">
 <meta property="article:tag" content="rocksdb">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/storage-engine/rocketsdb/sstable.png">
 
 <link rel="canonical" href="http://weikeqin.com/2022/07/30/rocksdb-index-model/">
 
@@ -247,7 +249,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-01-30 23:12:21" itemprop="dateModified" datetime="2023-01-30T23:12:21+08:00">2023-01-30</time>
+                <time title="修改时间：2023-04-09 23:03:44" itemprop="dateModified" datetime="2023-04-09T23:03:44+08:00">2023-04-09</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -293,14 +295,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>241</span>
+              <span>5.1k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -313,8 +315,120 @@
 
       
         <h1 id="1-RocksDB是什么"><a href="#1-RocksDB是什么" class="headerlink" title="(1) RocksDB是什么"></a>(1) RocksDB是什么</h1><p>  RocksDB是 Facebook 开源的一个高性能持久化 KV 存储。</p>
+<p>  RocksDB是一个基于LSM树的键值存储引擎，旨在提供高性能、可扩展性和可靠性。<br>  它的核心思想是将数据分为多个层级，每个层级使用不同的数据结构来存储数据。</p>
+<p>  在写入时，数据首先被写入内存中的MemTable，然后根据大小和数量的限制，MemTable会被转换为一个SSTable文件并写入磁盘。<br>  在读取时，RocksDB会首先在内存中的MemTable中查找数据，如果没有找到，则会在磁盘上的SSTable文件中查找。</p>
+<p>  为了提高读取性能，RocksDB还使用了Bloom Filter和Skip List等数据结构来加速查找。</p>
+<p>  此外，RocksDB还支持多种数据压缩算法，以减少磁盘空间的使用。</p>
 <p>  越来越多的新生代数据库，都不约而同地选择 RocksDB 作为它们的存储引擎。<br>  比如 CockroachDB 用到了 RocksDB 作为它的存储引擎;<br>  MyRocks项目用 RocksDB 给 MySQL 做存储引擎，目的是取代现有的 InnoDB 存储引擎。</p>
-<h1 id="为什么要用RocksDB"><a href="#为什么要用RocksDB" class="headerlink" title="为什么要用RocksDB"></a>为什么要用RocksDB</h1><h1 id="RocksDB是怎么应用到存储系统的"><a href="#RocksDB是怎么应用到存储系统的" class="headerlink" title="RocksDB是怎么应用到存储系统的"></a>RocksDB是怎么应用到存储系统的</h1><h1 id="RocksDB索引模型"><a href="#RocksDB索引模型" class="headerlink" title="RocksDB索引模型"></a>RocksDB索引模型</h1><h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/225400">后端存储实战课 - 24 | RocksDB：不丢数据的高性能KV存储</a></p>
+<br>
+
+
+<h1 id="2-为什么要用RocksDB"><a href="#2-为什么要用RocksDB" class="headerlink" title="(2) 为什么要用RocksDB"></a>(2) 为什么要用RocksDB</h1><p>  简单来说有3个主要原因：1:持久化  2:数据量大时用磁盘存储便宜</p>
+<p>  来对比一下 RocksDB 和 Redis 这两个 KV 存储。  </p>
+<p>  Redis是内存数据库，从官方给出的测试数据来看，它的随机读写性能大约在 50 万次 / 秒左右。<br>  RocksDB 数据存储在磁盘， 相应的随机读写性能大约在 20 万次 / 秒左右。</p>
+<p>  虽然性能还不如 Redis，但是已经可以算是同一个量级的水平了。</p>
+<p>  Redis 是一个内存数据库，并不是一个可靠的存储。数据写到内存中就算成功了，它并不保证安全地保存到磁盘上。<br>  而 RocksDB 它是一个持久化的 KV 存储，它需要保证每条数据都要安全地写到磁盘上</p>
+<br>
+
+<h1 id="3-RocksDB索引模型"><a href="#3-RocksDB索引模型" class="headerlink" title="(3) RocksDB索引模型"></a>(3) RocksDB索引模型</h1><p>  RocksDB 采用了一个非常复杂的数据存储结构，并且这个存储结构采用了内存和磁盘混合存储方式，使用磁盘来保证数据的可靠存储，并且利用速度更快的内存来提升读写性能。这种数据结构就是 <code>LSM-Tree</code> 。</p>
+<h2 id="3-1-RocksDB使用的数据结构"><a href="#3-1-RocksDB使用的数据结构" class="headerlink" title="(3.1) RocksDB使用的数据结构"></a>(3.1) RocksDB使用的数据结构</h2><p>  LSM-Tree 的全称是：The Log-Structured Merge-Tree，是一种非常复杂的复合数据结构，它包含了 WAL（Write Ahead Log）、跳表（SkipList）和一个分层的有序表（SSTable，Sorted String Table）。</p>
+<p>  <img src="/img/database/storage-engine/rocketsdb/sstable.png"></p>
+<p>  LSM-Tree 论文  <a target="_blank" rel="noopener" href="https://ranger.uta.edu/~sjiang/pubs/papers/wang14-LSM-SDF.pdf">https://ranger.uta.edu/~sjiang/pubs/papers/wang14-LSM-SDF.pdf</a></p>
+<p>  WAL 保证数据顺序写入<br>  跳表 查询性能O(log N)<br>  分层有序表 排序</p>
+<p>  LSM-Tree（Log-Structured Merge Tree）是一种针对写入密集型工作负载进行优化的基于磁盘的数据结构。<br>  它由多个级别组成，每个级别都是键值对的排序运行。<br>  当执行写操作时，新的键值对将添加到内存缓冲区中。一旦缓冲区达到一定大小，它将作为新的排序运行刷新到磁盘上。<br>  当一个级别中的排序运行数量超过一定阈值时，它们将合并为下一个级别中的新的排序运行。</p>
+<p>  这个合并过程是LSM-Tree的效率所在。通过合并排序运行而不是单个键值对，LSM-Tree可以减少读取特定键值对所需的磁盘寻道次数。<br>  此外，通过保持内存缓冲区相对较小，LSM-Tree可以减少维护数据结构所需的内存量。</p>
+<p>  要实现LSM-Tree，可以使用SkipList数据结构作为每个级别中的排序运行。SkipList的Insert方法可用于将新的键值对添加到内存缓冲区中，FindGreaterOrEqual方法可用于在排序运行中高效地搜索特定键。合并过程可以使用Iterator对象和SkipList的Merge方法的组合来实现。</p>
+<p>  总的来说，LSM-Tree是一种强大的数据结构，非常适合写入密集型工作负载。通过利用SkipList和排序运行的原理，LSM-Tree可以提供高效的写入和读取性能，同时最小化维护数据结构所需的内存量。</p>
+<h2 id="3-2-新增数据"><a href="#3-2-新增数据" class="headerlink" title="(3.2) 新增数据"></a>(3.2) 新增数据</h2><p> 当 LSM-Tree 收到一个写请求，比如说：PUT foo bar，把 Key foo 的值设置为 bar。<br>  1、操作命令会被写入到磁盘的 WAL 日志中（图中右侧的 Log）。<br>  2、数据会被写入到内存中的 MemTable 中，返回写入成功。<br>  3、MemTable 写满(默认是32M)之后，就被转换成 Immutable MemTable，然后再创建一个空的 MemTable 继续写。<br>  4、后台线程不断把 Immutable MemTable 复制到磁盘文件中，然后释放内存空间。 (此时每个文件里的Key是有序的，但是文件之间是完全无序的)<br>  5、分层合并使文件有序。 (除第0层无序， 第0层是MemTable 直接 dump 出来的磁盘文件所在的那一层)</p>
+<h3 id="3-2-1-WAL日志的作用"><a href="#3-2-1-WAL日志的作用" class="headerlink" title="(3.2.1) WAL日志的作用"></a>(3.2.1) WAL日志的作用</h3><p>  写WAL日志是顺序写磁盘，性能较好。<br>  WAL日志可以用于故障恢复，一旦系统宕机，可以从日志中把内存中还没有来得及写入磁盘的数据恢复出来。<br>  WAL日志解决了数据可靠性的问题。</p>
+<h3 id="3-2-2-MemTable的作用"><a href="#3-2-2-MemTable的作用" class="headerlink" title="(3.2.2) MemTable的作用"></a>(3.2.2) MemTable的作用</h3><p>  MemTable 是一个按照 Key 组织的跳表（SkipList），查询复杂度是 O(log N)<br>  写 MemTable 是个内存操作，速度也非常快。</p>
+<p>  跳表和平衡树有着类似的查找性能，但实现起来更简单一些。</p>
+<p> 这里面有一点需要注意的是，LSM-Tree 在处理写入的过程中，直接就往 MemTable 里写，并不去查找这个 Key 是不是已经存在了。</p>
+<p> 把 MemTable 写入 SSTable 这个写操作，因为它是把整块内存写入到整个文件中，这同样是一个顺序写操作。</p>
+<h3 id="3-2-3-分层合并"><a href="#3-2-3-分层合并" class="headerlink" title="(3.2.3) 分层合并"></a>(3.2.3) 分层合并</h3><p>  SSTable 被分为很多层，越往上层，文件越少，越往底层，文件越多。<br>  每一层的容量都有一个固定的上限，一般来说，下一层的容量是上一层的 10 倍。<br>  当某一层写满了，就会触发后台线程往下一层合并，数据合并到下一层之后，本层的 SSTable 文件就可以删除掉了。<br>  合并的过程也是排序的过程，除 Level 0 以外，每一层内的文件都是有序的，文件内的 KV 也是有序的。</p>
+<h2 id="3-3-更新数据"><a href="#3-3-更新数据" class="headerlink" title="(3.3) 更新数据"></a>(3.3) 更新数据</h2><p>  和新增数据一样</p>
+<h2 id="3-4-删除数据"><a href="#3-4-删除数据" class="headerlink" title="(3.4) 删除数据"></a>(3.4) 删除数据</h2><p>  LSM-Tree 删除数据：在每条数据上增加一个删除的标志位，查询的时候判断是否已经删除，落盘的时候根据删除标志位合并数据，但是这样会浪费一些空间资源</p>
+<p>  标记删除，有墓碑的概念，被删除的条目，如果在memtable里，可以直接通过墓碑标记为删除，如果不在memtable里就插入一条新的删除记录，这两种情况都会在层级合并的时候真正发挥作用，同时WAL里通过一条额外的log记录这个删除操作。</p>
+<p>  另外感觉WAL里存储的其实就是操作指令流，和raft里面的日志完全一个概念，所以raft协议和leveldb/rocksdb的组合简直是绝配</p>
+<h2 id="3-5-查询数据"><a href="#3-5-查询数据" class="headerlink" title="(3.5) 查询数据"></a>(3.5) 查询数据</h2><p>  查询的过程是按照顺序从一个一个table中去查询，先查内存后查磁盘<br>  Level 0 是无序的，所以一般Level只保存很少的几个文件。Level 0的查找顺序就是按照文件的创建顺序倒序查找，也就是从最新的向最旧的查找。 </p>
+<br>
+
+
+<h1 id="4-RocksDB索引模型源码解读"><a href="#4-RocksDB索引模型源码解读" class="headerlink" title="(4) RocksDB索引模型源码解读"></a>(4) RocksDB索引模型源码解读</h1><h1 id="4-1-源码解析"><a href="#4-1-源码解析" class="headerlink" title="(4.1) 源码解析"></a>(4.1) 源码解析</h1><p>  源码地址: <a target="_blank" rel="noopener" href="https://github.com/facebook/rocksdb/tree/v8.0.0/memtable">https://github.com/facebook/rocksdb/tree/v8.0.0/memtable</a></p>
+<p>  RocksDB索引模型主要源码<br>  Memtable结构<br>  数据结构-SkipList<br>  分层有序表</p>
+<h2 id="4-2-跳表-SkipList-源码解析"><a href="#4-2-跳表-SkipList-源码解析" class="headerlink" title="(4.2) 跳表(SkipList)源码解析"></a>(4.2) 跳表(SkipList)源码解析</h2><p>  SkipList类是一个模板类，它有两个模板参数：Key和Comparator。Key参数指定键值存储中使用的键的类型，而Comparator参数指定用于比较键的比较函数。</p>
+<p>  SkipList类提供了几种方法，用于在存储中插入、搜索和迭代键值对。<br>  Insert方法将新的键值对插入存储中；<br>  Contains方法检查给定的键是否存在于存储中；<br>  Iterator类提供了一种按排序顺序迭代存储中键值对的方法。</p>
+<p>  SkipList类被设计为线程安全的，写操作需要外部同步，通常是互斥锁。<br>  另一方面，读操作不需要任何内部锁定或同步，但需要保证在读取过程中SkipList不会被销毁。</p>
+<p>  总的来说，SkipList类提供了一个高性能、线程安全的数据结构，用于存储和检索RocksDB中的键值对。</p>
+<h3 id="4-2-1-跳表结构"><a href="#4-2-1-跳表结构" class="headerlink" title="(4.2.1) 跳表结构"></a>(4.2.1) 跳表结构</h3><p>  <a target="_blank" rel="noopener" href="https://github.com/facebook/rocksdb/blob/v8.0.0/memtable/skiplist.h#L170">https://github.com/facebook/rocksdb/blob/v8.0.0/memtable/skiplist.h#L170</a></p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; filepath: memtable&#x2F;skiplist.h
+
+&#x2F;&#x2F; 定义 SkipList 类，模板参数为 Key 和 Comparator
+template &lt;typename Key, class Comparator&gt;
+
+&#x2F;&#x2F; 跳表结构定义
+class SkipList &#123;
+ private:
+  &#x2F;&#x2F; 节点
+  struct Node;
+                 
+ private:
+  &#x2F;&#x2F; 最大高度
+  const uint16_t kMaxHeight_;
+  &#x2F;&#x2F; 分支因子的默认值
+  const uint16_t kBranching_;
+  const uint32_t kScaledInverseBranching_;
+
+  &#x2F;&#x2F; 构造函数 后 不可更改
+  Comparator const compare_;
+  &#x2F;&#x2F; 用于分配节点的分配器
+  Allocator* const allocator_; 
+
+  &#x2F;&#x2F; 头节点
+  Node* const head_;
+
+  &#x2F;&#x2F; 跳表的高度
+  &#x2F;&#x2F; 只能被 Insert() 修改，可以被读取器读取，但是过时的值是可以接受的
+  std::atomic&lt;int&gt; max_height_;  
+
+  &#x2F;&#x2F; 用于优化顺序插入模式，比较棘手
+  &#x2F;&#x2F; prev_[i] 对于 i 小于等于 max_height_ 是 prev_[0] 的前驱节点，prev_height_ 是 prev_[0] 的高度
+  &#x2F;&#x2F; 在插入之前，prev_[0] 只能等于 head_，此时 max_height_ 和 prev_height_ 都为 1
+  Node** prev_;
+  int32_t prev_height_;
+
+ public:
+  &#x2F;&#x2F; 构造函数，接受比较器和分配器，以及最大高度和分支因子的默认值
+  explicit SkipList(Comparator cmp, Allocator* allocator,
+                    int32_t max_height &#x3D; 12, int32_t branching_factor &#x3D; 4);
+
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-2-2-跳表节点"><a href="#4-2-2-跳表节点" class="headerlink" title="(4.2.2) 跳表节点"></a>(4.2.2) 跳表节点</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; filepath: memtable&#x2F;skiplist.h
+
+&#x2F;&#x2F; 跳表节点
+template &lt;typename Key, class Comparator&gt;
+struct SkipList&lt;Key, Comparator&gt;::Node &#123;
+  explicit Node(const Key&amp; k) : key(k) &#123;&#125;
+
+  &#x2F;&#x2F; 节点的key
+  Key const key;
+
+ private:
+  &#x2F;&#x2F; 下一个节点(们)  每层指向的下一个节点不一样
+  &#x2F;&#x2F; 类似链表的next节点 只不过有多层&#x2F;多个
+  &#x2F;&#x2F; std::atomic 是原子类型对象，是为了解决并发编程中的线程安全提供的api，类似Java里的
+  std::atomic&lt;Node*&gt; next_[1];
+&#125;;
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="4-3-Memtable结构"><a href="#4-3-Memtable结构" class="headerlink" title="(4.3) Memtable结构"></a>(4.3) Memtable结构</h2><p>  MemTable是一个内存中的数据结构，用于存储最近写入的键值对。当MemTable达到一定大小时，它将被转换为SSTable并写入磁盘。SSTable是一种静态的、只读的数据结构，它被用作RocksDB的持久化存储。</p>
+<p>  Rocksdb 支持创建多数据结构类型的 Memtable，默认的是 SkipList，即跳跃表。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/225400">后端存储实战课 - 24 | RocksDB：不丢数据的高性能KV存储</a><br>[2] <a target="_blank" rel="noopener" href="https://ranger.uta.edu/~sjiang/pubs/papers/wang14-LSM-SDF.pdf">An Efficient Design and Implementation of LSM-Tree based Key-Value Store on Open-Channel SSD</a><br>[3] <a target="_blank" rel="noopener" href="https://xie.infoq.cn/article/8836cabe7d5959b95a7cebe93">技术贴 | Rocksdb 中 Memtable 源码解析</a></p>
 
     </div>
 
@@ -338,8 +452,8 @@
       <i class="fa fa-chevron-left"></i> thrift TProcessor
     </a></div>
       <div class="post-nav-item">
-    <a href="/2022/09/04/linux-network-packet-sending-process/" rel="next" title="Linux网络包发送过程">
-      Linux网络包发送过程 <i class="fa fa-chevron-right"></i>
+    <a href="/2022/08/20/go-performance-tuning-tool/" rel="next" title="go性能分析 及 线上问题定位">
+      go性能分析 及 线上问题定位 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -400,7 +514,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-RocksDB%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) RocksDB是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8RocksDB"><span class="nav-number">2.</span> <span class="nav-text">为什么要用RocksDB</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RocksDB%E6%98%AF%E6%80%8E%E4%B9%88%E5%BA%94%E7%94%A8%E5%88%B0%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F%E7%9A%84"><span class="nav-number">3.</span> <span class="nav-text">RocksDB是怎么应用到存储系统的</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RocksDB%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B"><span class="nav-number">4.</span> <span class="nav-text">RocksDB索引模型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-RocksDB%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) RocksDB是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8RocksDB"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用RocksDB</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-RocksDB%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.</span> <span class="nav-text">(3) RocksDB索引模型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-RocksDB%E4%BD%BF%E7%94%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) RocksDB使用的数据结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E6%96%B0%E5%A2%9E%E6%95%B0%E6%8D%AE"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 新增数据</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-WAL%E6%97%A5%E5%BF%97%E7%9A%84%E4%BD%9C%E7%94%A8"><span class="nav-number">3.2.1.</span> <span class="nav-text">(3.2.1) WAL日志的作用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-MemTable%E7%9A%84%E4%BD%9C%E7%94%A8"><span class="nav-number">3.2.2.</span> <span class="nav-text">(3.2.2) MemTable的作用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-3-%E5%88%86%E5%B1%82%E5%90%88%E5%B9%B6"><span class="nav-number">3.2.3.</span> <span class="nav-text">(3.2.3) 分层合并</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 更新数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E5%88%A0%E9%99%A4%E6%95%B0%E6%8D%AE"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 删除数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-%E6%9F%A5%E8%AF%A2%E6%95%B0%E6%8D%AE"><span class="nav-number">3.5.</span> <span class="nav-text">(3.5) 查询数据</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-RocksDB%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) RocksDB索引模型源码解读</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-1-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">5.</span> <span class="nav-text">(4.1) 源码解析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E8%B7%B3%E8%A1%A8-SkipList-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90"><span class="nav-number">5.1.</span> <span class="nav-text">(4.2) 跳表(SkipList)源码解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-1-%E8%B7%B3%E8%A1%A8%E7%BB%93%E6%9E%84"><span class="nav-number">5.1.1.</span> <span class="nav-text">(4.2.1) 跳表结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-2-%E8%B7%B3%E8%A1%A8%E8%8A%82%E7%82%B9"><span class="nav-number">5.1.2.</span> <span class="nav-text">(4.2.2) 跳表节点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-Memtable%E7%BB%93%E6%9E%84"><span class="nav-number">5.2.</span> <span class="nav-text">(4.3) Memtable结构</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">6.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -414,20 +528,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">313</span>
+          <span class="site-state-item-count">318</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-count">59</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

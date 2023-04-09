@@ -213,6 +213,152 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/10/30/mysql-query-profiler/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/10/30/mysql-query-profiler/" class="post-title-link" itemprop="url">MySQL Query Profiler 分析SQL慢查</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-10-30 16:40:49" itemprop="dateCreated datePublished" datetime="2022-10-30T16:40:49+08:00">2022-10-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-03-05 11:25:51" itemprop="dateModified" datetime="2023-03-05T11:25:51+08:00">2023-03-05</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/database/" itemprop="url" rel="index"><span itemprop="name">database</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2022/10/30/mysql-query-profiler/" class="post-meta-item leancloud_visitors" data-flag-title="MySQL Query Profiler 分析SQL慢查" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/10/30/mysql-query-profiler/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/10/30/mysql-query-profiler/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>17k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>16 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>　最近的一段时间里，线上数据库出现了很多慢查询，但是通过代码去看都是走了索引的，而且通过explain分析也是走了索引，但确实是有慢查询，很奇怪，就想通过mysql-query-profiler分析SQL慢查。</p>
+<p>　MySQL 的 Query Profiler 是一个使用非常方便的 Query 诊断分析工具，通过该工具可以获取一条Query 在整个执行过程中多种资源的消耗情况，如 CPU，IO，IPC，SWAP 等，以及发生的 PAGE FAULTS，CONTEXT SWITCHE 等等，同时还能得到该 Query 执行过程中 MySQL 所调用的各个函数在源文件中的位置。</p>
+<h1 id="1-Query-Profiler-的具体用法"><a href="#1-Query-Profiler-的具体用法" class="headerlink" title="(1) Query Profiler 的具体用法"></a>(1) Query Profiler 的具体用法</h1><h2 id="1-1-查看是否开启-Query-Profiler"><a href="#1-1-查看是否开启-Query-Profiler" class="headerlink" title="(1.1) 查看是否开启 Query Profiler"></a>(1.1) 查看是否开启 Query Profiler</h2><pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 查看是否开启 Query Profiler */</span>
+mysql<span class="token operator">></span>  <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span> <span class="token punctuation">;</span>  
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token operator">|</span> Variable_name <span class="token operator">|</span> <span class="token keyword">Value</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token operator">|</span> profiling     <span class="token operator">|</span> <span class="token keyword">OFF</span>   <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">---------------+-------+</span>
+<span class="token number">1</span> <span class="token keyword">row</span> <span class="token operator">in</span> <span class="token keyword">set</span> <span class="token punctuation">(</span><span class="token number">0.03</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h2 id="1-2-设置开启Query-Profiler功能"><a href="#1-2-设置开启Query-Profiler功能" class="headerlink" title="(1.2) 设置开启Query Profiler功能"></a>(1.2) 设置开启Query Profiler功能</h2><pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 开启 Query Profiler 功能。 */</span>
+mysql<span class="token operator">></span>  <span class="token keyword">set</span> profiling <span class="token operator">=</span> <span class="token number">1</span> <span class="token punctuation">;</span>    
+Query OK<span class="token punctuation">,</span> <span class="token number">0</span> <span class="token keyword">rows</span> affected<span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+<h2 id="1-3-获取系统中保存的所有-Query-Profiler-概要信息"><a href="#1-3-获取系统中保存的所有-Query-Profiler-概要信息" class="headerlink" title="(1.3) 获取系统中保存的所有 Query Profiler 概要信息"></a>(1.3) 获取系统中保存的所有 Query Profiler 概要信息</h2><pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/** 获取系统中保存的所有 Query 的 profile 概要信息 */</span>
+mysql<span class="token operator">></span>  <span class="token keyword">show</span> profiles<span class="token punctuation">;</span>  
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span> Query_ID <span class="token operator">|</span> Duration   <span class="token operator">|</span> Query                                                                                                                                                                                                                                                         <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token operator">|</span>        <span class="token number">1</span> <span class="token operator">|</span> <span class="token number">0.00138750</span> <span class="token operator">|</span> <span class="token keyword">show</span> variables <span class="token operator">like</span> <span class="token string">'profiling'</span>                                                                                                                                                                                                                               <span class="token operator">|</span>
+<span class="token operator">|</span>        <span class="token number">2</span> <span class="token operator">|</span> <span class="token number">0.19619525</span> <span class="token operator">|</span> <span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> xxxx_biz_db_xxx_base_xxxxxxxx <span class="token keyword">LIMIT</span> <span class="token number">10</span> <span class="token keyword">OFFSET</span> <span class="token number">0</span> <span class="token operator">|</span>
+<span class="token operator">+</span><span class="token comment">----------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+</span>
+<span class="token number">2</span> <span class="token keyword">rows</span> <span class="token operator">in</span> <span class="token keyword">set</span><span class="token punctuation">,</span> <span class="token number">1</span> warning <span class="token punctuation">(</span><span class="token number">0.00</span> sec<span class="token punctuation">)</span>
+
+mysql<span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>　</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/10/30/mysql-query-profiler/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/09/10/network-trouble-shooting/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -680,6 +826,408 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/08/20/go-performance-tuning-tool/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/08/20/go-performance-tuning-tool/" class="post-title-link" itemprop="url">go性能分析 及 线上问题定位</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-08-20 22:30:00" itemprop="dateCreated datePublished" datetime="2022-08-20T22:30:00+08:00">2022-08-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-04-09 20:05:17" itemprop="dateModified" datetime="2023-04-09T20:05:17+08:00">2023-04-09</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/go/" itemprop="url" rel="index"><span itemprop="name">go</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2022/08/20/go-performance-tuning-tool/" class="post-meta-item leancloud_visitors" data-flag-title="go性能分析 及 线上问题定位" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2022/08/20/go-performance-tuning-tool/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2022/08/20/go-performance-tuning-tool/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>9.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>8 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>  医生的<code>温度计</code>、<code>听诊器</code>、<code>血压计</code>，可以获取<code>就诊者</code>的各种健康指标。</p>
+<p>  如果把<code>研发工程师</code>比喻成<code>医生</code>，那<code>pprof</code>就是类似<code>温度计</code>、<code>听诊器</code>、<code>血压计</code>的一个工具集，可以用来分析<code>CPU</code>、<code>goroutine堆栈跟踪</code>、<code>内存分配及使用情况</code>、<code>互斥锁争用及耗时</code>、<code>goroutine阻塞</code> 等</p>
+<p>  <img src="/img/go/pprof/go-pprof-flamegraph2.png" alt="火焰图"></p>
+<h1 id="1-pprof是什么"><a href="#1-pprof是什么" class="headerlink" title="(1) pprof是什么"></a>(1) pprof是什么</h1><p>  性能分析是通过<code>分析器</code>(profiler)工具进行检测来实现的，在 Go 中使用称为 pprof。</p>
+<p>  pprof工具可以用来监测进程的运行数据，用于监控程序的性能及状况，以下指标都可以监控</p>
+<blockquote>
+<p>CPU— 确定应用程序的时间花在了哪里<br>Goroutine— 报告正在运行的 goroutines 堆栈跟踪<br>Heap— 报告堆内存分配以监视当前内存使用情况并检查可能的内存泄漏<br>Mutex— 报告锁争情况来分析代码中互斥锁使用行为以及应用程序是否在锁定调用上花费了太多时间<br>Block— 显示 goroutines 阻塞等待同步原语的位置</p>
+</blockquote>
+<p>  <img src="/img/go/pprof/go-pprof.png"></p>
+<h1 id="2-如何使用pprof"><a href="#2-如何使用pprof" class="headerlink" title="(2) 如何使用pprof"></a>(2) 如何使用pprof</h1><p>  pprof必须在代码里引入才能使用<br>  不像Java里的 <code>jps</code>、<code>jstat</code>、<code>jinfo</code>、<code>jstack</code>、<code>jmap</code> 工具可以单独使用</p>
+<p>  pprof 可以从以下两个包中引入</p>
+<pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">import</span> <span class="token string">"net/http/pprof"</span>
+
+<span class="token keyword">import</span> <span class="token string">"runtime/pprof"</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>  其中 <code>net/http/pprof</code> 使用 <code>runtime/pprof</code> 包来进行封装，并在 http 端口上暴露出来。<br>  <code>runtime/pprof</code> 可以用来产生 dump 文件，再使用 go tool pprof 来分析这运行日志。</p>
+<p>  使用 net/http/pprof 可以做到直接看到当前 web 服务的状态，包括 CPU 占用情况和内存使用情况等。</p>
+<h2 id="2-1-通过网页可视化使用pprof"><a href="#2-1-通过网页可视化使用pprof" class="headerlink" title="(2.1) 通过网页可视化使用pprof"></a>(2.1) 通过网页可视化使用pprof</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span class="token keyword">import</span> <span class="token punctuation">(</span>
+	<span class="token string">"net/http"</span>
+	<span class="token comment">// 代码里引入 pprof</span>
+	<span class="token boolean">_</span> <span class="token string">"net/http/pprof"</span>
+<span class="token punctuation">)</span>
+
+<span class="token keyword">func</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">// 代码里引入http server </span>
+	<span class="token keyword">go</span> <span class="token keyword">func</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">if</span> err <span class="token operator">:=</span> http<span class="token punctuation">.</span><span class="token function">ListenAndServe</span><span class="token punctuation">(</span><span class="token string">":6060"</span><span class="token punctuation">,</span> <span class="token boolean">nil</span><span class="token punctuation">)</span><span class="token punctuation">;</span> err <span class="token operator">!=</span> <span class="token boolean">nil</span> <span class="token punctuation">&#123;</span>
+			log<span class="token punctuation">.</span><span class="token function">Fatal</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+		<span class="token punctuation">&#125;</span>
+		os<span class="token punctuation">.</span><span class="token function">Exit</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span>
+	<span class="token punctuation">&#125;</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+   <span class="token comment">// 省略业务代码</span>
+
+<span class="token punctuation">&#125;</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  导入 <code>net/http/pprof</code> 的作用是，我们可以通过 <code>http://127.0.0.1:6060/debug/pprof/</code>  来访问 pprof<br>  通过 这个地址 可以通过网页很方便的查看各项指标</p>
+<p>  即使在生产环境中启用 <code>pprof</code> 也是安全的</p>
+<table>
+<thead>
+<tr>
+<th align="left">作用</th>
+<th align="left">关键字</th>
+<th align="left">访问url</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">所有过去内存分配的样本</td>
+<td align="left">allocs</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/allocs?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">导致同步基元阻塞的堆栈跟踪</td>
+<td align="left">block</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/block?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">当前程序的命令行调用</td>
+<td align="left">cmdline</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">所有当前 goroutines 的堆栈跟踪</td>
+<td align="left">goroutine</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/goroutine?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">活动对象的内存分配示例</td>
+<td align="left">heap</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/heap?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">争用互斥锁持有者的堆栈跟踪</td>
+<td align="left">mutx</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/mutex?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">CPU性能分析</td>
+<td align="left">profile</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/profile?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">创建新操作系统线程的堆栈跟踪</td>
+<td align="left">threadcreate</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/threadcreate?debug=1</code></td>
+</tr>
+<tr>
+<td align="left">当前程序执行的跟踪</td>
+<td align="left">full goroutine stack dump</td>
+<td align="left"><code>http://127.0.0.1:6060/debug/pprof/goroutine?debug=2</code></td>
+</tr>
+</tbody></table>
+<h2 id="2-2-通过下载的pprof文件分析"><a href="#2-2-通过下载的pprof文件分析" class="headerlink" title="(2.2) 通过下载的pprof文件分析"></a>(2.2) 通过下载的pprof文件分析</h2><h3 id="2-2-1-下载并使用"><a href="#2-2-1-下载并使用" class="headerlink" title="(2.2.1) 下载并使用"></a>(2.2.1) 下载并使用</h3><p>  直接运行 <code>go tool pprof http://localhost:6060/debug/pprof/profile</code>，其会自动下载数据到本地，然后供分析。<br>  默认会下载到当前用户的 <code>~/pprof/pprof.samples.cpu.001.pb.gz</code> 目录下</p>
+<p>  <code>go tool pprof http://localhost:6060/debug/pprof/profile</code> = <code>download filepath </code> + <code>go tool pprof filepath</code></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>bogon thrift<span class="token operator">-</span>tutorial<span class="token operator">-</span>go<span class="token operator">-</span>demo <span class="token operator">(</span>master<span class="token operator">)</span><span class="token punctuation">]</span><span class="token operator">$</span> go tool pprof <span class="token url">http://localhost:6060/debug/pprof/profile</span> 
+Fetching profile over HTTP from <span class="token url">http://localhost:6060/debug/pprof/profile</span>
+Saved profile in <span class="token file-path string">/Users/weikeqin/pprof/pprof.samples.cpu.001.pb.gz</span>
+<span class="token property">Type:</span> cpu
+<span class="token property">Time:</span> <span class="token date number">Aug 20</span><span class="token punctuation">,</span> <span class="token number">2022</span> at <span class="token number">8</span><span class="token operator">:</span><span class="token number">37pm</span> <span class="token operator">(</span>CST<span class="token operator">)</span>
+<span class="token property">Duration:</span> <span class="token number">30s</span><span class="token punctuation">,</span> Total samples <span class="token operator">=</span> <span class="token number">2.37s</span> <span class="token operator">(</span> <span class="token number">7.90</span><span class="token operator">%</span><span class="token operator">)</span>
+Entering interactive mode <span class="token operator">(</span>type <span class="token string">"help"</span> for commands<span class="token punctuation">,</span> <span class="token string">"o"</span> for options<span class="token operator">)</span>
+<span class="token operator">(</span>pprof<span class="token operator">)</span> <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-2-2-下载数据离线分析"><a href="#2-2-2-下载数据离线分析" class="headerlink" title="(2.2.2) 下载数据离线分析"></a>(2.2.2) 下载数据离线分析</h3><p><strong>下载文件</strong></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>computer <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> curl <span class="token operator">-</span>o <span class="token file-path string">/Users/weikeqin/pprof/go_profile.out</span>  <span class="token url">http://localhost:6060/debug/pprof/profile</span>
+  <span class="token operator">%</span> Total    <span class="token operator">%</span> Received <span class="token operator">%</span> Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+<span class="token number">100</span>   <span class="token number">107</span>  <span class="token number">100</span>   <span class="token number">107</span>    <span class="token number">0</span>     <span class="token number">0</span>      <span class="token number">3</span>      <span class="token number">0</span>  <span class="token time number">0:00:35</span>  <span class="token time number">0:00:30</span>  <span class="token time number">0:00:05</span>    <span class="token number">22</span>
+<span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>computer <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  执行 <code>curl -o /Users/weikeqin/pprof/go_profile.out  http://localhost:6060/debug/pprof/profile</code> ，会下载原始数据文件到 <code>/Users/weikeqin/pprof/go_profile.out</code> 目录。</p>
+<p><strong>分析文件</strong></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>computer pprof<span class="token punctuation">]</span><span class="token operator">$</span> go tool pprof <span class="token file-path string">/Users/weikeqin/pprof/go_profile.out</span>
+<span class="token property">Type:</span> cpu
+<span class="token property">Time:</span> <span class="token date number">Aug 20</span><span class="token punctuation">,</span> <span class="token number">2022</span> at <span class="token number">3</span><span class="token operator">:</span><span class="token number">39pm</span> <span class="token operator">(</span>CST<span class="token operator">)</span>
+<span class="token property">Duration:</span> <span class="token number">30.01s</span><span class="token punctuation">,</span> Total samples <span class="token operator">=</span> <span class="token number">0</span>
+No samples were found with the default sample value type<span class="token punctuation">.</span>
+Try <span class="token string">"sample_index"</span> command to analyze different sample values<span class="token punctuation">.</span>
+Entering interactive mode <span class="token operator">(</span>type <span class="token string">"help"</span> for commands<span class="token punctuation">,</span> <span class="token string">"o"</span> for options<span class="token operator">)</span>
+<span class="token operator">(</span>pprof<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<br>
+
+
+
+<h1 id="3-分析CPU占用情况"><a href="#3-分析CPU占用情况" class="headerlink" title="(3) 分析CPU占用情况"></a>(3) 分析CPU占用情况</h1><p>  通过 <code>http://127.0.0.1:6060/debug/pprof/profile?debug=1</code> 可以下载 <code>go_pprof_profile.out</code> 文件 </p>
+<h2 id="3-1-CPU分析原理"><a href="#3-1-CPU分析原理" class="headerlink" title="(3.1) CPU分析原理"></a>(3.1) CPU分析原理</h2><p>  CPU 分析器依赖于操作系统和信号。</p>
+<p>  当它被激活时，应用程序默认通过 SIGPROF 信号要求操作系统每 10 毫秒中断一次。当应用程序收到 SIGPROF 时，它会暂停当前活动并将执行转移到分析器。</p>
+<p>  分析器收集诸如当前 goroutine 活动之类的数据，并汇总可以检索的执行统计信息；然后停止分析并继续执行直到下一次的 SIGPROF。</p>
+<p>  我们可以访问 /debug/pprof/profile 路由来激活 CPU 分析。默认情况下，访问此路由会执行 30 秒的 CPU 分析。在 30 秒内，我们的应用程序每 10 毫秒中断一次。</p>
+<p>  请注意，可以更改这两个默认值：使用 seconds 参数将分析应该持续多长时间传递给路由（例如 /debug/pprof/profile?seconds=15），也可以更改中断率（甚至小于 10 毫秒）。</p>
+<p>  但多数情况下，10 毫秒应该足够了，在减小这个值（意味着增加频率）时，我们应该注意不要对性能产生影响。30 秒后，就可以下载 CPU 分析器的结果。</p>
+<p>  注意：<br>  也可以通过  -cpuprofile 标志来开启 CPU 分析器，比如在运行基准测试时就可以用这种方式。</p>
+<p>  例如，执行以下命令后可通过 /debug/pprof/profile 下载到相同的分析结果文件。</p>
+<h2 id="3-2-通过命令分析CPU数值指标"><a href="#3-2-通过命令分析CPU数值指标" class="headerlink" title="(3.2) 通过命令分析CPU数值指标"></a>(3.2) 通过命令分析CPU数值指标</h2><p>  如果在代码里使用了 <code>http.ListenAndServe(&quot;:6060&quot;, nil)</code>，可以直接访问 <code>http://127.0.0.1:6060/debug/pprof/profile?debug=1</code> 获取profile文件 </p>
+<p>  获取profile文件后使用 <code>go tool pprof go_profile.out</code> 来分析CPU占用情况</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">(</span>pprof<span class="token operator">)</span> 
+<span class="token operator">(</span>pprof<span class="token operator">)</span> help 
+  <span class="token property">Commands:</span>
+    callgrind        Outputs a graph in callgrind format
+    comments         Output all profile comments
+    disasm           Output assembly listings annotated with samples
+    dot              Outputs a graph in DOT format
+    eog              Visualize graph through eog
+    evince           Visualize graph through evince
+    gif              Outputs a graph image in GIF format
+    gv               Visualize graph through gv
+    kcachegrind      Visualize report in KCachegrind
+    list             Output annotated source for functions matching regexp
+    pdf              Outputs a graph in PDF format
+    peek             Output callers<span class="token operator">/</span>callees of functions matching regexp
+    png              Outputs a graph image in PNG format
+    proto            Outputs the profile in compressed protobuf format
+    ps               Outputs a graph in PS format
+    raw              Outputs a text representation of the raw profile
+    svg              Outputs a graph in SVG format
+    tags             Outputs all tags in the profile
+    text             Outputs top entries in text form
+    top              Outputs top entries in text form
+    topproto         Outputs top entries in compressed protobuf format
+    traces           Outputs all profile samples in text form
+    tree             Outputs a text rendering of call graph
+    web              Visualize graph through web browser
+    weblist          Display annotated source in a web browser
+    o<span class="token operator">/</span>options        List options and their current values
+    q<span class="token operator">/</span>quit<span class="token operator">/</span>exit<span class="token operator">/</span><span class="token operator">^</span>D   Exit pprof
+
+  <span class="token property">Options:</span>
+    call_tree        Create a context<span class="token operator">-</span>sensitive call tree
+    compact_labels   Show minimal headers
+    divide_by        Ratio to divide all samples before visualization
+    drop_negative    Ignore negative differences
+    edgefraction     Hide edges below <span class="token operator">&lt;</span>f<span class="token operator">></span><span class="token operator">*</span>total
+    focus            Restricts to samples going through a node matching regexp
+    hide             Skips nodes matching regexp
+    ignore           Skips paths going through any nodes matching regexp
+    intel_syntax     Show assembly in Intel syntax
+    mean             Average sample value over first value <span class="token operator">(</span>count<span class="token operator">)</span>
+    nodecount        Max number of nodes to show
+    nodefraction     Hide nodes below <span class="token operator">&lt;</span>f<span class="token operator">></span><span class="token operator">*</span>total
+    noinlines        Ignore inlines<span class="token punctuation">.</span>
+    normalize        Scales profile based on the base profile<span class="token punctuation">.</span>
+    output           Output filename for file<span class="token operator">-</span>based outputs
+    prune_from       Drops any functions below the matched frame<span class="token punctuation">.</span>
+    relative_percentages Show percentages relative to focused subgraph
+    sample_index     Sample value to report <span class="token operator">(</span><span class="token number">0</span><span class="token operator">-</span>based index or name<span class="token operator">)</span>
+    show             Only show nodes matching regexp
+    show_from        Drops functions above the highest matched frame<span class="token punctuation">.</span>
+    source_path      Search path for source files
+    tagfocus         Restricts to samples with tags in range or matched by regexp
+    taghide          Skip tags matching this regexp
+    tagignore        Discard samples with tags in range or matched by regexp
+    tagleaf          Adds pseudo stack frames for labels key<span class="token operator">/</span>value pairs at the callstack leaf<span class="token punctuation">.</span>
+    tagroot          Adds pseudo stack frames for labels key<span class="token operator">/</span>value pairs at the callstack root<span class="token punctuation">.</span>
+    tagshow          Only consider tags matching this regexp
+    trim             Honor nodefraction<span class="token operator">/</span>edgefraction<span class="token operator">/</span>nodecount defaults
+    trim_path        Path to trim from source paths before search
+    unit             Measurement units to display
+
+  <span class="token property">Option groups (only set one per group):</span>
+    granularity      
+      functions        Aggregate at the function level<span class="token punctuation">.</span>
+      filefunctions    Aggregate at the function level<span class="token punctuation">.</span>
+      files            Aggregate at the file level<span class="token punctuation">.</span>
+      lines            Aggregate at the source code line level<span class="token punctuation">.</span>
+      addresses        Aggregate at the address level<span class="token punctuation">.</span>
+    sort             
+      cum              Sort entries based on cumulative weight
+      flat             Sort entries based on own weight
+  <span class="token operator">:</span>   Clear focus<span class="token operator">/</span>ignore<span class="token operator">/</span>hide<span class="token operator">/</span>tagfocus<span class="token operator">/</span>tagignore
+
+  type <span class="token string">"help &lt;cmd|option>"</span> for more information
+<span class="token operator">(</span>pprof<span class="token operator">)</span> 
+<span class="token operator">(</span>pprof<span class="token operator">)</span> <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="3-2-1-生成调用关系图"><a href="#3-2-1-生成调用关系图" class="headerlink" title="(3.2.1) 生成调用关系图"></a>(3.2.1) 生成调用关系图</h3><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">(</span>pprof<span class="token operator">)</span>  web
+<span class="token operator">(</span>pprof<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>  会生成一个svg图片保存到 <code>file:///private/var/folders/ry/j30lp1sn19q7rbtq6020f6880000gn/T/pprof001.svg</code>，并且自动打开。</p>
+<p>  <img src="/img/go/pprof/go-pprof-graph.svg" alt="调用关系图"></p>
+<p>  每个方框代表一个函数，方框的大小和执行时间成正比，箭头代表调用关系，箭头上的时间代表被调用函数的执行时间</p>
+<h3 id="3-2-2-查看top占用"><a href="#3-2-2-查看top占用" class="headerlink" title="(3.2.2) 查看top占用"></a>(3.2.2) 查看top占用</h3><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">(</span>pprof<span class="token operator">)</span> top
+Showing nodes accounting for <span class="token number">5.75s</span><span class="token punctuation">,</span> <span class="token number">94.73</span><span class="token operator">%</span> of <span class="token number">6.07s</span> total
+Dropped <span class="token number">118</span> nodes <span class="token operator">(</span>cum <span class="token operator">&lt;</span><span class="token operator">=</span> <span class="token number">0.03s</span><span class="token operator">)</span>
+Showing top <span class="token number">10</span> nodes out of <span class="token number">94</span>
+      flat  flat<span class="token operator">%</span>   sum<span class="token operator">%</span>        cum   cum<span class="token operator">%</span>
+     <span class="token number">3.46s</span> <span class="token number">57.00</span><span class="token operator">%</span> <span class="token number">57.00</span><span class="token operator">%</span>      <span class="token number">3.47s</span> <span class="token number">57.17</span><span class="token operator">%</span>  <span class="token domain constant">syscall.syscall6</span>
+     <span class="token number">1.34s</span> <span class="token number">22.08</span><span class="token operator">%</span> <span class="token number">79.08</span><span class="token operator">%</span>      <span class="token number">1.34s</span> <span class="token number">22.08</span><span class="token operator">%</span>  <span class="token domain constant">runtime.kevent</span>
+     <span class="token number">0.30s</span>  <span class="token number">4.94</span><span class="token operator">%</span> <span class="token number">84.02</span><span class="token operator">%</span>      <span class="token number">0.30s</span>  <span class="token number">4.94</span><span class="token operator">%</span>  <span class="token domain constant">syscall.syscall</span>
+     <span class="token number">0.16s</span>  <span class="token number">2.64</span><span class="token operator">%</span> <span class="token number">86.66</span><span class="token operator">%</span>      <span class="token number">0.16s</span>  <span class="token number">2.64</span><span class="token operator">%</span>  runtime<span class="token punctuation">.</span>siftdownTimer
+     <span class="token number">0.12s</span>  <span class="token number">1.98</span><span class="token operator">%</span> <span class="token number">88.63</span><span class="token operator">%</span>      <span class="token number">0.13s</span>  <span class="token number">2.14</span><span class="token operator">%</span>  <span class="token domain constant">runtime.chansend</span>
+     <span class="token number">0.12s</span>  <span class="token number">1.98</span><span class="token operator">%</span> <span class="token number">90.61</span><span class="token operator">%</span>      <span class="token number">0.14s</span>  <span class="token number">2.31</span><span class="token operator">%</span>  <span class="token domain constant">runtime.walltime</span>
+     <span class="token number">0.10s</span>  <span class="token number">1.65</span><span class="token operator">%</span> <span class="token number">92.26</span><span class="token operator">%</span>      <span class="token number">0.10s</span>  <span class="token number">1.65</span><span class="token operator">%</span>  <span class="token domain constant">runtime.madvise</span>
+     <span class="token number">0.08s</span>  <span class="token number">1.32</span><span class="token operator">%</span> <span class="token number">93.57</span><span class="token operator">%</span>      <span class="token number">0.08s</span>  <span class="token number">1.32</span><span class="token operator">%</span>  runtime<span class="token punctuation">.</span>memclrNoHeapPointers
+     <span class="token number">0.06s</span>  <span class="token number">0.99</span><span class="token operator">%</span> <span class="token number">94.56</span><span class="token operator">%</span>      <span class="token number">0.06s</span>  <span class="token number">0.99</span><span class="token operator">%</span>  <span class="token domain constant">runtime.nanotime1</span>
+     <span class="token number">0.01s</span>  <span class="token number">0.16</span><span class="token operator">%</span> <span class="token number">94.73</span><span class="token operator">%</span>      <span class="token number">0.16s</span>  <span class="token number">2.64</span><span class="token operator">%</span>  <span class="token domain constant">runtime.mallocgc</span>
+<span class="token operator">(</span>pprof<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-3-CPU参数页面可视化分析"><a href="#3-3-CPU参数页面可视化分析" class="headerlink" title="(3.3) CPU参数页面可视化分析"></a>(3.3) CPU参数页面可视化分析</h2><p>  如果通过 <code>go tool pprof go_profile.out</code> 分析时觉得数字不直观时，可以通过页面可视化来查看</p>
+<p>  其实就是开了一个http服务，然后把 <code>go_profile.out</code> 做成可视化的了</p>
+<p>  比如 go_profile.out 对应的路径是 <code>/Users/weikeqin/WorkSpaces/golang/go_profile.out</code></p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>computer <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> go tool pprof <span class="token operator">-</span>http<span class="token operator">=</span><span class="token operator">:</span><span class="token number">8080</span> <span class="token file-path string">/Users/weikeqin/WorkSpaces/golang/go_profile.out</span> 
+Serving web UI on <span class="token url">http://localhost:8080</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>  <img src="/img/go/pprof/go-pprof-view.png"></p>
+<h3 id="3-3-1-调用链路-graph"><a href="#3-3-1-调用链路-graph" class="headerlink" title="(3.3.1) 调用链路(graph)"></a>(3.3.1) 调用链路(graph)</h3><p>  <img src="/img/go/pprof/go-pprof-graph.svg"></p>
+<h3 id="3-3-2-火焰图-flamegraph"><a href="#3-3-2-火焰图-flamegraph" class="headerlink" title="(3.3.2) 火焰图(flamegraph)"></a>(3.3.2) 火焰图(flamegraph)</h3><p>  <img src="/img/go/pprof/go-pprof-flamegraph.png"></p>
+<p>  <img src="/img/go/pprof/go-pprof-flamegraph2.png"></p>
+<h3 id="3-3-3-top"><a href="#3-3-3-top" class="headerlink" title="(3.3.3) top"></a>(3.3.3) top</h3><p>  CPU top占用情况</p>
+<p>  <img src="/img/go/pprof/go-pprof-top.png"></p>
+<h2 id="3-4-分析后的收获"><a href="#3-4-分析后的收获" class="headerlink" title="(3.4) 分析后的收获"></a>(3.4) 分析后的收获</h2><p>  对 runtime.mallogc 的调用过多，意味着我们可以尝试减少过多的小堆分配<br>  在通道操作或互斥锁上花费太多时间，可能表明过度竞争正在损害应用程序的性能<br>  在 syscall.Read 或 syscall.Write 上花费太多时间，意味着应用程序在内核模式下花费了大量时间。处理 I/O 缓冲可能是改进的途径</p>
+<br>
+
+ 
+
+<h1 id="4-分析内存-堆占用情况"><a href="#4-分析内存-堆占用情况" class="headerlink" title="(4) 分析内存-堆占用情况"></a>(4) 分析内存-堆占用情况</h1><p>  通过 <code>http://127.0.0.1:6060/debug/pprof/heap?debug=1</code> 可以查看堆占用情况 </p>
+<h2 id="4-1-堆分析原理"><a href="#4-1-堆分析原理" class="headerlink" title="(4.1) 堆分析原理"></a>(4.1) 堆分析原理</h2><p>  与 CPU 分析一样，堆分析也是基于采样的。</p>
+<h2 id="4-2-分析堆占用数字指标"><a href="#4-2-分析堆占用数字指标" class="headerlink" title="(4.2) 分析堆占用数字指标"></a>(4.2) 分析堆占用数字指标</h2><p>  通过 <code>http://127.0.0.1:6060/debug/pprof/heap?debug=1</code> 可以获取堆占用的详细数字指标</p>
+<p>  <img src="/img/go/pprof/go_pprof_heap_detail.png"></p>
+<h2 id="4-3-通过工具分析"><a href="#4-3-通过工具分析" class="headerlink" title="(4.3) 通过工具分析"></a>(4.3) 通过工具分析</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>computer pprof<span class="token punctuation">]</span><span class="token operator">$</span> go tool pprof <span class="token file-path string">/Users/weikeqin/pprof/go_pprof_heap.out</span>
+<span class="token property">Type:</span> inuse_space
+<span class="token property">Time:</span> <span class="token date number">Aug 20</span><span class="token punctuation">,</span> <span class="token number">2022</span> at <span class="token number">4</span><span class="token operator">:</span><span class="token number">29pm</span> <span class="token operator">(</span>CST<span class="token operator">)</span>
+Entering interactive mode <span class="token operator">(</span>type <span class="token string">"help"</span> for commands<span class="token punctuation">,</span> <span class="token string">"o"</span> for options<span class="token operator">)</span>
+<span class="token operator">(</span>pprof<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">(</span>pprof<span class="token operator">)</span>  svg
+Generating report in <span class="token domain constant">profile001.svg</span>
+<span class="token operator">(</span>pprof<span class="token operator">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>  生成svg，查看堆占用情况</p>
+<h2 id="4-3-通过网页可视化分析"><a href="#4-3-通过网页可视化分析" class="headerlink" title="(4.3) 通过网页可视化分析"></a>(4.3) 通过网页可视化分析</h2><p>  通过 <code>http://127.0.0.1:6060/debug/pprof/heap?debug=0</code> 下载文件，下载的文件可以重名名</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>bogon <span class="token operator">~</span><span class="token punctuation">]</span><span class="token operator">$</span> go tool pprof <span class="token operator">-</span>http<span class="token operator">=</span><span class="token operator">:</span><span class="token number">8082</span> <span class="token file-path string">/Users/weikeqin/pprof/go_pprof_heap.out</span>
+Serving web UI on <span class="token url">http://localhost:8082</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>  <img src="/img/go/pprof/go_pprof_heap_view.png"></p>
+<p>alloc_objects— 分配的对象总数<br>alloc_space— 分配的内存总量<br>inuse_objects— 已分配但尚未释放的对象数<br>inuse_space— 已分配但尚未释放的内存量</p>
+<h1 id="5-遇到的问题"><a href="#5-遇到的问题" class="headerlink" title="(5) 遇到的问题"></a>(5) 遇到的问题</h1><h2 id="5-1-Could-not-execute-dot-may-need-to-install-graphviz"><a href="#5-1-Could-not-execute-dot-may-need-to-install-graphviz" class="headerlink" title="(5.1) Could not execute dot; may need to install graphviz."></a>(5.1) Could not execute dot; may need to install graphviz.</h2><pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token punctuation">[</span>weikeqin<span class="token operator">@</span>bogon thrift<span class="token operator">-</span>tutorial<span class="token operator">-</span>go<span class="token operator">-</span>demo <span class="token operator">(</span>master<span class="token operator">)</span><span class="token punctuation">]</span><span class="token operator">$</span> go tool pprof <span class="token operator">-</span>http<span class="token operator">=</span><span class="token operator">:</span><span class="token number">8080</span> <span class="token file-path string">/Users/weikeqin/WorkSpaces/golang/go_profile.out</span> 
+Serving web UI on <span class="token url">http://localhost:8080</span>
+Failed to execute dot<span class="token punctuation">.</span> Is Graphviz installed<span class="token operator">?</span>
+<span class="token property">exec:</span> <span class="token string">"dot"</span><span class="token operator">:</span> executable file not found in <span class="token operator">$</span>PATH
+Failed to execute dot<span class="token punctuation">.</span> Is Graphviz installed<span class="token operator">?</span>
+<span class="token property">exec:</span> <span class="token string">"dot"</span><span class="token operator">:</span> executable file not found in <span class="token operator">$</span>PATH
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  到 <a target="_blank" rel="noopener" href="https://www.graphviz.org/download/">https://www.graphviz.org/download/</a> 下载 Graphviz </p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.cn/post/7002963307787190309">如何排查 Go 程序 CPU 占用过高问题</a><br>[2] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/368567370">Go 程序内存泄露问题快速定位</a><br>[3] <a target="_blank" rel="noopener" href="https://blog.wolfogre.com/posts/go-ppof-practice/">golang pprof 实战</a>  △<br>[4] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/396363069">实用go pprof使用指南</a><br>[5] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/7_b1NnoLxyE-kp7mnfXj4w">Go 中的性能分析和执行跟踪</a>  ☆<br>[6] <a target="_blank" rel="noopener" href="https://go.dev/doc/diagnostics#profiling">go.dev-doc-diagnostics#profiling</a><br>[7] <a target="_blank" rel="noopener" href="https://www.cnblogs.com/TimLiuDream/p/10038239.html">使用google的pprof工具以及在gin中集成pprof</a><br>[8] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/51559344">Golang性能测试工具PProf应用详解</a><br>[9] <a target="_blank" rel="noopener" href="https://medium.com/@teivah/concurrency-isnt-always-faster-in-go-de325168907c">Concurrency isn’t Always Faster in Go</a></p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/07/30/rocksdb-index-model/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -711,7 +1259,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-01-30 23:12:21" itemprop="dateModified" datetime="2023-01-30T23:12:21+08:00">2023-01-30</time>
+                <time title="修改时间：2023-04-09 23:03:44" itemprop="dateModified" datetime="2023-04-09T23:03:44+08:00">2023-04-09</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -750,14 +1298,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>241</span>
+              <span>5.1k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -770,8 +1318,120 @@
 
       
           <h1 id="1-RocksDB是什么"><a href="#1-RocksDB是什么" class="headerlink" title="(1) RocksDB是什么"></a>(1) RocksDB是什么</h1><p>  RocksDB是 Facebook 开源的一个高性能持久化 KV 存储。</p>
+<p>  RocksDB是一个基于LSM树的键值存储引擎，旨在提供高性能、可扩展性和可靠性。<br>  它的核心思想是将数据分为多个层级，每个层级使用不同的数据结构来存储数据。</p>
+<p>  在写入时，数据首先被写入内存中的MemTable，然后根据大小和数量的限制，MemTable会被转换为一个SSTable文件并写入磁盘。<br>  在读取时，RocksDB会首先在内存中的MemTable中查找数据，如果没有找到，则会在磁盘上的SSTable文件中查找。</p>
+<p>  为了提高读取性能，RocksDB还使用了Bloom Filter和Skip List等数据结构来加速查找。</p>
+<p>  此外，RocksDB还支持多种数据压缩算法，以减少磁盘空间的使用。</p>
 <p>  越来越多的新生代数据库，都不约而同地选择 RocksDB 作为它们的存储引擎。<br>  比如 CockroachDB 用到了 RocksDB 作为它的存储引擎;<br>  MyRocks项目用 RocksDB 给 MySQL 做存储引擎，目的是取代现有的 InnoDB 存储引擎。</p>
-<h1 id="为什么要用RocksDB"><a href="#为什么要用RocksDB" class="headerlink" title="为什么要用RocksDB"></a>为什么要用RocksDB</h1><h1 id="RocksDB是怎么应用到存储系统的"><a href="#RocksDB是怎么应用到存储系统的" class="headerlink" title="RocksDB是怎么应用到存储系统的"></a>RocksDB是怎么应用到存储系统的</h1><h1 id="RocksDB索引模型"><a href="#RocksDB索引模型" class="headerlink" title="RocksDB索引模型"></a>RocksDB索引模型</h1><h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/225400">后端存储实战课 - 24 | RocksDB：不丢数据的高性能KV存储</a></p>
+<br>
+
+
+<h1 id="2-为什么要用RocksDB"><a href="#2-为什么要用RocksDB" class="headerlink" title="(2) 为什么要用RocksDB"></a>(2) 为什么要用RocksDB</h1><p>  简单来说有3个主要原因：1:持久化  2:数据量大时用磁盘存储便宜</p>
+<p>  来对比一下 RocksDB 和 Redis 这两个 KV 存储。  </p>
+<p>  Redis是内存数据库，从官方给出的测试数据来看，它的随机读写性能大约在 50 万次 / 秒左右。<br>  RocksDB 数据存储在磁盘， 相应的随机读写性能大约在 20 万次 / 秒左右。</p>
+<p>  虽然性能还不如 Redis，但是已经可以算是同一个量级的水平了。</p>
+<p>  Redis 是一个内存数据库，并不是一个可靠的存储。数据写到内存中就算成功了，它并不保证安全地保存到磁盘上。<br>  而 RocksDB 它是一个持久化的 KV 存储，它需要保证每条数据都要安全地写到磁盘上</p>
+<br>
+
+<h1 id="3-RocksDB索引模型"><a href="#3-RocksDB索引模型" class="headerlink" title="(3) RocksDB索引模型"></a>(3) RocksDB索引模型</h1><p>  RocksDB 采用了一个非常复杂的数据存储结构，并且这个存储结构采用了内存和磁盘混合存储方式，使用磁盘来保证数据的可靠存储，并且利用速度更快的内存来提升读写性能。这种数据结构就是 <code>LSM-Tree</code> 。</p>
+<h2 id="3-1-RocksDB使用的数据结构"><a href="#3-1-RocksDB使用的数据结构" class="headerlink" title="(3.1) RocksDB使用的数据结构"></a>(3.1) RocksDB使用的数据结构</h2><p>  LSM-Tree 的全称是：The Log-Structured Merge-Tree，是一种非常复杂的复合数据结构，它包含了 WAL（Write Ahead Log）、跳表（SkipList）和一个分层的有序表（SSTable，Sorted String Table）。</p>
+<p>  <img src="/img/database/storage-engine/rocketsdb/sstable.png"></p>
+<p>  LSM-Tree 论文  <a target="_blank" rel="noopener" href="https://ranger.uta.edu/~sjiang/pubs/papers/wang14-LSM-SDF.pdf">https://ranger.uta.edu/~sjiang/pubs/papers/wang14-LSM-SDF.pdf</a></p>
+<p>  WAL 保证数据顺序写入<br>  跳表 查询性能O(log N)<br>  分层有序表 排序</p>
+<p>  LSM-Tree（Log-Structured Merge Tree）是一种针对写入密集型工作负载进行优化的基于磁盘的数据结构。<br>  它由多个级别组成，每个级别都是键值对的排序运行。<br>  当执行写操作时，新的键值对将添加到内存缓冲区中。一旦缓冲区达到一定大小，它将作为新的排序运行刷新到磁盘上。<br>  当一个级别中的排序运行数量超过一定阈值时，它们将合并为下一个级别中的新的排序运行。</p>
+<p>  这个合并过程是LSM-Tree的效率所在。通过合并排序运行而不是单个键值对，LSM-Tree可以减少读取特定键值对所需的磁盘寻道次数。<br>  此外，通过保持内存缓冲区相对较小，LSM-Tree可以减少维护数据结构所需的内存量。</p>
+<p>  要实现LSM-Tree，可以使用SkipList数据结构作为每个级别中的排序运行。SkipList的Insert方法可用于将新的键值对添加到内存缓冲区中，FindGreaterOrEqual方法可用于在排序运行中高效地搜索特定键。合并过程可以使用Iterator对象和SkipList的Merge方法的组合来实现。</p>
+<p>  总的来说，LSM-Tree是一种强大的数据结构，非常适合写入密集型工作负载。通过利用SkipList和排序运行的原理，LSM-Tree可以提供高效的写入和读取性能，同时最小化维护数据结构所需的内存量。</p>
+<h2 id="3-2-新增数据"><a href="#3-2-新增数据" class="headerlink" title="(3.2) 新增数据"></a>(3.2) 新增数据</h2><p> 当 LSM-Tree 收到一个写请求，比如说：PUT foo bar，把 Key foo 的值设置为 bar。<br>  1、操作命令会被写入到磁盘的 WAL 日志中（图中右侧的 Log）。<br>  2、数据会被写入到内存中的 MemTable 中，返回写入成功。<br>  3、MemTable 写满(默认是32M)之后，就被转换成 Immutable MemTable，然后再创建一个空的 MemTable 继续写。<br>  4、后台线程不断把 Immutable MemTable 复制到磁盘文件中，然后释放内存空间。 (此时每个文件里的Key是有序的，但是文件之间是完全无序的)<br>  5、分层合并使文件有序。 (除第0层无序， 第0层是MemTable 直接 dump 出来的磁盘文件所在的那一层)</p>
+<h3 id="3-2-1-WAL日志的作用"><a href="#3-2-1-WAL日志的作用" class="headerlink" title="(3.2.1) WAL日志的作用"></a>(3.2.1) WAL日志的作用</h3><p>  写WAL日志是顺序写磁盘，性能较好。<br>  WAL日志可以用于故障恢复，一旦系统宕机，可以从日志中把内存中还没有来得及写入磁盘的数据恢复出来。<br>  WAL日志解决了数据可靠性的问题。</p>
+<h3 id="3-2-2-MemTable的作用"><a href="#3-2-2-MemTable的作用" class="headerlink" title="(3.2.2) MemTable的作用"></a>(3.2.2) MemTable的作用</h3><p>  MemTable 是一个按照 Key 组织的跳表（SkipList），查询复杂度是 O(log N)<br>  写 MemTable 是个内存操作，速度也非常快。</p>
+<p>  跳表和平衡树有着类似的查找性能，但实现起来更简单一些。</p>
+<p> 这里面有一点需要注意的是，LSM-Tree 在处理写入的过程中，直接就往 MemTable 里写，并不去查找这个 Key 是不是已经存在了。</p>
+<p> 把 MemTable 写入 SSTable 这个写操作，因为它是把整块内存写入到整个文件中，这同样是一个顺序写操作。</p>
+<h3 id="3-2-3-分层合并"><a href="#3-2-3-分层合并" class="headerlink" title="(3.2.3) 分层合并"></a>(3.2.3) 分层合并</h3><p>  SSTable 被分为很多层，越往上层，文件越少，越往底层，文件越多。<br>  每一层的容量都有一个固定的上限，一般来说，下一层的容量是上一层的 10 倍。<br>  当某一层写满了，就会触发后台线程往下一层合并，数据合并到下一层之后，本层的 SSTable 文件就可以删除掉了。<br>  合并的过程也是排序的过程，除 Level 0 以外，每一层内的文件都是有序的，文件内的 KV 也是有序的。</p>
+<h2 id="3-3-更新数据"><a href="#3-3-更新数据" class="headerlink" title="(3.3) 更新数据"></a>(3.3) 更新数据</h2><p>  和新增数据一样</p>
+<h2 id="3-4-删除数据"><a href="#3-4-删除数据" class="headerlink" title="(3.4) 删除数据"></a>(3.4) 删除数据</h2><p>  LSM-Tree 删除数据：在每条数据上增加一个删除的标志位，查询的时候判断是否已经删除，落盘的时候根据删除标志位合并数据，但是这样会浪费一些空间资源</p>
+<p>  标记删除，有墓碑的概念，被删除的条目，如果在memtable里，可以直接通过墓碑标记为删除，如果不在memtable里就插入一条新的删除记录，这两种情况都会在层级合并的时候真正发挥作用，同时WAL里通过一条额外的log记录这个删除操作。</p>
+<p>  另外感觉WAL里存储的其实就是操作指令流，和raft里面的日志完全一个概念，所以raft协议和leveldb/rocksdb的组合简直是绝配</p>
+<h2 id="3-5-查询数据"><a href="#3-5-查询数据" class="headerlink" title="(3.5) 查询数据"></a>(3.5) 查询数据</h2><p>  查询的过程是按照顺序从一个一个table中去查询，先查内存后查磁盘<br>  Level 0 是无序的，所以一般Level只保存很少的几个文件。Level 0的查找顺序就是按照文件的创建顺序倒序查找，也就是从最新的向最旧的查找。 </p>
+<br>
+
+
+<h1 id="4-RocksDB索引模型源码解读"><a href="#4-RocksDB索引模型源码解读" class="headerlink" title="(4) RocksDB索引模型源码解读"></a>(4) RocksDB索引模型源码解读</h1><h1 id="4-1-源码解析"><a href="#4-1-源码解析" class="headerlink" title="(4.1) 源码解析"></a>(4.1) 源码解析</h1><p>  源码地址: <a target="_blank" rel="noopener" href="https://github.com/facebook/rocksdb/tree/v8.0.0/memtable">https://github.com/facebook/rocksdb/tree/v8.0.0/memtable</a></p>
+<p>  RocksDB索引模型主要源码<br>  Memtable结构<br>  数据结构-SkipList<br>  分层有序表</p>
+<h2 id="4-2-跳表-SkipList-源码解析"><a href="#4-2-跳表-SkipList-源码解析" class="headerlink" title="(4.2) 跳表(SkipList)源码解析"></a>(4.2) 跳表(SkipList)源码解析</h2><p>  SkipList类是一个模板类，它有两个模板参数：Key和Comparator。Key参数指定键值存储中使用的键的类型，而Comparator参数指定用于比较键的比较函数。</p>
+<p>  SkipList类提供了几种方法，用于在存储中插入、搜索和迭代键值对。<br>  Insert方法将新的键值对插入存储中；<br>  Contains方法检查给定的键是否存在于存储中；<br>  Iterator类提供了一种按排序顺序迭代存储中键值对的方法。</p>
+<p>  SkipList类被设计为线程安全的，写操作需要外部同步，通常是互斥锁。<br>  另一方面，读操作不需要任何内部锁定或同步，但需要保证在读取过程中SkipList不会被销毁。</p>
+<p>  总的来说，SkipList类提供了一个高性能、线程安全的数据结构，用于存储和检索RocksDB中的键值对。</p>
+<h3 id="4-2-1-跳表结构"><a href="#4-2-1-跳表结构" class="headerlink" title="(4.2.1) 跳表结构"></a>(4.2.1) 跳表结构</h3><p>  <a target="_blank" rel="noopener" href="https://github.com/facebook/rocksdb/blob/v8.0.0/memtable/skiplist.h#L170">https://github.com/facebook/rocksdb/blob/v8.0.0/memtable/skiplist.h#L170</a></p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; filepath: memtable&#x2F;skiplist.h
+
+&#x2F;&#x2F; 定义 SkipList 类，模板参数为 Key 和 Comparator
+template &lt;typename Key, class Comparator&gt;
+
+&#x2F;&#x2F; 跳表结构定义
+class SkipList &#123;
+ private:
+  &#x2F;&#x2F; 节点
+  struct Node;
+                 
+ private:
+  &#x2F;&#x2F; 最大高度
+  const uint16_t kMaxHeight_;
+  &#x2F;&#x2F; 分支因子的默认值
+  const uint16_t kBranching_;
+  const uint32_t kScaledInverseBranching_;
+
+  &#x2F;&#x2F; 构造函数 后 不可更改
+  Comparator const compare_;
+  &#x2F;&#x2F; 用于分配节点的分配器
+  Allocator* const allocator_; 
+
+  &#x2F;&#x2F; 头节点
+  Node* const head_;
+
+  &#x2F;&#x2F; 跳表的高度
+  &#x2F;&#x2F; 只能被 Insert() 修改，可以被读取器读取，但是过时的值是可以接受的
+  std::atomic&lt;int&gt; max_height_;  
+
+  &#x2F;&#x2F; 用于优化顺序插入模式，比较棘手
+  &#x2F;&#x2F; prev_[i] 对于 i 小于等于 max_height_ 是 prev_[0] 的前驱节点，prev_height_ 是 prev_[0] 的高度
+  &#x2F;&#x2F; 在插入之前，prev_[0] 只能等于 head_，此时 max_height_ 和 prev_height_ 都为 1
+  Node** prev_;
+  int32_t prev_height_;
+
+ public:
+  &#x2F;&#x2F; 构造函数，接受比较器和分配器，以及最大高度和分支因子的默认值
+  explicit SkipList(Comparator cmp, Allocator* allocator,
+                    int32_t max_height &#x3D; 12, int32_t branching_factor &#x3D; 4);
+
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h3 id="4-2-2-跳表节点"><a href="#4-2-2-跳表节点" class="headerlink" title="(4.2.2) 跳表节点"></a>(4.2.2) 跳表节点</h3><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; filepath: memtable&#x2F;skiplist.h
+
+&#x2F;&#x2F; 跳表节点
+template &lt;typename Key, class Comparator&gt;
+struct SkipList&lt;Key, Comparator&gt;::Node &#123;
+  explicit Node(const Key&amp; k) : key(k) &#123;&#125;
+
+  &#x2F;&#x2F; 节点的key
+  Key const key;
+
+ private:
+  &#x2F;&#x2F; 下一个节点(们)  每层指向的下一个节点不一样
+  &#x2F;&#x2F; 类似链表的next节点 只不过有多层&#x2F;多个
+  &#x2F;&#x2F; std::atomic 是原子类型对象，是为了解决并发编程中的线程安全提供的api，类似Java里的
+  std::atomic&lt;Node*&gt; next_[1];
+&#125;;
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h2 id="4-3-Memtable结构"><a href="#4-3-Memtable结构" class="headerlink" title="(4.3) Memtable结构"></a>(4.3) Memtable结构</h2><p>  MemTable是一个内存中的数据结构，用于存储最近写入的键值对。当MemTable达到一定大小时，它将被转换为SSTable并写入磁盘。SSTable是一种静态的、只读的数据结构，它被用作RocksDB的持久化存储。</p>
+<p>  Rocksdb 支持创建多数据结构类型的 Memtable，默认的是 SkipList，即跳跃表。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/225400">后端存储实战课 - 24 | RocksDB：不丢数据的高性能KV存储</a><br>[2] <a target="_blank" rel="noopener" href="https://ranger.uta.edu/~sjiang/pubs/papers/wang14-LSM-SDF.pdf">An Efficient Design and Implementation of LSM-Tree based Key-Value Store on Open-Channel SSD</a><br>[3] <a target="_blank" rel="noopener" href="https://xie.infoq.cn/article/8836cabe7d5959b95a7cebe93">技术贴 | Rocksdb 中 Memtable 源码解析</a></p>
 
       
     </div>
@@ -1196,325 +1856,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/07/02/thrift-transport/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/07/02/thrift-transport/" class="post-title-link" itemprop="url">thrift 传输方式(Transport)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-07-02 15:19:24" itemprop="dateCreated datePublished" datetime="2022-07-02T15:19:24+08:00">2022-07-02</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-17 23:23:54" itemprop="dateModified" datetime="2022-07-17T23:23:54+08:00">2022-07-17</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2022/07/02/thrift-transport/" class="post-meta-item leancloud_visitors" data-flag-title="thrift 传输方式(Transport)" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="far fa-comment"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/07/02/thrift-transport/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/07/02/thrift-transport/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>12k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="1-传输方式-Transport-作用"><a href="#1-传输方式-Transport-作用" class="headerlink" title="(1) 传输方式(Transport)作用"></a>(1) 传输方式(Transport)作用</h1><p>  传输方式(Transport)作为rpc框架接收报文的入口，提供各种底层实现如socket创建、读写、接收连接等。<br>  同时实现各种复写传输层包括http、framed、buffered、压缩传输等。</p>
-<h2 id="1-1-支持的传输方式"><a href="#1-1-支持的传输方式" class="headerlink" title="(1.1) 支持的传输方式"></a>(1.1) 支持的传输方式</h2><p>  thrift支持多种传输方式 </p>
-<table>
-<thead>
-<tr>
-<th>传输方式</th>
-<th>特点</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>TSocket</td>
-<td>阻塞型 socket，用于客户端，采用系统函数 read 和 write 进行读写数据。</td>
-</tr>
-<tr>
-<td>TServerSocket</td>
-<td>非阻塞型 socket，用于服务器端，accecpt 到的 socket 类型都是 TSocket（即阻塞型 socket）。</td>
-</tr>
-<tr>
-<td>TBufferedTransport</td>
-<td></td>
-</tr>
-<tr>
-<td>TFramedTransport</td>
-<td></td>
-</tr>
-<tr>
-<td>TMemoryBuffer</td>
-<td></td>
-</tr>
-<tr>
-<td>TFileTransport</td>
-<td></td>
-</tr>
-<tr>
-<td>TFDTransport</td>
-<td></td>
-</tr>
-<tr>
-<td>TSimpleFileTransport</td>
-<td></td>
-</tr>
-<tr>
-<td>TZlibTransport</td>
-<td></td>
-</tr>
-<tr>
-<td>TSSLSocket</td>
-<td></td>
-</tr>
-<tr>
-<td>TSSLServerSocket</td>
-<td></td>
-</tr>
-</tbody></table>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/07/02/thrift-transport/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2022/06/26/thrift-design/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/06/26/thrift-design/" class="post-title-link" itemprop="url">thrift架构设计</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-06-26 19:01:13" itemprop="dateCreated datePublished" datetime="2022-06-26T19:01:13+08:00">2022-06-26</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-30 23:44:12" itemprop="dateModified" datetime="2022-07-30T23:44:12+08:00">2022-07-30</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/rpc/" itemprop="url" rel="index"><span itemprop="name">rpc</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2022/06/26/thrift-design/" class="post-meta-item leancloud_visitors" data-flag-title="thrift架构设计" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="far fa-comment"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2022/06/26/thrift-design/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2022/06/26/thrift-design/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.4k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>  Thrift是一个轻量、支持多语言、可扩展、高性能的远程服务调用框架。<br>  提供了数据传输、序列化、应用层处理的清晰抽象。</p>
-<p>The Apache Thrift software framework, for scalable cross-language services development, combines a software stack with a code generation engine to build services that work efficiently and seamlessly between C++, Java, Python, PHP, Ruby, Erlang, Perl, Haskell, C#, Cocoa, JavaScript, Node.js, Smalltalk, OCaml and Delphi and other languages.</p>
-<h1 id="1-thrift架构分层"><a href="#1-thrift架构分层" class="headerlink" title="(1) thrift架构分层"></a>(1) thrift架构分层</h1><p>  <img src="/img/rpc/thrift/thrift-layers.png" alt="thrift-layers"></p>
-<table>
-<thead>
-<tr>
-<th>分层</th>
-<th>职责</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>服务调用层 (客户端/服务端)</td>
-<td>客户端、服务端调用。</td>
-</tr>
-<tr>
-<td>协议层</td>
-<td>消息解析</td>
-</tr>
-<tr>
-<td>传输层包装</td>
-<td>功能增强，实现各种复写传输层包括http、framed、buffered、压缩传输等</td>
-</tr>
-<tr>
-<td>低级传输层</td>
-<td>靠近网络层、作为rpc框架接收报文的入口，提供各种底层实现如socket创建、读写、接收连接等。</td>
-</tr>
-<tr>
-<td>语言层</td>
-<td>thrift采用接口描述语言定义并创建服务，支持可扩展的跨语言服务开发</td>
-</tr>
-<tr>
-<td>操作系统层</td>
-<td>由编程语言提供各种操作系统的支持</td>
-</tr>
-</tbody></table>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/06/26/thrift-design/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1584,20 +1925,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">313</span>
+          <span class="site-state-item-count">318</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-count">59</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
