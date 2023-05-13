@@ -17,19 +17,19 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"hide","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="问大家一个问题，假如Redis宕机，内存中的数据全部丢失，怎么恢复数据？ Redis 分别提供了 RDB 和 AOF 两种持久化机制：  RDB将数据库的快照(snapshot)以二进制的方式保存到磁盘中。  AOF则以协议文本的方式，将所有对数据库进行过写入的命令(及其参数)记录到AOF文件，以此达到记录数据库状态的目的。 (1) AOF日志是什么  AOF(Append Only File">
+  <meta name="description" content="经常会被问到一个问题，假如Redis宕机，内存中的数据全部丢失，怎么恢复数据？ Redis 分别提供了 RDB 和 AOF 两种持久化机制：  RDB将数据库的快照(snapshot)以二进制的方式保存到磁盘中。类似于MySQL全量备份。  AOF则以协议文本的方式，将所有对数据库进行过写入的命令(及其参数)记录到AOF文件，以此达到记录数据库状态的目的。 类似于MySQL binlog 增量">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis AOF">
 <meta property="og:url" content="http://weikeqin.com/2022/01/16/redis-aof/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="问大家一个问题，假如Redis宕机，内存中的数据全部丢失，怎么恢复数据？ Redis 分别提供了 RDB 和 AOF 两种持久化机制：  RDB将数据库的快照(snapshot)以二进制的方式保存到磁盘中。  AOF则以协议文本的方式，将所有对数据库进行过写入的命令(及其参数)记录到AOF文件，以此达到记录数据库状态的目的。 (1) AOF日志是什么  AOF(Append Only File">
+<meta property="og:description" content="经常会被问到一个问题，假如Redis宕机，内存中的数据全部丢失，怎么恢复数据？ Redis 分别提供了 RDB 和 AOF 两种持久化机制：  RDB将数据库的快照(snapshot)以二进制的方式保存到磁盘中。类似于MySQL全量备份。  AOF则以协议文本的方式，将所有对数据库进行过写入的命令(及其参数)记录到AOF文件，以此达到记录数据库状态的目的。 类似于MySQL binlog 增量">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/log/aof/redis-write-aof-log.png">
 <meta property="article:published_time" content="2022-01-16T06:44:05.000Z">
-<meta property="article:modified_time" content="2023-03-25T14:09:38.977Z">
+<meta property="article:modified_time" content="2023-04-26T16:49:29.860Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta property="article:tag" content="database">
@@ -249,7 +249,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-03-25 22:09:38" itemprop="dateModified" datetime="2023-03-25T22:09:38+08:00">2023-03-25</time>
+                <time title="修改时间：2023-04-27 00:49:29" itemprop="dateModified" datetime="2023-04-27T00:49:29+08:00">2023-04-27</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -295,14 +295,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>25k</span>
+              <span>6.6k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>23 分钟</span>
+              <span>6 分钟</span>
             </span>
 
         </div>
@@ -314,23 +314,121 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>  问大家一个问题，假如Redis宕机，内存中的数据全部丢失，怎么恢复数据？</p>
-<p>Redis 分别提供了 RDB 和 AOF 两种持久化机制：<br>  RDB将数据库的快照(snapshot)以二进制的方式保存到磁盘中。<br>  AOF则以协议文本的方式，将所有对数据库进行过写入的命令(及其参数)记录到AOF文件，以此达到记录数据库状态的目的。</p>
-<h1 id="1-AOF日志是什么"><a href="#1-AOF日志是什么" class="headerlink" title="(1) AOF日志是什么"></a>(1) AOF日志是什么</h1><p>  AOF(Append Only File)日志是一种写后日志，在Redis先执行命令，把数据写入内存后，然后才记录日志，日志会追加到文件末尾，所以叫AOF日志。</p>
+        <p>  经常会被问到一个问题，假如Redis宕机，内存中的数据全部丢失，怎么恢复数据？</p>
+<p>Redis 分别提供了 RDB 和 AOF 两种持久化机制：<br>  RDB将数据库的快照(snapshot)以二进制的方式保存到磁盘中。类似于MySQL全量备份。<br>  AOF则以协议文本的方式，将所有对数据库进行过写入的命令(及其参数)记录到AOF文件，以此达到记录数据库状态的目的。 类似于MySQL binlog 增量更新。</p>
+<h1 id="1-AOF日志是什么"><a href="#1-AOF日志是什么" class="headerlink" title="(1) AOF日志是什么"></a>(1) AOF日志是什么</h1><p>  Redis AOF（Append-Only File）是一种持久化机制，它记录Redis接收到的每个写操作。它通过将每个写操作追加到磁盘上的文件中来实现。这个文件称为AOF文件。</p>
+<p>  AOF文件以Redis特定的格式编写，以实现最佳性能。它也是只追加的，这意味着一旦数据被写入文件，就不能被修改或删除。这使得它成为一种可靠和安全的数据持久化方式。</p>
 <p>  <img src="/img/database/redis/log/aof/redis-write-aof-log.png"></p>
 <p>  和我们常见的WAL日志不同，WAL(Write Ahead Log)是写前日志，在实际写数据前，先把修改的数据记到日志文件中，再去执行命令，这个就要求数据库需要额外的检查命令是否正确。</p>
+<p>  AOF(Append Only File)日志是一种写后日志，在Redis先执行命令，把数据写入内存后，然后才记录日志，日志会追加到文件末尾，所以叫AOF日志。</p>
 <span id="more"></span>
 
+<br>
 
-<h1 id="2-为什么要用AOF"><a href="#2-为什么要用AOF" class="headerlink" title="(2) 为什么要用AOF"></a>(2) 为什么要用AOF</h1><p>  AOF日志的作用主要有2个: </p>
+
+<h1 id="2-AOF有哪些作用？"><a href="#2-AOF有哪些作用？" class="headerlink" title="(2) AOF有哪些作用？"></a>(2) AOF有哪些作用？</h1><p>  AOF日志的作用主要有2个:</p>
 <ol>
+<li>持久化，把内存中的数据保存到到磁盘上。</li>
 <li>用来在redis宕机后恢复数据；</li>
 <li>可以用来主从数据同步。</li>
 </ol>
-<h2 id="AOF为什么要先执行命令再记日志呢？"><a href="#AOF为什么要先执行命令再记日志呢？" class="headerlink" title="() AOF为什么要先执行命令再记日志呢？"></a>() AOF为什么要先执行命令再记日志呢？</h2><p>  MySQL在处理写操作时是先写redo log，再写bin log，最后提交事务。 可以认为是先记日志，再执行命令。<br>  这样做可以保证cash-safe，假设写完redo log MySQL宕机了，重启后也可以根据redo log来恢复数据。</p>
-<p>  为什么Redis的AOF日志要先执行命令再记日志呢？<br>  如果执行完命令宕机了，那从库岂不是和主库数据不一致了？</p>
-<p>  为了避免额外的检查开销，Redis 在向 AOF 里面记录日志的时候，并不会先去对这些命令进行语法检查。所以，如果先记日志再执行命令的话，日志中就有可能记录了错误的命令，Redis 在使用日志恢复数据时，就可能会出错。</p>
-<h1 id="3-AOF原理"><a href="#3-AOF原理" class="headerlink" title="(3) AOF原理"></a>(3) AOF原理</h1><h2 id="3-1-AOF命令同步原理"><a href="#3-1-AOF命令同步原理" class="headerlink" title="(3.1) AOF命令同步原理"></a>(3.1) AOF命令同步原理</h2><p>  Redis将所有对数据库进行过写入的命令(及其参数)记录到 AOF 文件， 以此达到记录数据库状态的目的。</p>
+<br>
+
+
+<h1 id="3-AOF使用"><a href="#3-AOF使用" class="headerlink" title="(3) AOF使用"></a>(3) AOF使用</h1><h2 id="3-1-开启AOF"><a href="#3-1-开启AOF" class="headerlink" title="(3.1) 开启AOF"></a>(3.1) 开启AOF</h2><pre class="line-numbers language-conf" data-language="conf"><code class="language-conf"># redis.conf 1254行  
+# 设置成yes 开启AOF
+appendonly yes
+
+
+# 设置AOF文件名
+appendfilename &quot;appendonly.aof&quot;
+
+
+# 保存模式  
+# 默认是 everysec
+# appendfsync always
+appendfsync everysec
+# appendfsync no
+
+
+# 关闭AOF重写配置 
+# 如果有延迟问题  可以把AOF后台重写关闭(把no改成yes)
+# 详细内容看 redis.conf 英文注释
+no-appendfsync-on-rewrite no
+
+
+# 自动AOF重写触发条件 
+# AOF重写比例
+auto-aof-rewrite-percentage 100
+# AOF重写最小的文件大小 默认64mb 
+auto-aof-rewrite-min-size 64mb
+
+
+# 
+aof-load-truncated yes
+
+
+# 
+aof-use-rdb-preamble yes<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="3-2-AOF保存模式"><a href="#3-2-AOF保存模式" class="headerlink" title="(3.2) AOF保存模式"></a>(3.2) AOF保存模式</h2><p>Redis 目前支持三种 AOF 保存模式，它们分别是：</p>
+<table>
+<thead>
+<tr>
+<th align="left">保存模式</th>
+<th align="left">解释</th>
+<th align="left">速度及安全性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">AOF_FSYNC_ALWAYS</td>
+<td align="left">在每次写操作后追加日志同步(fsync)。</td>
+<td align="left">慢 最安全</td>
+</tr>
+<tr>
+<td align="left">AOF_FSYNC_EVERYSEC</td>
+<td align="left">每秒只同步(fsync)一次。</td>
+<td align="left">妥协</td>
+</tr>
+<tr>
+<td align="left">AOF_FSYNC_NO</td>
+<td align="left">不同步(fsync)，只让操作系统在需要时刷新数据。</td>
+<td align="left">很快</td>
+</tr>
+</tbody></table>
+<pre class="line-numbers language-conf" data-language="conf"><code class="language-conf"># Redis supports three different modes:
+#
+# no: don&#39;t fsync, just let the OS flush the data when it wants. Faster.
+# always: fsync after every write to the append only log. Slow, Safest.
+# everysec: fsync only one time every second. Compromise.<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  注意： <code>fsync()</code>函数是把数据同步文件。<br>  <code>fsync</code>函数只对由文件描述符filedes指定的单一文件起作用，并且等待写磁盘操作结束，然后返回。可用于数据库这样的应用程序，这种应用程序需要确保将修改过的块立即写到磁盘上。</p>
+<h2 id="3-3-AOF保存模式对性能和安全性的影响"><a href="#3-3-AOF保存模式对性能和安全性的影响" class="headerlink" title="(3.3) AOF保存模式对性能和安全性的影响"></a>(3.3) AOF保存模式对性能和安全性的影响</h2><p>对于三种 AOF 保存模式， 它们对服务器主进程的阻塞情况如下：</p>
+<table>
+<thead>
+<tr>
+<th align="left">保存模式</th>
+<th align="left">解释</th>
+<th align="left">对服务器主进程的阻塞情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">AOF_FSYNC_NO</td>
+<td align="left">不保存</td>
+<td align="left">写入和保存都由主进程执行，两个操作都会阻塞主进程。</td>
+</tr>
+<tr>
+<td align="left">AOF_FSYNC_EVERYSEC</td>
+<td align="left">每一秒钟保存一次</td>
+<td align="left">写入操作由主进程执行，阻塞主进程。保存操作由子线程执行，不直接阻塞主进程，但保存操作完成的快慢会影响写入操作的阻塞时长。</td>
+</tr>
+<tr>
+<td align="left">AOF_FSYNC_ALWAYS</td>
+<td align="left">每执行一个命令保存一次</td>
+<td align="left">和模式 1 一样。</td>
+</tr>
+</tbody></table>
+<h1 id="4-AOF原理"><a href="#4-AOF原理" class="headerlink" title="(4) AOF原理"></a>(4) AOF原理</h1><h2 id="4-1-AOF命令是怎么同步的？"><a href="#4-1-AOF命令是怎么同步的？" class="headerlink" title="(4.1) AOF命令是怎么同步的？"></a>(4.1) AOF命令是怎么同步的？</h2><p>  Redis将所有对数据库进行过写入的命令(及其参数)记录到 AOF 文件， 以此达到记录数据库状态的目的。</p>
 <pre class="line-numbers language-log" data-language="log"><code class="language-log">redis<span class="token operator">></span> RPUSH list <span class="token number">1</span> <span class="token number">2</span> <span class="token number">3</span> <span class="token number">4</span>
 <span class="token operator">(</span>integer<span class="token operator">)</span> <span class="token number">4</span>
 
@@ -367,7 +465,8 @@ LPOP list
 LPUSH list <span class="token number">1</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h2 id="3-2-Reids-AOF数据存储方式"><a href="#3-2-Reids-AOF数据存储方式" class="headerlink" title="(3.2) Reids AOF数据存储方式"></a>(3.2) Reids AOF数据存储方式</h2><p>  为了处理的方便， AOF文件使用网络通讯协议的格式来保存这些命令。</p>
+<h3 id="4-1-1-MySQL-binlog有3种方式保存，redis-aof有几种方式？"><a href="#4-1-1-MySQL-binlog有3种方式保存，redis-aof有几种方式？" class="headerlink" title="(4.1.1) MySQL binlog有3种方式保存，redis aof有几种方式？"></a>(4.1.1) MySQL binlog有3种方式保存，redis aof有几种方式？</h3><p>  MySQL binlog有 <code>STATMENT</code>、<code>ROW</code> 和 <code>MIXED</code> 三种格式<br>  redis aof只有一种方式。</p>
+<h2 id="4-2-Reids-AOF数据是怎么存到文件的？"><a href="#4-2-Reids-AOF数据是怎么存到文件的？" class="headerlink" title="(4.2) Reids AOF数据是怎么存到文件的？"></a>(4.2) Reids AOF数据是怎么存到文件的？</h2><p>  为了处理的方便， AOF文件使用网络通讯协议的格式来保存这些命令。</p>
 <pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token operator">*</span><span class="token number">2</span>      <span class="token operator">#</span> 表示这条命令的消息体共<span class="token number">2</span>行
 <span class="token operator">$</span><span class="token number">6</span>      <span class="token operator">#</span> 下一行的数据长度为<span class="token number">6</span>
 SELECT  <span class="token operator">#</span> 消息体
@@ -405,86 +504,47 @@ list
 <span class="token number">1</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>除了 SELECT 命令是 AOF 程序自己加上去的之外， 其他命令都是之前我们在终端里执行的命令。</p>
-<br>
-
-
-
-
-<h1 id="4-AOF怎么使用"><a href="#4-AOF怎么使用" class="headerlink" title="(4) AOF怎么使用"></a>(4) AOF怎么使用</h1><h2 id="4-1-保存模式"><a href="#4-1-保存模式" class="headerlink" title="(4.1) 保存模式"></a>(4.1) 保存模式</h2><p>Redis 目前支持三种 AOF 保存模式，它们分别是：</p>
-<ol>
-<li>AOF_FSYNC_NO：不保存。</li>
-<li>AOF_FSYNC_EVERYSEC ：每一秒钟保存一次。</li>
-<li>AOF_FSYNC_ALWAYS ：每执行一个命令保存一次。</li>
-</ol>
-<h2 id="4-2-AOF保存模式对性能和安全性的影响"><a href="#4-2-AOF保存模式对性能和安全性的影响" class="headerlink" title="(4.2) AOF保存模式对性能和安全性的影响"></a>(4.2) AOF保存模式对性能和安全性的影响</h2><p>对于三种 AOF 保存模式， 它们对服务器主进程的阻塞情况如下：</p>
-<p>不保存（AOF_FSYNC_NO）：写入和保存都由主进程执行，两个操作都会阻塞主进程。<br>每一秒钟保存一次（AOF_FSYNC_EVERYSEC）：写入操作由主进程执行，阻塞主进程。保存操作由子线程执行，不直接阻塞主进程，但保存操作完成的快慢会影响写入操作的阻塞时长。<br>每执行一个命令保存一次（AOF_FSYNC_ALWAYS）：和模式 1 一样。</p>
-<h1 id="5-进阶"><a href="#5-进阶" class="headerlink" title="(5) 进阶"></a>(5) 进阶</h1><h2 id="5-1-同步命令到AOF文件的过程"><a href="#5-1-同步命令到AOF文件的过程" class="headerlink" title="(5.1) 同步命令到AOF文件的过程"></a>(5.1) 同步命令到AOF文件的过程</h2><p>同步命令到AOF文件的整个过程可以分为三个阶段：</p>
+<h2 id="4-3-redis命令同步到AOF文件的流程"><a href="#4-3-redis命令同步到AOF文件的流程" class="headerlink" title="(4.3) redis命令同步到AOF文件的流程"></a>(4.3) redis命令同步到AOF文件的流程</h2><p>  // todo 流程图</p>
+<p>同步命令到AOF文件的整个过程可以分为三个阶段：</p>
 <ol>
 <li>命令传播：Redis 将执行完的命令、命令的参数、命令的参数个数等信息发送到AOF程序中。</li>
 <li>缓存追加：AOF程序根据接收到的命令数据，将命令转换为网络通讯协议的格式，然后将协议内容追加到服务器的AOF缓存中。</li>
 <li>文件写入和保存：AOF缓存中的内容被写入到AOF文件末尾，如果设定的AOF保存条件被满足的话， <code>fsync</code>函数或者 <code>fdatasync</code>函数会被调用，将写入的内容真正地保存到磁盘中。</li>
 </ol>
-<h2 id="5-2-什么时候会触发AOF重写"><a href="#5-2-什么时候会触发AOF重写" class="headerlink" title="(5.2) 什么时候会触发AOF重写"></a>(5.2) 什么时候会触发AOF重写</h2><p>有两个配置项在控制AOF重写的触发时机：</p>
-<ol>
-<li><code>auto-aof-rewrite-min-size</code>: 表示运行AOF重写时文件的最小大小，默认为64MB</li>
-<li><code>auto-aof-rewrite-percentage</code>: 这个值的计算方法是：当前AOF文件大小和上一次重写后AOF文件大小的差值，再除以上一次重写后AOF文件大小。也就是当前AOF文件比上一次重写后AOF文件的增量大小，和上一次重写后AOF文件大小的比值。</li>
-</ol>
-<p>AOF文件大小同时超出上面这两个配置项时，会触发AOF重写。</p>
-<h2 id="5-3-重写AOF文件时潜在的阻塞风险"><a href="#5-3-重写AOF文件时潜在的阻塞风险" class="headerlink" title="(5.3) 重写AOF文件时潜在的阻塞风险"></a>(5.3) 重写AOF文件时潜在的阻塞风险</h2><p>  Redis采用fork子进程重写AOF文件时，潜在的阻塞风险包括：fork子进程 和 AOF重写过程中父进程产生写入的场景<br>  a、fork子进程，fork这个瞬间一定是会阻塞主线程的（注意，fork时并不会一次性拷贝所有内存数据给子进程），fork采用操作系统提供的写实复制(Copy On Write)机制，就是为了避免一次性拷贝大量内存数据给子进程造成的长时间阻塞问题，但fork子进程需要拷贝进程必要的数据结构，其中有一项就是拷贝内存页表（虚拟内存和物理内存的映射索引表），这个拷贝过程会消耗大量CPU资源，拷贝完成之前整个进程是会阻塞的，阻塞时间取决于整个实例的内存大小，实例越大，内存页表越大，fork阻塞时间越久。<br>  拷贝内存页表完成后，子进程与父进程指向相同的内存地址空间，也就是说此时虽然产生了子进程，但是并没有申请与父进程相同的内存大小。<br>  那什么时候父子进程才会真正内存分离呢？“写实复制”顾名思义，就是在写发生时，才真正拷贝内存真正的数据，这个过程中，父进程也可能会产生阻塞的风险，就是下面介绍的场景。</p>
-<p>  b、fork出的子进程指向与父进程相同的内存地址空间，此时子进程就可以执行AOF重写，把内存中的所有数据写入到AOF文件中。<br>  但是此时父进程依旧是会有流量写入的，如果父进程操作的是一个已经存在的key，那么这个时候父进程就会真正拷贝这个key对应的内存数据，申请新的内存空间，这样逐渐地，父子进程内存数据开始分离，父子进程逐渐拥有各自独立的内存空间。因为内存分配是以页为单位进行分配的，默认4k，如果父进程此时操作的是一个bigkey，重新申请大块内存耗时会变长，可能会产阻塞风险。<br>  另外，如果操作系统开启了内存大页机制(Huge Page，页面大小2M)，那么父进程申请内存时阻塞的概率将会大大提高，所以在Redis机器上需要关闭Huge Page机制。Redis每次fork生成RDB或AOF重写完成后，都可以在Redis log中看到父进程重新申请了多大的内存空间。</p>
-<h2 id="5-3-为什么AOF重写不复用AOF本身的日志"><a href="#5-3-为什么AOF重写不复用AOF本身的日志" class="headerlink" title="(5.3) 为什么AOF重写不复用AOF本身的日志"></a>(5.3) 为什么AOF重写不复用AOF本身的日志</h2><p>AOF重写不复用AOF本身的日志，<br>一个原因是父子进程写同一个文件必然会产生竞争问题，控制竞争就意味着会影响父进程的性能。<br>二是如果AOF重写过程中失败了，那么原本的AOF文件相当于被污染了，无法做恢复使用。<br>所以Redis AOF重写一个新文件，重写失败的话，直接删除这个文件就好了，不会对原先的AOF文件产生影响。等重写完成之后，直接替换旧文件即可。</p>
 <br>
 
-<h1 id="5-AOF重写"><a href="#5-AOF重写" class="headerlink" title="(5) AOF重写"></a>(5) AOF重写</h1><p>AOF 文件通过同步 Redis 服务器所执行的命令， 从而实现了数据库状态的记录， 但是， 这种同步方式会造成一个问题： 随着运行时间的流逝， AOF 文件会变得越来越大。</p>
-<p>举个例子， 如果服务器执行了以下命令，那么光是记录 list 键的状态， AOF 文件就需要保存四条命令。</p>
-<pre class="line-numbers language-log" data-language="log"><code class="language-log">RPUSH list <span class="token number">1</span> <span class="token number">2</span> <span class="token number">3</span> <span class="token number">4</span>      <span class="token operator">/</span><span class="token operator">/</span> <span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">]</span>
-
-RPOP list               <span class="token operator">/</span><span class="token operator">/</span> <span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">]</span>
-
-LPOP list               <span class="token operator">/</span><span class="token operator">/</span> <span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">]</span>
-
-LPUSH list <span class="token number">1</span>            <span class="token operator">/</span><span class="token operator">/</span> <span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>“重写”其实是一个有歧义的词语， 实际上， AOF 重写并不需要对原有的 AOF 文件进行任何写入和读取， 它针对的是数据库中键的当前值。<br>上面的例子，列表键 list 在数据库中的值就为 [1, 2, 3] 。<br>如果要保存这个列表的当前状态， 并且尽量减少所使用的命令数， 那么最简单的方式不是去 AOF 文件上分析前面执行的四条命令， 而是直接读取 list 键在数据库的当前值， 然后用一条 RPUSH 1 2 3 命令来代替前面的四条命令。</p>
-<p>  列表、集合、字符串、有序集、哈希表等键可以用类似的方法来保存状态， 并且保存这些状态所使用的命令数量， 比起之前建立这些键的状态所使用命令的数量要大大减少。</p>
-<h2 id="4-1-AOF后台重写"><a href="#4-1-AOF后台重写" class="headerlink" title="(4.1) AOF后台重写"></a>(4.1) AOF后台重写</h2><p>避免竞争aof文件</p>
-<p>当子进程在执行AOF重写时， 主进程需要执行以下三个工作：<br>处理命令请求。<br>将写命令追加到现有的 AOF 文件中。<br>将写命令追加到 AOF 重写缓存中。</p>
-<h2 id="4-2-AOF重写函数与触发时机"><a href="#4-2-AOF重写函数与触发时机" class="headerlink" title="(4.2) AOF重写函数与触发时机"></a>(4.2) AOF重写函数与触发时机</h2><p>  实现AOF重写的函数是 <code>rewriteAppendOnlyFileBackground</code></p>
-<p>触发AOF有3种方法：</p>
-<ol>
-<li>执行 <code>bgrewriteaof</code> 命令，对应的函数是<code>bgrewriteaofCommand</code></li>
-<li>配置开始AOF重写，对应函数是<code>startAppendOnly</code></li>
-<li>周期性检查，对应函数是 <code>serverCron</code> 里的 <code>rewriteAppendOnlyFileBackground</code></li>
-</ol>
-<h3 id="4-2-1-手动触发AOF重写-bgrewriteaofCommand"><a href="#4-2-1-手动触发AOF重写-bgrewriteaofCommand" class="headerlink" title="(4.2.1) 手动触发AOF重写-bgrewriteaofCommand"></a>(4.2.1) 手动触发AOF重写-bgrewriteaofCommand</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">void</span> <span class="token function">bgrewriteaofCommand</span><span class="token punctuation">(</span>client <span class="token operator">*</span>c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>aof_child_pid <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 有AOF重写子进程 </span>
-        <span class="token comment">// 后台已经有重写进程</span>
-        <span class="token function">addReplyError</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token string">"Background append only file rewriting already in progress"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">hasActiveChildProcess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 有活跃子进程</span>
-        <span class="token comment">// </span>
-        server<span class="token punctuation">.</span>aof_rewrite_scheduled <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
-        <span class="token comment">// </span>
-        <span class="token function">addReplyStatus</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token string">"Background append only file rewriting scheduled"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">rewriteAppendOnlyFileBackground</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> C_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  <span class="token comment">// 实际执行AOF重写</span>
-        <span class="token function">addReplyStatus</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token string">"Background append only file rewriting started"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
-        <span class="token function">addReplyError</span><span class="token punctuation">(</span>c<span class="token punctuation">,</span><span class="token string">"Can't execute an AOF background rewriting. "</span>
-                        <span class="token string">"Please check the server logs for more information."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h3 id="4-2-2-开始AOF重新-startAppendOnly"><a href="#4-2-2-开始AOF重新-startAppendOnly" class="headerlink" title="(4.2.2) 开始AOF重新-startAppendOnly"></a>(4.2.2) 开始AOF重新-startAppendOnly</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Called when the user switches from "appendonly no" to "appendonly yes"
- * at runtime using the CONFIG command. */</span>
+<h1 id="5-思考"><a href="#5-思考" class="headerlink" title="(5) 思考"></a>(5) 思考</h1><h2 id="5-1-AOF为什么要先执行命令再记日志呢？"><a href="#5-1-AOF为什么要先执行命令再记日志呢？" class="headerlink" title="(5.1) AOF为什么要先执行命令再记日志呢？"></a>(5.1) AOF为什么要先执行命令再记日志呢？</h2><p>  MySQL在处理写操作时是先写redo log，再写bin log，最后提交事务。 可以认为是先记日志，再执行命令。<br>  这样做可以保证cash-safe，假设写完redo log MySQL宕机了，重启后也可以根据redo log来恢复数据。</p>
+<p>  为什么Redis的AOF日志要先执行命令再记日志呢？<br>  如果执行完命令宕机了，那从库岂不是和主库数据不一致了？</p>
+<p>  为了避免额外的检查开销，Redis 在向 AOF 里面记录日志的时候，并不会先去对这些命令进行语法检查。所以，如果先记日志再执行命令的话，日志中就有可能记录了错误的命令，Redis 在使用日志恢复数据时，就可能会出错。</p>
+<h2 id="5-2-AOF文件有大小限制吗？"><a href="#5-2-AOF文件有大小限制吗？" class="headerlink" title="(5.2) AOF文件有大小限制吗？"></a>(5.2) AOF文件有大小限制吗？</h2><p>  MySQL的redo log</p>
+<h2 id="5-3-AOF文件写满了怎么办？"><a href="#5-3-AOF文件写满了怎么办？" class="headerlink" title="(5.3) AOF文件写满了怎么办？"></a>(5.3) AOF文件写满了怎么办？</h2><p>  MySQL的redo log支持循环写，类似一个环形数组，写满了可以把以前的记录覆盖掉继续写。<br>  Redis的AOF文件</p>
+<br>
+
+
+
+<h1 id="6-Redis-AOF源码解读"><a href="#6-Redis-AOF源码解读" class="headerlink" title="(6) Redis AOF源码解读"></a>(6) Redis AOF源码解读</h1><p>  一旦 AOF 功能启用后，<code>configSetCommand</code> 函数就会调用 <code>startAppendOnly</code> 函数</p>
+<p>  TODO 流程图 </p>
+<p>// 启动后台子进程，执行AOF 持久化操作。 <code>bgrewriteaofCommand()</code>，<code>startAppendOnly()</code>，<br>// serverCron() 中会调用此函数</p>
+<h2 id="5-1-开启AOF日志-startAppendOnly"><a href="#5-1-开启AOF日志-startAppendOnly" class="headerlink" title="(5.1) 开启AOF日志-startAppendOnly"></a>(5.1) 开启AOF日志-startAppendOnly</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/**
+ * 开启AOF日志
+ * 
+ * 当用户在运行时使用 CONFIG 命令从 "appendonly no" 切换到 "appendonly yes" 时调用。
+ */</span>
 <span class="token keyword">int</span> <span class="token function">startAppendOnly</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
-    <span class="token keyword">char</span> cwd<span class="token punctuation">[</span>MAXPATHLEN<span class="token punctuation">]</span><span class="token punctuation">;</span> <span class="token comment">/* Current working dir path for error messages. */</span>
+    <span class="token keyword">char</span> cwd<span class="token punctuation">[</span>MAXPATHLEN<span class="token punctuation">]</span><span class="token punctuation">;</span> <span class="token comment">// 错误消息的工作目录</span>
     <span class="token keyword">int</span> newfd<span class="token punctuation">;</span>
 
+    <span class="token comment">// 打开文件</span>
     newfd <span class="token operator">=</span> <span class="token function">open</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>aof_filename<span class="token punctuation">,</span>O_WRONLY<span class="token operator">|</span>O_APPEND<span class="token operator">|</span>O_CREAT<span class="token punctuation">,</span><span class="token number">0644</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 确保AOF之前是关闭状态</span>
     <span class="token function">serverAssert</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>aof_state <span class="token operator">==</span> AOF_OFF<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
     <span class="token keyword">if</span> <span class="token punctuation">(</span>newfd <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
         <span class="token keyword">char</span> <span class="token operator">*</span>cwdp <span class="token operator">=</span> <span class="token function">getcwd</span><span class="token punctuation">(</span>cwd<span class="token punctuation">,</span>MAXPATHLEN<span class="token punctuation">)</span><span class="token punctuation">;</span>
 
+        <span class="token comment">// 记录日志 打开文件失败</span>
         <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span>
             <span class="token string">"Redis needs to enable the AOF but can't open the "</span>
             <span class="token string">"append only file %s (in server root dir %s): %s"</span><span class="token punctuation">,</span>
@@ -493,57 +553,47 @@ LPUSH list <span class="token number">1</span>            <span class="token ope
             <span class="token function">strerror</span><span class="token punctuation">(</span>errno<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
         <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 如果有活跃子进程(RDB/AOF子进程) 并且 AOF子进程存在</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">hasActiveChildProcess</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> server<span class="token punctuation">.</span>aof_child_pid <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 更新  </span>
         server<span class="token punctuation">.</span>aof_rewrite_scheduled <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token comment">// 日志记录    已经有另一个后台操作启用AOF。 AOF 后台计划在可能时启动。</span>
         <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"AOF was enabled but there is already another background operation. An AOF background was scheduled to start when possible."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
-        <span class="token comment">/* If there is a pending AOF rewrite, we need to switch it off and
-         * start a new one: the old one cannot be reused because it is not
-         * accumulating the AOF buffer. */</span>
+        <span class="token comment">// 如果有待处理的 AOF 重写，我们需要将其关闭并启动一个新的：旧的不能被重用，因为它没有积累 AOF 缓冲区。</span>
         <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>aof_child_pid <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// AOF已启用，但是有一个存在的AOF重写后台进程。停止AOF后台进程并且重启一个新的重写进程。</span>
             <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"AOF was enabled but there is already an AOF rewriting in background. Stopping background AOF and starting a rewrite now."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 关闭AOF子进程</span>
             <span class="token function">killAppendOnlyChild</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
         <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">// 后台重写AOF</span>
         <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">rewriteAppendOnlyFileBackground</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> C_ERR<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// 关闭AOF文件</span>
             <span class="token function">close</span><span class="token punctuation">(</span>newfd<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// 记录日志   Redis 需要启用 AOF，但不能触发后台 AOF 重写操作。 检查上述日志以获取有关错误的更多信息。</span>
             <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Redis needs to enable the AOF but can't trigger a background AOF rewrite operation. Check the above logs for more info about the error."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
             <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
-    <span class="token comment">/* We correctly switched on AOF, now wait for the rewrite to be complete
-     * in order to append data on disk. */</span>
+
+    <span class="token comment">// 我们正确地打开了 AOF，现在等待重写完成以便将数据附加到磁盘上。 </span>
     server<span class="token punctuation">.</span>aof_state <span class="token operator">=</span> AOF_WAIT_REWRITE<span class="token punctuation">;</span>
+
+    <span class="token comment">// 更新AOF上次同步(刷盘)时间</span>
     server<span class="token punctuation">.</span>aof_last_fsync <span class="token operator">=</span> server<span class="token punctuation">.</span>unixtime<span class="token punctuation">;</span>
+
+    <span class="token comment">// 更新AOF文件描述符</span>
     server<span class="token punctuation">.</span>aof_fd <span class="token operator">=</span> newfd<span class="token punctuation">;</span>
     <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-
-<h3 id="4-2-3-周期性执行-serverCron"><a href="#4-2-3-周期性执行-serverCron" class="headerlink" title="(4.2.3) 周期性执行-serverCron"></a>(4.2.3) 周期性执行-serverCron</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">int</span> <span class="token function">serverCron</span><span class="token punctuation">(</span><span class="token keyword">struct</span> <span class="token class-name">aeEventLoop</span> <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">long</span> <span class="token keyword">long</span> id<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>clientData<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
-
-    <span class="token comment">// 省略部分代码</span>
-
-    <span class="token comment">/* Start a scheduled AOF rewrite if this was requested by the user while
-     * a BGSAVE was in progress. */</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">hasActiveChildProcess</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span>
-        server<span class="token punctuation">.</span>aof_rewrite_scheduled<span class="token punctuation">)</span>
-    <span class="token punctuation">&#123;</span>
-        <span class="token function">rewriteAppendOnlyFileBackground</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span>
-
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h2 id="其它"><a href="#其它" class="headerlink" title="其它"></a>其它</h2><p>  AOF重写可以由用户通过调用 BGREWRITEAOF 手动触发。</p>
-<p>另外， 服务器在 AOF 功能开启的情况下， 会维持以下三个变量：</p>
-<p>记录当前 AOF 文件大小的变量 aof_current_size 。<br>记录最后一次 AOF 重写之后， AOF 文件大小的变量 aof_rewrite_base_size 。<br>增长百分比变量 aof_rewrite_perc 。<br>每次当 serverCron 函数执行时， 它都会检查以下条件是否全部满足， 如果是的话， 就会触发自动的 AOF 重写：</p>
-<p>没有 BGSAVE 命令在进行。<br>没有 BGREWRITEAOF 在进行。<br>当前 AOF 文件大小大于 server.aof_rewrite_min_size （默认值为 1 MB）。<br>当前 AOF 文件大小和最后一次 AOF 重写后的大小之间的比率大于等于指定的增长百分比。<br>默认情况下， 增长百分比为 100% ， 也即是说， 如果前面三个条件都已经满足， 并且当前 AOF 文件大小比最后一次 AOF 重写时的大小要大一倍的话， 那么触发自动 AOF 重写。</p>
-<h2 id="4-3-AOF重写的基本过程"><a href="#4-3-AOF重写的基本过程" class="headerlink" title="(4.3) AOF重写的基本过程"></a>(4.3) AOF重写的基本过程</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* ----------------------------------------------------------------------------
- * AOF background rewrite
- * ------------------------------------------------------------------------- */</span>
-
-<span class="token comment">/* This is how rewriting of the append only file in background works:
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* This is how rewriting of the append only file in background works:
  *
  * 1) The user calls BGREWRITEAOF
  * 2) Redis calls this function, that forks():
@@ -559,10 +609,7 @@ LPUSH list <span class="token number">1</span>            <span class="token ope
     <span class="token class-name">pid_t</span> childpid<span class="token punctuation">;</span>
 
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">hasActiveChildProcess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
-
-    <span class="token comment">// 创建管道，用于父子进程通信</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">aofCreatePipes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> C_OK<span class="token punctuation">)</span> <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
-    <span class="token comment">// </span>
     <span class="token function">openChildInfoPipe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>childpid <span class="token operator">=</span> <span class="token function">redisFork</span><span class="token punctuation">(</span>CHILD_TYPE_AOF<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
         <span class="token keyword">char</span> tmpfile<span class="token punctuation">[</span><span class="token number">256</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
@@ -602,443 +649,9 @@ LPUSH list <span class="token number">1</span>            <span class="token ope
         <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span> <span class="token comment">/* unreached */</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-
-
-<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Create the pipes used for parent - child process IPC during rewrite.
- * We have a data pipe used to send AOF incremental diffs to the child,
- * and two other pipes used by the children to signal it finished with
- * the rewrite so no more data should be written, and another for the
- * parent to acknowledge it understood this new condition. */</span>
-<span class="token keyword">int</span> <span class="token function">aofCreatePipes</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
-    <span class="token keyword">int</span> fds<span class="token punctuation">[</span><span class="token number">6</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
-    <span class="token keyword">int</span> j<span class="token punctuation">;</span>
-
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">pipe</span><span class="token punctuation">(</span>fds<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">goto</span> error<span class="token punctuation">;</span> <span class="token comment">/* parent -> children data. */</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">pipe</span><span class="token punctuation">(</span>fds<span class="token operator">+</span><span class="token number">2</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">goto</span> error<span class="token punctuation">;</span> <span class="token comment">/* children -> parent ack. */</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">pipe</span><span class="token punctuation">(</span>fds<span class="token operator">+</span><span class="token number">4</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">goto</span> error<span class="token punctuation">;</span> <span class="token comment">/* parent -> children ack. */</span>
-
-
-    <span class="token comment">/* Parent -> children data is non blocking. */</span>
-    <span class="token comment">// </span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">anetNonBlock</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>fds<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">!=</span> ANET_OK<span class="token punctuation">)</span> <span class="token keyword">goto</span> error<span class="token punctuation">;</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">anetNonBlock</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>fds<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">!=</span> ANET_OK<span class="token punctuation">)</span> <span class="token keyword">goto</span> error<span class="token punctuation">;</span>
-
-    <span class="token comment">// 创建文件事件</span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">aeCreateFileEvent</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>el<span class="token punctuation">,</span> fds<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> AE_READABLE<span class="token punctuation">,</span> aofChildPipeReadable<span class="token punctuation">,</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token operator">==</span> AE_ERR<span class="token punctuation">)</span> <span class="token keyword">goto</span> error<span class="token punctuation">;</span>
-
-    <span class="token comment">// 主进程和重写子进程间用于传递操作命令的管道-写描述符</span>
-    server<span class="token punctuation">.</span>aof_pipe_write_data_to_child <span class="token operator">=</span> fds<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
-    <span class="token comment">// 主进程和重写子进程间用于传递操作命令的管道-读描述符</span>
-    server<span class="token punctuation">.</span>aof_pipe_read_data_from_parent <span class="token operator">=</span> fds<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
-    <span class="token comment">// 重写子进程向父进程发送ACK信息的管道-写描述符</span>
-    server<span class="token punctuation">.</span>aof_pipe_write_ack_to_parent <span class="token operator">=</span> fds<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
-    <span class="token comment">// 重写子进程向父进程发送ACK信息的管道-读描述符</span>
-    server<span class="token punctuation">.</span>aof_pipe_read_ack_from_child <span class="token operator">=</span> fds<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
-    <span class="token comment">// 父进程向重写子进程发送ACK信息的管道-写描述符</span>
-    server<span class="token punctuation">.</span>aof_pipe_write_ack_to_child <span class="token operator">=</span> fds<span class="token punctuation">[</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
-    <span class="token comment">// 父进程向重写子进程发送ACK信息的管道-读描述符</span>
-    server<span class="token punctuation">.</span>aof_pipe_read_ack_from_parent <span class="token operator">=</span> fds<span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
-    server<span class="token punctuation">.</span>aof_stop_sending_diff <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
-    <span class="token keyword">return</span> C_OK<span class="token punctuation">;</span>
-
-error<span class="token operator">:</span>
-    <span class="token function">serverLog</span><span class="token punctuation">(</span>LL_WARNING<span class="token punctuation">,</span><span class="token string">"Error opening /setting AOF rewrite IPC pipes: %s"</span><span class="token punctuation">,</span>
-        <span class="token function">strerror</span><span class="token punctuation">(</span>errno<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> <span class="token number">6</span><span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token keyword">if</span><span class="token punctuation">(</span>fds<span class="token punctuation">[</span>j<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token function">close</span><span class="token punctuation">(</span>fds<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">return</span> C_ERR<span class="token punctuation">;</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h1 id="5-文件IO工作原理"><a href="#5-文件IO工作原理" class="headerlink" title="(5) 文件IO工作原理"></a>(5) 文件IO工作原理</h1><p>  在我们向文件中写数据时，传统Unix/Liunx系统内核通常现将数据复制到缓冲区中，然后排入队列，晚些时候再写入磁盘。这种方式被称为延迟写(delayed write)。</p>
-<p>  对磁盘文件的write操作，更新的只是内存中的page cache，因为write调用不会等到硬盘IO完成之后才返回，因此如果OS在write调用之后、硬盘同步之前崩溃，则数据可能丢失。</p>
-<p>  为了保证磁盘上时间文件系统与缓冲区内容的一致性，UNIX系统提供了sync、fsync和fdatasync三个函数:<br>sync  只是将所有修改过的块缓冲区排查写队列，然后就返回，它并不等待时间写磁盘操作结束。通常称为update的系统守护进程会周期性地（一般每隔30秒）调用sync函数。这就保证了定期flush内核的块缓冲区。</p>
-<p>fsync  只对由文件描述符fd指定的单一文件起作用，并且等待写磁盘操作结束才返回。fsync可用于数据库这样的应用程序，这种应用程序需要确保将修改过的块立即写到磁盘上。</p>
-<p>fdatasync  类似于fsync，但它只影响文件的数据部分。而除数据外，fsync还会同步更新文件的属性。</p>
-<p>  现在来看一下fsync的性能问题，与fdatasync不同，fsync除了同步文件的修改内容（脏页），fsync还会同步文件的描述信息（metadata，包括size、访问时间statime &amp; stmtime等等），因为文件的数据和metadata通常存在硬盘的不同地方，因此fsync至少需要两次IO写操作，这个在fsync的man page有说明：<br>  fdatasync不会同步metadata，因此可以减少一次IO写操作。fdatasync的man page中的解释：</p>
-<p>  具体来说，如果文件的尺寸（st_size）发生变化，是需要立即同步，否则OS一旦崩溃，即使文件的数据部分已同步，由于metadata没有同步，依然读不到修改的内容。<br>  而最后访问时间(atime)/修改时间(mtime)是不需要每次都同步的，只要应用程序对这两个时间戳没有苛刻的要求，基本没有影响。</p>
-<p>  在Redis的源文件<code>src/config.h</code>中可以看到在Redis针对Linux实际使用了<code>fdatasync()</code>来进行刷盘操作</p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Define redis_fsync to fdatasync() in Linux and fsync() for all the rest *&#x2F;
-#ifdef __linux__
-#define redis_fsync fdatasync
-#else
-#define redis_fsync fsync
-#endif<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="Redis的AOF刷盘工作原理"><a href="#Redis的AOF刷盘工作原理" class="headerlink" title="Redis的AOF刷盘工作原理"></a>Redis的AOF刷盘工作原理</h2><p>always    每次有新命令追加到AOF文件是就执行一次同步到AOF文件的操作，安全性最高，但是性能影响最大。<br>everysec  每秒执行一次同步到AOF文件的操作，redis会在一个单独线程中执行同步操作。<br>no        将数据同步操作交给操作系统来处理，性能最好，但是数据可靠性最差。 </p>
-<p>  如果配置文件设置appendonly=yes后，没有指定apendfsync，默认会使用everysec选项，很多redis线上集群都是采用的这个选项。</p>
-<p> 来具体分析一下Redis代码中关于AOF刷盘操作的工作原理：<br> <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/server.c#L3014">https://github.com/redis/redis/blob/6.0/src/server.c#L3014</a> </p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* 在设置 appendonly&#x3D;yes 开启AOF日志时 *&#x2F;
-if (server.aof_state &#x3D;&#x3D; AOF_ON) &#123;
-    &#x2F;&#x2F; 
-    server.aof_fd &#x3D; open(server.aof_filename,
-                            O_WRONLY|O_APPEND|O_CREAT,0644);
-    if (server.aof_fd &#x3D;&#x3D; -1) &#123;
-        serverLog(LL_WARNING, &quot;Can&#39;t open the append-only file: %s&quot;,
-            strerror(errno));
-        exit(1);
-    &#125;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  同时在Redis启动时也会创建专门的bio线程处理aof持久化，在src/server.c文件的initServer()中会调用bioInit()函数创建两个线程，分别用来处理刷盘和关闭文件的任务。代码如下:<br>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/bio.h#L43">https://github.com/redis/redis/blob/6.0/src/bio.h#L43</a></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Background job opcodes *&#x2F;
-#define BIO_CLOSE_FILE    0 &#x2F;* Deferred close(2) syscall. *&#x2F;
-#define BIO_AOF_FSYNC     1 &#x2F;* Deferred AOF fsync. *&#x2F;
-#define BIO_LAZY_FREE     2 &#x2F;* Deferred objects freeing. *&#x2F;
-#define BIO_NUM_OPS       3<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/bio.c#L123">https://github.com/redis/redis/blob/6.0/src/bio.c#L123</a></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Ready to spawn our threads. We use the single argument the thread
- * function accepts in order to pass the job ID the thread is
- * responsible of. *&#x2F;
-for (j &#x3D; 0; j &lt; BIO_NUM_OPS; j++) &#123;
-    void *arg &#x3D; (void*)(unsigned long) j;
-    if (pthread_create(&amp;thread,&amp;attr,bioProcessBackgroundJobs,arg) !&#x3D; 0) &#123;
-        serverLog(LL_WARNING,&quot;Fatal: Can&#39;t initialize Background Jobs.&quot;);
-        exit(1);
-    &#125;
-    bio_threads[j] &#x3D; thread;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  当redis服务器执行写命令时，例如SET foo helloworld，不仅仅会修改内存数据集，也会记录此操作，记录的方式就是前面所说的数据组织方式。redis将一些内容被追加到server.aof buf缓冲区中，可以把它理解为一个小型临时中转站，所有累积的更新缓存都会先放入这里，它会在特定时机写入文件或者插入到server.aof rewrite buf blocks，同时每次写操作后先写入缓存，然后定期fsync到磁盘，在到达某些时机(主要是受auto-aof-rewrite-percentage/auto-aof-rewrite-min-size这两个参数影响)后，还会fork子进程执行rewrite。为了避免在服务器突然崩溃时丢失过多的数据，在redis会在下列几个特定时机调用flushAppendOnlyFile函数进行写盘操作：<br>1.进入事件循环之前<br>2.服务器定时函数serverCron()中，在Redis运行期间主要是在这里调用flushAppendOnlyFile<br>3.停止AOF策略的stopAppendOnly()函数中</p>
-<p>因 serverCron 函数中的所有代码每秒都会调用 server.hz 次，为了对部分代码的调用次数进行限制，Redis使用了一个宏 runwithperiod(milliseconds) { … } ，这个宏可以将被包含代码的执行次数降低为每 milliseconds 执行一次。</p>
-<p>  代码: <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/server.c#L2026">https://github.com/redis/redis/blob/6.0/src/server.c#L2026</a></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* This is our timer interrupt, called server.hz times per second.
- * Here is where we do a number of things that need to be done asynchronously.
- * For instance:
- *
- * - Active expired keys collection (it is also performed in a lazy way on
- *   lookup).
- * - Software watchdog.
- * - Update some statistic.
- * - Incremental rehashing of the DBs hash tables.
- * - Triggering BGSAVE &#x2F; AOF rewrite, and handling of terminated children.
- * - Clients timeout of different kinds.
- * - Replication reconnection.
- * - Many more...
- *
- * Everything directly called here will be called server.hz times per second,
- * so in order to throttle execution of things we want to do less frequently
- * a macro is used: run_with_period(milliseconds) &#123; .... &#125;
- *&#x2F;
-
-int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) &#123;
- 
-    &#x2F;&#x2F; ... 省略部分代码
-
-    &#x2F;* AOF postponed flush: Try at every cron cycle if the slow fsync
-     * completed. *&#x2F;
-    if (server.aof_flush_postponed_start) flushAppendOnlyFile(0);
-
-    &#x2F;* AOF write errors: in this case we have a buffer to flush as well and
-     * clear the AOF error in case of success to make the DB writable again,
-     * however to try every second is enough in case of &#39;hz&#39; is set to
-     * a higher frequency. *&#x2F;
-    run_with_period(1000) &#123;
-        if (server.aof_last_write_status &#x3D;&#x3D; C_ERR)
-            flushAppendOnlyFile(0);
-    &#125;
- 
-    &#x2F;&#x2F; ... 省略部分代码  
- 
-    return 1000&#x2F;server.hz;
-&#125;
-<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  通过下面的代码可以看到flushAppendOnlyFile函数中，在write写盘之后根据apendfsync选项来执行刷盘策略，如果是AOF FSYNC ALWAYS，就立即执行刷盘操作，如果是AOF EVERYSEC，则创建一个后台异步刷盘任务。 在函数bioCreateBackgroundJob()会创建bio后台任务，在函数bioProcessBackgroundJobs()会执行bio后台任务的处理。</p>
-<p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/aof.c#L210">https://github.com/redis/redis/blob/6.0/src/aof.c#L210</a></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Starts a background task that performs fsync() against the specified
- * file descriptor (the one of the AOF file) in another thread. *&#x2F;
-void aof_background_fsync(int fd) &#123;
-    bioCreateBackgroundJob(BIO_AOF_FSYNC,(void*)(long)fd,NULL,NULL);
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/aof.c#L253">https://github.com/redis/redis/blob/6.0/src/aof.c#L253</a></p>
-<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;* Called when the user switches from &quot;appendonly no&quot; to &quot;appendonly yes&quot;
- * at runtime using the CONFIG command. *&#x2F;
-int startAppendOnly(void) &#123;
-    char cwd[MAXPATHLEN]; &#x2F;* Current working dir path for error messages. *&#x2F;
-    int newfd;
-
-    &#x2F;&#x2F; 打开文件
-    newfd &#x3D; open(server.aof_filename,O_WRONLY|O_APPEND|O_CREAT,0644);
-    serverAssert(server.aof_state &#x3D;&#x3D; AOF_OFF);
-    if (newfd &#x3D;&#x3D; -1) &#123;
-        char *cwdp &#x3D; getcwd(cwd,MAXPATHLEN);
-
-        serverLog(LL_WARNING,
-            &quot;Redis needs to enable the AOF but can&#39;t open the &quot;
-            &quot;append only file %s (in server root dir %s): %s&quot;,
-            server.aof_filename,
-            cwdp ? cwdp : &quot;unknown&quot;,
-            strerror(errno));
-        return C_ERR;
-    &#125;
-    if (hasActiveChildProcess() &amp;&amp; server.aof_child_pid &#x3D;&#x3D; -1) &#123;
-        server.aof_rewrite_scheduled &#x3D; 1;
-        serverLog(LL_WARNING,&quot;AOF was enabled but there is already another background operation. An AOF background was scheduled to start when possible.&quot;);
-    &#125; else &#123;
-        &#x2F;* If there is a pending AOF rewrite, we need to switch it off and
-         * start a new one: the old one cannot be reused because it is not
-         * accumulating the AOF buffer. *&#x2F;
-        if (server.aof_child_pid !&#x3D; -1) &#123;
-            serverLog(LL_WARNING,&quot;AOF was enabled but there is already an AOF rewriting in background. Stopping background AOF and starting a rewrite now.&quot;);
-            killAppendOnlyChild();
-        &#125;
-        if (rewriteAppendOnlyFileBackground() &#x3D;&#x3D; C_ERR) &#123;
-            close(newfd);
-            serverLog(LL_WARNING,&quot;Redis needs to enable the AOF but can&#39;t trigger a background AOF rewrite operation. Check the above logs for more info about the error.&quot;);
-            return C_ERR;
-        &#125;
-    &#125;
-    &#x2F;* We correctly switched on AOF, now wait for the rewrite to be complete
-     * in order to append data on disk. *&#x2F;
-    server.aof_state &#x3D; AOF_WAIT_REWRITE;
-    server.aof_last_fsync &#x3D; server.unixtime;
-    server.aof_fd &#x3D; newfd;
-    return C_OK;
-&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/aof.c#L340">https://github.com/redis/redis/blob/6.0/src/aof.c#L340</a></p>
-<pre><code class="c++">/* Write the append only file buffer on disk.
- *
- * Since we are required to write the AOF before replying to the client,
- * and the only way the client socket can get a write is entering when the
- * the event loop, we accumulate all the AOF writes in a memory
- * buffer and write it on disk using this function just before entering
- * the event loop again.
- *
- * About the &#39;force&#39; argument:
- *
- * When the fsync policy is set to &#39;everysec&#39; we may delay the flush if there
- * is still an fsync() going on in the background thread, since for instance
- * on Linux write(2) will be blocked by the background fsync anyway.
- * When this happens we remember that there is some aof buffer to be
- * flushed ASAP, and will try to do that in the serverCron() function.
- *
- * However if force is set to 1 we&#39;ll write regardless of the background
- * fsync. */
-#define AOF_WRITE_LOG_ERROR_RATE 30 /* Seconds between errors logging. */
-void flushAppendOnlyFile(int force) &#123;
-    ssize_t nwritten;
-    int sync_in_progress = 0;
-    mstime_t latency;
-
-    // 没有数据，不需要写盘
-    if (sdslen(server.aof_buf) == 0) &#123;
-        /* Check if we need to do fsync even the aof buffer is empty,
-         * because previously in AOF_FSYNC_EVERYSEC mode, fsync is
-         * called only when aof buffer is not empty, so if users
-         * stop write commands before fsync called in one second,
-         * the data in page cache cannot be flushed in time. */
-        if (server.aof_fsync == AOF_FSYNC_EVERYSEC &amp;&amp;
-            server.aof_fsync_offset != server.aof_current_size &amp;&amp;
-            server.unixtime &gt; server.aof_last_fsync &amp;&amp;
-            !(sync_in_progress = aofFsyncInProgress())) &#123;
-            goto try_fsync;
-        &#125; else &#123;
-            return;
-        &#125;
-    &#125;
-
-    // 通过bio的任务技术器bio_pending来判断是否有后台fsync操作正在进行
-    // 如果有就要标记下sync_in_process
-    if (server.aof_fsync == AOF_FSYNC_EVERYSEC)
-        sync_in_progress = aofFsyncInProgress();
-
-    // 如果没有设置强制刷盘的选项，可能不会立即进行,而是延迟执行AOF刷盘
-    // 因为 Linux 上的 write(2) 会被后台的 fsync 阻塞, 
-    // 如果强制执行write 的话，服务器主线程将阻塞在 write 上面 
-    if (server.aof_fsync == AOF_FSYNC_EVERYSEC &amp;&amp; !force) &#123;
-        /* With this append fsync policy we do background fsyncing.
-         * If the fsync is still in progress we can try to delay
-         * the write for a couple of seconds. */
-        if (sync_in_progress) &#123;
-            if (server.aof_flush_postponed_start == 0) &#123;
-                /* No previous write postponing, remember that we are
-                 * postponing the flush and return. */
-                server.aof_flush_postponed_start = server.unixtime;
-                return;
-            &#125; else if (server.unixtime - server.aof_flush_postponed_start &lt; 2) &#123;
-                // 如果距离上次执行刷盘操作没有超过2秒，直接返回 
-                /* We were already waiting for fsync to finish, but for less
-                 * than two seconds this is still ok. Postpone again. */
-                return;
-            &#125;
-
-            // 如果后台还有 fsync 在执行，并且 write 已经推迟 &gt;= 2 秒
-            // 那么执行写操作（write 将被阻塞）
-            // 假如此时出现死机等故障，可能存在丢失2秒左右的AOF日志数据
-            /* Otherwise fall trough, and go write since we can&#39;t wait
-             * over two seconds. */
-            server.aof_delayed_fsync++;
-            serverLog(LL_NOTICE,&quot;Asynchronous AOF fsync is taking too long (disk is busy?). Writing the AOF buffer without waiting for fsync to complete, this may slow down Redis.&quot;);
-        &#125;
-    &#125;
-    /* We want to perform a single write. This should be guaranteed atomic
-     * at least if the filesystem we are writing is a real physical one.
-     * While this will save us against the server being killed I don&#39;t think
-     * there is much to do about the whole server stopping for power problems
-     * or alike */
-
-    if (server.aof_flush_sleep &amp;&amp; sdslen(server.aof_buf)) &#123;
-        usleep(server.aof_flush_sleep);
-    &#125;
-
-    // 将server.aof_buf中缓存的AOF日志数据进行写盘
-    latencyStartMonitor(latency);
-    nwritten = aofWrite(server.aof_fd,server.aof_buf,sdslen(server.aof_buf));
-    latencyEndMonitor(latency);
-    /* We want to capture different events for delayed writes:
-     * when the delay happens with a pending fsync, or with a saving child
-     * active, and when the above two conditions are missing.
-     * We also use an additional event name to save all samples which is
-     * useful for graphing / monitoring purposes. */
-    if (sync_in_progress) &#123;
-        latencyAddSampleIfNeeded(&quot;aof-write-pending-fsync&quot;,latency);
-    &#125; else if (hasActiveChildProcess()) &#123;
-        latencyAddSampleIfNeeded(&quot;aof-write-active-child&quot;,latency);
-    &#125; else &#123;
-        latencyAddSampleIfNeeded(&quot;aof-write-alone&quot;,latency);
-    &#125;
-    latencyAddSampleIfNeeded(&quot;aof-write&quot;,latency);
-
-    // 重置延迟刷盘时间
-    /* We performed the write so reset the postponed flush sentinel to zero. */
-    server.aof_flush_postponed_start = 0;
-
-    // 如果write失败，那么尝试将该情况写入到日志里面
-    if (nwritten != (ssize_t)sdslen(server.aof_buf)) &#123;
-        static time_t last_write_error_log = 0;
-        int can_log = 0;
-
-        /* Limit logging rate to 1 line per AOF_WRITE_LOG_ERROR_RATE seconds. */
-        if ((server.unixtime - last_write_error_log) &gt; AOF_WRITE_LOG_ERROR_RATE) &#123;
-            can_log = 1;
-            last_write_error_log = server.unixtime;
-        &#125;
-
-        /* Log the AOF write error and record the error code. */
-        if (nwritten == -1) &#123;
-            if (can_log) &#123;
-                serverLog(LL_WARNING,&quot;Error writing to the AOF file: %s&quot;,
-                    strerror(errno));
-                server.aof_last_write_errno = errno;
-            &#125;
-        &#125; else &#123;
-            if (can_log) &#123;
-                serverLog(LL_WARNING,&quot;Short write while writing to &quot;
-                                       &quot;the AOF file: (nwritten=%lld, &quot;
-                                       &quot;expected=%lld)&quot;,
-                                       (long long)nwritten,
-                                       (long long)sdslen(server.aof_buf));
-            &#125;
-
-            // 通过ftruncate尝试删除新追加到AOF中的不完整的数据内容
-            if (ftruncate(server.aof_fd, server.aof_current_size) == -1) &#123;
-                if (can_log) &#123;
-                    serverLog(LL_WARNING, &quot;Could not remove short write &quot;
-                             &quot;from the append-only file.  Redis may refuse &quot;
-                             &quot;to load the AOF the next time it starts.  &quot;
-                             &quot;ftruncate: %s&quot;, strerror(errno));
-                &#125;
-            &#125; else &#123;
-                /* If the ftruncate() succeeded we can set nwritten to
-                 * -1 since there is no longer partial data into the AOF. */
-                nwritten = -1;
-            &#125;
-            server.aof_last_write_errno = ENOSPC;
-        &#125;
-
-        // 处理写入AOF文件时出现的错误
-        /* Handle the AOF write error. */
-        if (server.aof_fsync == AOF_FSYNC_ALWAYS) &#123;
-            /* We can&#39;t recover when the fsync policy is ALWAYS since the
-             * reply for the client is already in the output buffers, and we
-             * have the contract with the user that on acknowledged write data
-             * is synced on disk. */
-            serverLog(LL_WARNING,&quot;Can&#39;t recover from AOF write error when the AOF fsync policy is &#39;always&#39;. Exiting...&quot;);
-            exit(1);
-        &#125; else &#123;
-            /* Recover from failed write leaving data into the buffer. However
-             * set an error to stop accepting writes as long as the error
-             * condition is not cleared. */
-            server.aof_last_write_status = C_ERR;
-
-            // 如果是已经写入了部分数据，是不能通过ftruncate进行撤销的
-            // 这里通过sdsrange清除掉aof_buf中已经写入磁盘的那部分数据
-            /* Trim the sds buffer if there was a partial write, and there
-             * was no way to undo it with ftruncate(2). */
-            if (nwritten &gt; 0) &#123;
-                server.aof_current_size += nwritten;
-                sdsrange(server.aof_buf,nwritten,-1);
-            &#125;
-            return; /* We&#39;ll try again on the next call... */
-        &#125;
-    &#125; else &#123;
-        /* Successful write(2). If AOF was in error state, restore the
-         * OK state and log the event. */
-        if (server.aof_last_write_status == C_ERR) &#123;
-            serverLog(LL_WARNING,
-                &quot;AOF write error looks solved, Redis can write again.&quot;);
-            server.aof_last_write_status = C_OK;
-        &#125;
-    &#125;
-    // 更新写入后的 AOF 文件大小
-    server.aof_current_size += nwritten;
-
-    // 当 server.aof_buf 足够小,重新利用空间，防止频繁的内存分配。
-    // 相反，当 server.aof_buf 占据大量的空间，采取的策略是释放空间。
-    /* Re-use AOF buffer when it is small enough. The maximum comes from the
-     * arena size of 4k minus some overhead (but is otherwise arbitrary). */
-    if ((sdslen(server.aof_buf)+sdsavail(server.aof_buf)) &lt; 4000) &#123;
-        sdsclear(server.aof_buf);
-    &#125; else &#123;
-        sdsfree(server.aof_buf);
-        server.aof_buf = sdsempty();
-    &#125;
-
-try_fsync:
-    /* Don&#39;t fsync if no-appendfsync-on-rewrite is set to yes and there are
-     * children doing I/O in the background. */
-    if (server.aof_no_fsync_on_rewrite &amp;&amp; hasActiveChildProcess())
-        return;
-
-    // 执行 fysnc
-    /* Perform the fsync if needed. */
-    if (server.aof_fsync == AOF_FSYNC_ALWAYS) &#123;
-        /* redis_fsync is defined as fdatasync() for Linux in order to avoid
-         * flushing metadata. */
-        latencyStartMonitor(latency);
-        redis_fsync(server.aof_fd); /* Let&#39;s try to get this data on the disk */
-        latencyEndMonitor(latency);
-        latencyAddSampleIfNeeded(&quot;aof-fsync-always&quot;,latency);
-        server.aof_fsync_offset = server.aof_current_size;
-        server.aof_last_fsync = server.unixtime;
-    &#125; else if ((server.aof_fsync == AOF_FSYNC_EVERYSEC &amp;&amp;
-                server.unixtime &gt; server.aof_last_fsync)) &#123;
-        if (!sync_in_progress) &#123;
-            aof_background_fsync(server.aof_fd);
-            server.aof_fsync_offset = server.aof_current_size;
-        &#125;
-        server.aof_last_fsync = server.unixtime;
-    &#125;
-&#125;
-</code></pre>
-<blockquote>
-<ol>
-<li>主线程操作完内存数据后，会执行write，之后根据配置决定是立即还是延迟fdatasync</li>
-<li>redis在启动时，会创建专门的bio线程用于处理aof持久化</li>
-<li>如果是apendfsync=everysec，时机到达后，会创建异步任务(bio)</li>
-<li>bio线程轮询任务池，拿到任务后同步执行fdatasync</li>
-</ol>
-</blockquote>
-<p>如果是always每次写命令后都是刷盘，故障时丢失数据最少，如果是everysec，会丢失大概2秒的数据，在bio延迟刷盘时如果后台刷盘操作卡住，在ServerCron里面每一轮循环(频率取决于hz参数，我们设置为100，也就是一秒执行100次循环)都检查是否上一次后台刷盘操作是否超过2秒，如果超过立即进行一次强制刷盘，因此可以粗略的认为最大可能丢失2.01秒的数据。</p>
-<p>如果在进行bgrewriteaof期间出现故障，因rewrite会阻塞fdatasync刷盘，可能丢失的数据量更大，这个就不太容易量化评估了。</p>
-<p>  关于AOF对访问延迟的影响，Redis作者曾经专门写过一篇博客 <a target="_blank" rel="noopener" href="http://oldblog.antirez.com/post/fsync-different-thread-useless.html">fsync() on a different thread: apparently a useless trick</a>，结论是bio对延迟的改善并不是很大,因为虽然apendfsync=everysec时fdatasync在后台运行，wirte的aof_buf并不大,基本上不会导致阻塞，而是后台的fdatasync会导致write等待datasync完成了之后才调用write导致阻塞，fdataysnc会握住文件句柄，fwrite也会用到文件句柄,这里write会导致了主线程阻塞。这也就是为什么之前浪潮服务器的RAID出现性能问题时，虽然对大部分应用没有影响，但是对于Redis这种对延迟非常敏感的应用却造成了影响的原因。</p>
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/271754">04 | AOF日志：宕机了，Redis如何避免数据丢失？</a><br>[2] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/internal/aof.html">AOF-Redis设计与实现</a></p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://time.geekbang.org/column/article/271754">04 | AOF日志：宕机了，Redis如何避免数据丢失？</a><br>[2] <a target="_blank" rel="noopener" href="https://redisbook.readthedocs.io/en/latest/internal/aof.html">AOF-Redis设计与实现</a><br>[3] <a target="_blank" rel="noopener" href="https://gsmtoday.github.io/2018/07/30/redis-01/">Redis AOF 持久化- Redis源码分析</a></p>
 <!--
   关于Redis的aof持久化的几点认识  http://way.xiaojukeji.com/article/7326    https://i.xiaojukeji.com/way/article/720295 
 -->
@@ -1127,7 +740,7 @@ try_fsync:
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-AOF%E6%97%A5%E5%BF%97%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) AOF日志是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8AOF"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用AOF</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%85%88%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4%E5%86%8D%E8%AE%B0%E6%97%A5%E5%BF%97%E5%91%A2%EF%BC%9F"><span class="nav-number">2.1.</span> <span class="nav-text">() AOF为什么要先执行命令再记日志呢？</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-AOF%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) AOF原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-AOF%E5%91%BD%E4%BB%A4%E5%90%8C%E6%AD%A5%E5%8E%9F%E7%90%86"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) AOF命令同步原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-Reids-AOF%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) Reids AOF数据存储方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-AOF%E6%80%8E%E4%B9%88%E4%BD%BF%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">(4) AOF怎么使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E4%BF%9D%E5%AD%98%E6%A8%A1%E5%BC%8F"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) 保存模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-AOF%E4%BF%9D%E5%AD%98%E6%A8%A1%E5%BC%8F%E5%AF%B9%E6%80%A7%E8%83%BD%E5%92%8C%E5%AE%89%E5%85%A8%E6%80%A7%E7%9A%84%E5%BD%B1%E5%93%8D"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) AOF保存模式对性能和安全性的影响</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E8%BF%9B%E9%98%B6"><span class="nav-number">5.</span> <span class="nav-text">(5) 进阶</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E5%90%8C%E6%AD%A5%E5%91%BD%E4%BB%A4%E5%88%B0AOF%E6%96%87%E4%BB%B6%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) 同步命令到AOF文件的过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E4%BC%9A%E8%A7%A6%E5%8F%91AOF%E9%87%8D%E5%86%99"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) 什么时候会触发AOF重写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-%E9%87%8D%E5%86%99AOF%E6%96%87%E4%BB%B6%E6%97%B6%E6%BD%9C%E5%9C%A8%E7%9A%84%E9%98%BB%E5%A1%9E%E9%A3%8E%E9%99%A9"><span class="nav-number">5.3.</span> <span class="nav-text">(5.3) 重写AOF文件时潜在的阻塞风险</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-%E4%B8%BA%E4%BB%80%E4%B9%88AOF%E9%87%8D%E5%86%99%E4%B8%8D%E5%A4%8D%E7%94%A8AOF%E6%9C%AC%E8%BA%AB%E7%9A%84%E6%97%A5%E5%BF%97"><span class="nav-number">5.4.</span> <span class="nav-text">(5.3) 为什么AOF重写不复用AOF本身的日志</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-AOF%E9%87%8D%E5%86%99"><span class="nav-number">6.</span> <span class="nav-text">(5) AOF重写</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-AOF%E5%90%8E%E5%8F%B0%E9%87%8D%E5%86%99"><span class="nav-number">6.1.</span> <span class="nav-text">(4.1) AOF后台重写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-AOF%E9%87%8D%E5%86%99%E5%87%BD%E6%95%B0%E4%B8%8E%E8%A7%A6%E5%8F%91%E6%97%B6%E6%9C%BA"><span class="nav-number">6.2.</span> <span class="nav-text">(4.2) AOF重写函数与触发时机</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-1-%E6%89%8B%E5%8A%A8%E8%A7%A6%E5%8F%91AOF%E9%87%8D%E5%86%99-bgrewriteaofCommand"><span class="nav-number">6.2.1.</span> <span class="nav-text">(4.2.1) 手动触发AOF重写-bgrewriteaofCommand</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-2-%E5%BC%80%E5%A7%8BAOF%E9%87%8D%E6%96%B0-startAppendOnly"><span class="nav-number">6.2.2.</span> <span class="nav-text">(4.2.2) 开始AOF重新-startAppendOnly</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-3-%E5%91%A8%E6%9C%9F%E6%80%A7%E6%89%A7%E8%A1%8C-serverCron"><span class="nav-number">6.2.3.</span> <span class="nav-text">(4.2.3) 周期性执行-serverCron</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E5%AE%83"><span class="nav-number">6.3.</span> <span class="nav-text">其它</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-AOF%E9%87%8D%E5%86%99%E7%9A%84%E5%9F%BA%E6%9C%AC%E8%BF%87%E7%A8%8B"><span class="nav-number">6.4.</span> <span class="nav-text">(4.3) AOF重写的基本过程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%96%87%E4%BB%B6IO%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86"><span class="nav-number">7.</span> <span class="nav-text">(5) 文件IO工作原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis%E7%9A%84AOF%E5%88%B7%E7%9B%98%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86"><span class="nav-number">7.1.</span> <span class="nav-text">Redis的AOF刷盘工作原理</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">8.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-AOF%E6%97%A5%E5%BF%97%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) AOF日志是什么</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-AOF%E6%9C%89%E5%93%AA%E4%BA%9B%E4%BD%9C%E7%94%A8%EF%BC%9F"><span class="nav-number">2.</span> <span class="nav-text">(2) AOF有哪些作用？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-AOF%E4%BD%BF%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">(3) AOF使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%BC%80%E5%90%AFAOF"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 开启AOF</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-AOF%E4%BF%9D%E5%AD%98%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) AOF保存模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-AOF%E4%BF%9D%E5%AD%98%E6%A8%A1%E5%BC%8F%E5%AF%B9%E6%80%A7%E8%83%BD%E5%92%8C%E5%AE%89%E5%85%A8%E6%80%A7%E7%9A%84%E5%BD%B1%E5%93%8D"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) AOF保存模式对性能和安全性的影响</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-AOF%E5%8E%9F%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">(4) AOF原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-AOF%E5%91%BD%E4%BB%A4%E6%98%AF%E6%80%8E%E4%B9%88%E5%90%8C%E6%AD%A5%E7%9A%84%EF%BC%9F"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) AOF命令是怎么同步的？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-1-MySQL-binlog%E6%9C%893%E7%A7%8D%E6%96%B9%E5%BC%8F%E4%BF%9D%E5%AD%98%EF%BC%8Credis-aof%E6%9C%89%E5%87%A0%E7%A7%8D%E6%96%B9%E5%BC%8F%EF%BC%9F"><span class="nav-number">4.1.1.</span> <span class="nav-text">(4.1.1) MySQL binlog有3种方式保存，redis aof有几种方式？</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-Reids-AOF%E6%95%B0%E6%8D%AE%E6%98%AF%E6%80%8E%E4%B9%88%E5%AD%98%E5%88%B0%E6%96%87%E4%BB%B6%E7%9A%84%EF%BC%9F"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) Reids AOF数据是怎么存到文件的？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-redis%E5%91%BD%E4%BB%A4%E5%90%8C%E6%AD%A5%E5%88%B0AOF%E6%96%87%E4%BB%B6%E7%9A%84%E6%B5%81%E7%A8%8B"><span class="nav-number">4.3.</span> <span class="nav-text">(4.3) redis命令同步到AOF文件的流程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%80%9D%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">(5) 思考</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-AOF%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%85%88%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4%E5%86%8D%E8%AE%B0%E6%97%A5%E5%BF%97%E5%91%A2%EF%BC%9F"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) AOF为什么要先执行命令再记日志呢？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-AOF%E6%96%87%E4%BB%B6%E6%9C%89%E5%A4%A7%E5%B0%8F%E9%99%90%E5%88%B6%E5%90%97%EF%BC%9F"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) AOF文件有大小限制吗？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-AOF%E6%96%87%E4%BB%B6%E5%86%99%E6%BB%A1%E4%BA%86%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9F"><span class="nav-number">5.3.</span> <span class="nav-text">(5.3) AOF文件写满了怎么办？</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-Redis-AOF%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">6.</span> <span class="nav-text">(6) Redis AOF源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E5%BC%80%E5%90%AFAOF%E6%97%A5%E5%BF%97-startAppendOnly"><span class="nav-number">6.1.</span> <span class="nav-text">(5.1) 开启AOF日志-startAppendOnly</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">7.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -1141,7 +754,7 @@ try_fsync:
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">307</span>
+          <span class="site-state-item-count">308</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
