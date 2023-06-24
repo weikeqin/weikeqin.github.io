@@ -213,6 +213,274 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/06/24/redis-memory-optimization/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/06/24/redis-memory-optimization/" class="post-title-link" itemprop="url">Redis内存优化</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2023-06-24 08:54:14 / 修改时间：23:25:18" itemprop="dateCreated datePublished" datetime="2023-06-24T08:54:14+08:00">2023-06-24</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2023/06/24/redis-memory-optimization/" class="post-meta-item leancloud_visitors" data-flag-title="Redis内存优化" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2023/06/24/redis-memory-optimization/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2023/06/24/redis-memory-optimization/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>4 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>  最近遇到了一个问题，团队缓存了用户在支付时的一些数据，大概有几十个T，看看有没有办法优化。</p>
+<h1 id="1-Redis内存使用概览"><a href="#1-Redis内存使用概览" class="headerlink" title="(1) Redis内存使用概览"></a>(1) Redis内存使用概览</h1><p>  通过<code>info memory</code>命令查看内存使用情况<br>  <code>info</code>命令可以查看Redis Server的基本信息、CPU、内存、持久化、客户端连接信息等等；<br>  <code>info memory</code> 可以查看Redis Server的内存相关信息。</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> info memory
+<span class="token operator">#</span> Memory
+used_memory<span class="token operator">:</span><span class="token number">153492864</span>
+used_memory_human<span class="token operator">:</span><span class="token number">146.38M</span>
+used_memory_rss<span class="token operator">:</span><span class="token number">163676160</span>
+used_memory_rss_human<span class="token operator">:</span><span class="token number">156.09M</span>
+used_memory_peak<span class="token operator">:</span><span class="token number">153510864</span>
+used_memory_peak_human<span class="token operator">:</span><span class="token number">146.40M</span>
+used_memory_peak_perc<span class="token operator">:</span><span class="token number">99.99</span><span class="token operator">%</span>
+used_memory_overhead<span class="token operator">:</span><span class="token number">49426784</span>
+used_memory_startup<span class="token operator">:</span><span class="token number">1020736</span>
+used_memory_dataset<span class="token operator">:</span><span class="token number">104066080</span>
+used_memory_dataset_perc<span class="token operator">:</span><span class="token number">68.25</span><span class="token operator">%</span>
+allocator_allocated<span class="token operator">:</span><span class="token number">153427264</span>
+allocator_active<span class="token operator">:</span><span class="token number">163639296</span>
+allocator_resident<span class="token operator">:</span><span class="token number">163639296</span>
+total_system_memory<span class="token operator">:</span><span class="token number">34359738368</span>
+total_system_memory_human<span class="token operator">:</span><span class="token number">32.00G</span>
+used_memory_lua<span class="token operator">:</span><span class="token number">36864</span>
+used_memory_lua_human<span class="token operator">:</span><span class="token number">36.00K</span>
+used_memory_scripts<span class="token operator">:</span><span class="token number">0</span>
+used_memory_scripts_human<span class="token operator">:</span><span class="token number">0B</span>
+number_of_cached_scripts<span class="token operator">:</span><span class="token number">0</span>
+maxmemory<span class="token operator">:</span><span class="token number">0</span>
+maxmemory_human<span class="token operator">:</span><span class="token number">0B</span>
+maxmemory_policy<span class="token operator">:</span>noeviction
+allocator_frag_ratio<span class="token operator">:</span><span class="token number">1.07</span>
+allocator_frag_bytes<span class="token operator">:</span><span class="token number">10212032</span>
+allocator_rss_ratio<span class="token operator">:</span><span class="token number">1.00</span>
+allocator_rss_bytes<span class="token operator">:</span><span class="token number">0</span>
+rss_overhead_ratio<span class="token operator">:</span><span class="token number">1.00</span>
+rss_overhead_bytes<span class="token operator">:</span><span class="token number">36864</span>
+mem_fragmentation_ratio<span class="token operator">:</span><span class="token number">1.07</span>
+mem_fragmentation_bytes<span class="token operator">:</span><span class="token number">10248896</span>
+mem_not_counted_for_evict<span class="token operator">:</span><span class="token number">0</span>
+mem_replication_backlog<span class="token operator">:</span><span class="token number">0</span>
+mem_clients_slaves<span class="token operator">:</span><span class="token number">0</span>
+mem_clients_normal<span class="token operator">:</span><span class="token number">17440</span>
+mem_aof_buffer<span class="token operator">:</span><span class="token number">0</span>
+mem_allocator<span class="token operator">:</span>libc
+active_defrag_running<span class="token operator">:</span><span class="token number">0</span>
+lazyfree_pending_objects<span class="token operator">:</span><span class="token number">0</span>
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<p>  参数对应说明参考  <a target="_blank" rel="noopener" href="https://redis.io/commands/info/">https://redis.io/commands/info/</a> </p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2023/06/24/redis-memory-optimization/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/06/24/redis-memory-allocated/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="WKQ">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="天道酬勤">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2023/06/24/redis-memory-allocated/" class="post-title-link" itemprop="url">Redis内存分配</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2023-06-24 06:54:51 / 修改时间：23:25:13" itemprop="dateCreated datePublished" datetime="2023-06-24T06:54:51+08:00">2023-06-24</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+                </span>
+            </span>
+
+          
+            <span id="/2023/06/24/redis-memory-allocated/" class="post-meta-item leancloud_visitors" data-flag-title="Redis内存分配" title="阅读次数">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span class="leancloud-visitors-count"></span>
+            </span>
+  
+  <span class="post-meta-item">
+    
+      <span class="post-meta-item-icon">
+        <i class="far fa-comment"></i>
+      </span>
+      <span class="post-meta-item-text">Valine：</span>
+    
+    <a title="valine" href="/2023/06/24/redis-memory-allocated/#valine-comments" itemprop="discussionUrl">
+      <span class="post-comments-count valine-comment-count" data-xid="/2023/06/24/redis-memory-allocated/" itemprop="commentCount"></span>
+    </a>
+  </span>
+  
+  <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="1-Redis内存分配器"><a href="#1-Redis内存分配器" class="headerlink" title="(1) Redis内存分配器"></a>(1) Redis内存分配器</h1><h1 id="2-为什么要设置内存分配器"><a href="#2-为什么要设置内存分配器" class="headerlink" title="(2) 为什么要设置内存分配器"></a>(2) 为什么要设置内存分配器</h1><h1 id="3-内存分配的原理"><a href="#3-内存分配的原理" class="headerlink" title="(3) 内存分配的原理"></a>(3) 内存分配的原理</h1><h1 id="4-源码解读"><a href="#4-源码解读" class="headerlink" title="(4) 源码解读"></a>(4) 源码解读</h1><p>  由于redis要求满足跨平台性，而每个平台又会有自己的内存管理函数。<br>  <code>zmalloc.c</code>和<code>zmalloc.h</code>主要功能就是对原有库里的内存分配函数进行封装，形成独立的一套内存管理函数。</p>
+<p>  根据系统的不同，使用不同的内存管理函数，例如<code>jemalloc</code>, <code>tcmalloc</code>, <code>cmalloc</code>。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2023/06/24/redis-memory-allocated/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/04/16/redis-aof-rewrite/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -485,7 +753,7 @@ auto-aof-rewrite-min-size 64mb<span aria-hidden="true" class="line-numbers-rows"
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-04-09 23:10:15" itemprop="dateModified" datetime="2023-04-09T23:10:15+08:00">2023-04-09</time>
+                <time title="修改时间：2023-05-15 09:27:23" itemprop="dateModified" datetime="2023-05-15T09:27:23+08:00">2023-05-15</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -545,6 +813,7 @@ auto-aof-rewrite-min-size 64mb<span aria-hidden="true" class="line-numbers-rows"
       
           <p>  有一个常见的问题，Redis是如何实现高可用的？</p>
 <h1 id="1-如何实现高可用"><a href="#1-如何实现高可用" class="headerlink" title="(1) 如何实现高可用"></a>(1) 如何实现高可用</h1><p>  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。</p>
+<p>  <img src="/img/database/redis/cluster/redis-read-write-separation.png" alt="图片"></p>
 <p>  Redis主从是冗余的一种体现。</p>
 <p>  Redis的高可用是通过<code>主从</code>、<code>哨兵</code>来保障的。在主库挂了以后，<code>哨兵</code>可以把流量切到<code>从库</code>，让从库顶上去，来保障服务可用。</p>
 <p>  那就有一个问题了，顶上去的从库的数据和主库数据一样吗？还有Redis是如何实现主从数据同步的？</p>
@@ -555,7 +824,7 @@ auto-aof-rewrite-min-size 64mb<span aria-hidden="true" class="line-numbers-rows"
 <h1 id="2-Redis主从数据同步"><a href="#2-Redis主从数据同步" class="headerlink" title="(2) Redis主从数据同步"></a>(2) Redis主从数据同步</h1><p>  Redis多个副本(主库和从库)之间的数据如何保持一致呢？<br>  数据读写操作可以发给所有的实例吗？</p>
 <h2 id="2-1-新增数据是如何保存到Redis副本"><a href="#2-1-新增数据是如何保存到Redis副本" class="headerlink" title="(2.1) 新增数据是如何保存到Redis副本"></a>(2.1) 新增数据是如何保存到Redis副本</h2><p>  Redis是通过读写分离的方式，通过主从库模式来保障多个副本数据一致。 (MySQL、Kafka也是类似)</p>
 <p>  为什么要采用读写分离的方式呢？<br>  set key v1<br>  set key v2</p>
-<p>  <img src=""></p>
+<p>  <img src="/img/database/redis/cluster/redis-read-write-separation.png" alt="Redis主从分离"></p>
 <p>  如果允许所有副本接收写操作(新增 修改 删除)，数据在这多个副本可能就不一致了(分别是 v1 和 v2）。</p>
 <p>  如果必须保障新增的数据在多个副本上一致，就要涉及到<code>加锁</code>、<code>实例间协商是否完成修改</code>等一系列操作，但这会带来巨额的开销，当然是不太能接受的。</p>
           <!--noindex-->
@@ -1163,299 +1432,6 @@ auto-aof-rewrite-min-size 64mb<span aria-hidden="true" class="line-numbers-rows"
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/23/redis-server-start/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/01/23/redis-server-start/" class="post-title-link" itemprop="url">Redis Server 启动</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-01-23 21:08:07" itemprop="dateCreated datePublished" datetime="2023-01-23T21:08:07+08:00">2023-01-23</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-02-05 21:13:43" itemprop="dateModified" datetime="2023-02-05T21:13:43+08:00">2023-02-05</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2023/01/23/redis-server-start/" class="post-meta-item leancloud_visitors" data-flag-title="Redis Server 启动" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="far fa-comment"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2023/01/23/redis-server-start/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2023/01/23/redis-server-start/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>5.2k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>  Redis整体架构</p>
-<p>  Redis是典型的 <code>Client-Server</code> 架构，类似于MySQL和RPC框架。<br>  Redis Server类似于RPC框架Server，在客户端使用前需要先启动Redis Server。那么有一个问题，Redis Server启动后会做哪些操作？需要哪些配置，有没有什么坑？</p>
-<h1 id="1-Redis-Server启动入口-main函数"><a href="#1-Redis-Server启动入口-main函数" class="headerlink" title="(1) Redis Server启动入口-main函数"></a>(1) Redis Server启动入口-main函数</h1><p>  源码地址  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/server.c">https://github.com/redis/redis/blob/6.0/src/server.c</a> </p>
-<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">//file: src/server.c</span>
-
-<span class="token comment">// #L5297  5297行</span>
-<span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token keyword">int</span> argc<span class="token punctuation">,</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
-
-    <span class="token comment">// 1. 初始化配置 设置默认值</span>
-    <span class="token function">initServerConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-
-    <span class="token comment">/* We need to init sentinel right now as parsing the configuration file
-     * in sentinel mode will have the effect of populating the sentinel
-     * data structures with master nodes to monitor. */</span>
-    <span class="token comment">// 2. 判断server是否设置为哨兵模式 </span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span>server<span class="token punctuation">.</span>sentinel_mode<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
-        <span class="token function">initSentinelConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-        <span class="token comment">// 初始化哨兵</span>
-        <span class="token function">initSentinel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span>
-
-    <span class="token comment">/* Check if we need to start in redis-check-rdb/aof mode. We just execute
-     * the program main. However the program is part of the Redis executable
-     * so that we can easily execute an RDB check on loading errors. */</span>
-    <span class="token comment">// 3. 持久化 rdb aof  </span>
-    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">strstr</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token string">"redis-check-rdb"</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span>
-        <span class="token function">redis_check_rdb_main</span><span class="token punctuation">(</span>argc<span class="token punctuation">,</span>argv<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">strstr</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span><span class="token string">"redis-check-aof"</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token constant">NULL</span><span class="token punctuation">)</span>
-        <span class="token function">redis_check_aof_main</span><span class="token punctuation">(</span>argc<span class="token punctuation">,</span>argv<span class="token punctuation">)</span><span class="token punctuation">;</span>
-
-    <span class="token comment">// 4. 加载Server配置 </span>
-    <span class="token function">loadServerConfig</span><span class="token punctuation">(</span>configfile<span class="token punctuation">,</span>options<span class="token punctuation">)</span><span class="token punctuation">;</span>
-
-    <span class="token comment">// 5. 启动RedisServer时 初始化配置及资源</span>
-    <span class="token function">initServer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-
-    <span class="token comment">// 6. 循环处理请求及事件，直到服务器关闭为止</span>
-    <span class="token function">aeMain</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>el<span class="token punctuation">)</span><span class="token punctuation">;</span> 
-
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/01/23/redis-server-start/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/22/redis-object-sorted-set/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="天道酬勤">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/01/22/redis-object-sorted-set/" class="post-title-link" itemprop="url">Redis 对象 有序集合 / Sorted Set / zset</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-01-22 11:18:49" itemprop="dateCreated datePublished" datetime="2023-01-22T11:18:49+08:00">2023-01-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-02-05 21:21:46" itemprop="dateModified" datetime="2023-02-05T21:21:46+08:00">2023-02-05</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
-                </span>
-            </span>
-
-          
-            <span id="/2023/01/22/redis-object-sorted-set/" class="post-meta-item leancloud_visitors" data-flag-title="Redis 对象 有序集合 / Sorted Set / zset" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-  
-  <span class="post-meta-item">
-    
-      <span class="post-meta-item-icon">
-        <i class="far fa-comment"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2023/01/22/redis-object-sorted-set/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2023/01/22/redis-object-sorted-set/" itemprop="commentCount"></span>
-    </a>
-  </span>
-  
-  <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>11k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>  有序集合(Sorted Set)是Redis中的一种对象，它本身是集合类型，同时也可以支持集合中的元素带有权重，并按权重排序。</p>
-<h1 id="1-有序集合-Sorted-Set-是什么"><a href="#1-有序集合-Sorted-Set-是什么" class="headerlink" title="(1) 有序集合(Sorted Set)是什么"></a>(1) 有序集合(Sorted Set)是什么</h1><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
- * ZSET 是有序集合，使用两个数据结构来保存相同的元素，以便将 O(log(N)) INSERT 和 REMOVE 操作放入已排序的数据结构中。
- * 
- * 这些元素被添加到将 Redis 对象映射到分数的哈希表中。
- * 同时，将元素添加到将分数映射到 Redis 对象的跳跃列表（因此对象在此“视图”中按分数排序）。
- *
- * 请注意，为了节省内存，表示元素的 SDS 字符串在哈希表和跳表中都是相同的。 
- * 为了更容易地管理共享的 SDS 字符串，我们所做的是仅在 zslFreeNode() 中释放 SDS 字符串。 
- * 字典没有设置无值方法。
- * 所以我们应该总是从字典中删除一个元素，然后再从跳过列表中删除。
- */</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h2 id="1-1-有序集合结构"><a href="#1-1-有序集合结构" class="headerlink" title="(1.1) 有序集合结构"></a>(1.1) 有序集合结构</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
- * 有序集合 zset 结构体
- */</span>
-<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">zset</span> <span class="token punctuation">&#123;</span>
-    dict <span class="token operator">*</span>dict<span class="token punctuation">;</span> <span class="token comment">// 字典</span>
-    zskiplist <span class="token operator">*</span>zsl<span class="token punctuation">;</span> <span class="token comment">// 跳表</span>
-<span class="token punctuation">&#125;</span> zset<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>  Sorted Set 同时采用<code>跳表</code>和<code>哈希表</code>两个索引结构<br>  利用了跳表高效支持范围查询(如 ZRANGEBYSCORE 操作)，以及哈希表高效支持单点查询(如 ZSCORE 操作)的特征<br>  可以在一个数据类型中，同时高效支持范围查询和单点查询，这是单一索引结构比较难达到的效果。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/01/22/redis-object-sorted-set/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1525,7 +1501,7 @@ auto-aof-rewrite-min-size 64mb<span aria-hidden="true" class="line-numbers-rows"
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">308</span>
+          <span class="site-state-item-count">310</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
