@@ -20,22 +20,29 @@
     var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"hide","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="最近遇到了一个问题，团队缓存了用户在支付时的一些数据，大概有几十个T，看看有没有办法优化。 (1) Redis内存使用概览  通过info memory命令查看内存使用情况  info命令可以查看Redis Server的基本信息、CPU、内存、持久化、客户端连接信息等等；  info memory 可以查看Redis Server的内存相关信息。 127.0.0.1:6379&gt; info m">
+  <meta name="description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用。 (1) Redis-Server内存划分情况  Redis作为内存数据库，在内存中存储的内容主要是数据(键值对)；除了数据以外，Redis的其他部分也会占用内存。  Redis内存主要划分以">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis内存优化">
 <meta property="og:url" content="http://weikeqin.com/2023/06/24/redis-memory-optimization/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="最近遇到了一个问题，团队缓存了用户在支付时的一些数据，大概有几十个T，看看有没有办法优化。 (1) Redis内存使用概览  通过info memory命令查看内存使用情况  info命令可以查看Redis Server的基本信息、CPU、内存、持久化、客户端连接信息等等；  info memory 可以查看Redis Server的内存相关信息。 127.0.0.1:6379&gt; info m">
+<meta property="og:description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用。 (1) Redis-Server内存划分情况  Redis作为内存数据库，在内存中存储的内容主要是数据(键值对)；除了数据以外，Redis的其他部分也会占用内存。  Redis内存主要划分以">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-division.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/index-model/redis-index-model.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object-object-encoding-mapping.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-struct.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-all.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-memory.svg">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/hashtable/hashtable.svg">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/redis-object.svg">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object-object-encoding-mapping.svg">
 <meta property="article:published_time" content="2023-06-24T00:54:14.000Z">
-<meta property="article:modified_time" content="2023-06-25T01:18:13.179Z">
+<meta property="article:modified_time" content="2023-06-27T01:28:31.322Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-struct.svg">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-division.png">
 
 <link rel="canonical" href="http://weikeqin.com/2023/06/24/redis-memory-optimization/">
 
@@ -250,7 +257,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-06-25 09:18:13" itemprop="dateModified" datetime="2023-06-25T09:18:13+08:00">2023-06-25</time>
+                <time title="修改时间：2023-06-27 09:28:31" itemprop="dateModified" datetime="2023-06-27T09:28:31+08:00">2023-06-27</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -296,14 +303,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>7.1k</span>
+              <span>14k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>13 分钟</span>
             </span>
 
         </div>
@@ -315,8 +322,21 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>  最近遇到了一个问题，团队缓存了用户在支付时的一些数据，大概有几十个T，看看有没有办法优化。</p>
-<h1 id="1-Redis内存使用概览"><a href="#1-Redis内存使用概览" class="headerlink" title="(1) Redis内存使用概览"></a>(1) Redis内存使用概览</h1><p>  通过<code>info memory</code>命令查看内存使用情况<br>  <code>info</code>命令可以查看Redis Server的基本信息、CPU、内存、持久化、客户端连接信息等等；<br>  <code>info memory</code> 可以查看Redis Server的内存相关信息。</p>
+        <p>  我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。<br>  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用。</p>
+<h1 id="1-Redis-Server内存划分情况"><a href="#1-Redis-Server内存划分情况" class="headerlink" title="(1) Redis-Server内存划分情况"></a>(1) Redis-Server内存划分情况</h1><p>  Redis作为内存数据库，在内存中存储的内容主要是数据(键值对)；除了数据以外，Redis的其他部分也会占用内存。<br>  Redis内存主要划分以下几部分: ①自身进程内存、②自身数据内存、③缓冲内存、④内存碎片</p>
+<p>  <img src="/img/database/redis/memory/redis-server-memory-division.png" alt="内存划分"></p>
+<h2 id="1-1-自身进程内存"><a href="#1-1-自身进程内存" class="headerlink" title="1.1 自身进程内存"></a>1.1 自身进程内存</h2><p>  Redis进程自身也会消耗内存(如代码、常量池)，不过很少，大约几M，在大多数生产环境中与Redis数据占用的内存相比可以忽略。这部分内存不是由内存分配器分配，因此不会统计在used_memory中。</p>
+<p>  除了这些，Redis创建的子进程也会运行占用内存，如Redis执行AOF或者RDB重写时创建的子进程，这部分内存不属于Redis进程，也不会统计在<code>used_memory</code>和<code>used_memory_rss</code>中。</p>
+<h2 id="1-2-自身数据内存"><a href="#1-2-自身数据内存" class="headerlink" title="1.2 自身数据内存"></a>1.2 自身数据内存</h2><p>  自身数据内存：作为数据库，数据肯定是最主要的部分，这部分内存也在used_memory中。<br>  Redis所有数据都是key-value型，每次创建key-value都是创建2个RedisObject，即 key对应的<code>RedisObjec</code> 和 value对应的<code>RedisObject</code> 。</p>
+<p>  <img src="/img/database/redis/index-model/redis-index-model.png" alt="redis索引模型"></p>
+<span id="more"></span>
+
+<h2 id="1-3-缓冲内存"><a href="#1-3-缓冲内存" class="headerlink" title="1.3 缓冲内存"></a>1.3 缓冲内存</h2><p>  缓冲内存包括<code>客户端缓冲区</code>、<code>复制积压缓冲区</code>和<code>AOF缓冲区</code>，这部分内存由 内存分配器(linux系统下为jemalloc) 分配，因此会统计在<code>used_memory</code>中。</p>
+<h2 id="1-4-内存碎片"><a href="#1-4-内存碎片" class="headerlink" title="1.4 内存碎片"></a>1.4 内存碎片</h2><p>  Redis内存分配器有 libc、jemalloc、 tcmalloc，内存分配器的作用就是为了更好的管理和重复利用内存。<br>  内存碎片是Redis在分配、回收物理内存过程中产生的。</p>
+<br>
+
+
+<h1 id="2-Redis-Server内存使用概览"><a href="#2-Redis-Server内存使用概览" class="headerlink" title="(2) Redis-Server内存使用概览"></a>(2) Redis-Server内存使用概览</h1><p>  通过 <code>info</code>命令可以查看Redis Server的基本信息、CPU、内存、持久化、客户端连接信息等等；<br>  通过 <code>info memory</code> 可以查看Redis Server的内存相关信息。</p>
 <pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> info memory
 <span class="token operator">#</span> Memory
 used_memory<span class="token operator">:</span><span class="token number">153492864</span>
@@ -363,8 +383,6 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 
 
 <p>  参数对应说明参考  <a target="_blank" rel="noopener" href="https://redis.io/commands/info/">https://redis.io/commands/info/</a> </p>
-<span id="more"></span>
-
 <table>
 <thead>
 <tr>
@@ -578,23 +596,46 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <p>  <code>used_memory</code> = <code>used_memory_startup</code> + <code>used_memory_dataset</code><br>  Redis内存分配器分配的内存大小 = Redis启动时内存大小 + 数据集大小</p>
 <br>
 
-
-
-<h1 id="2-Redis-Server内存划分情况"><a href="#2-Redis-Server内存划分情况" class="headerlink" title="(2) Redis-Server内存划分情况"></a>(2) Redis-Server内存划分情况</h1><p>  Redis作为内存数据库，在内存中存储的内容主要是数据(键值对)；除了数据以外，Redis的其他部分也会占用内存。<br>  Redis内存主要划分以下几部分: ①自身进程内存、②自身数据内存、③缓冲内存、④内存碎片</p>
-<p>  <img src=""></p>
-<h2 id="2-1-自身进程内存"><a href="#2-1-自身进程内存" class="headerlink" title="2.1 自身进程内存"></a>2.1 自身进程内存</h2><p>Redis进程自身也会消耗内存(如代码、常量池)，不过很少，大约几M，在大多数生产环境中与Redis数据占用的内存相比可以忽略。这部分内存不是由内存分配器分配，因此不会统计在used_memory中。</p>
-<p>除了这些，Redis创建的子进程也会运行占用内存，如Redis执行AOF或者RDB重写时创建的子进程，这部分内存不属于Redis进程，也不会统计在used_memory和used_memory_rss中。 </p>
-<h2 id="2-2-自身数据内存"><a href="#2-2-自身数据内存" class="headerlink" title="2.2 自身数据内存"></a>2.2 自身数据内存</h2><p>自身数据内存：作为数据库，数据肯定是最主要的部分，这部分内存也在used_memory中。<br>Redis所有数据都是Key-Value型，每次创建Key-Value都是创建2个RedisObject，即Key对应的RedisObject和Value对应的RedisObject。</p>
-<h2 id="2-3-缓冲内存"><a href="#2-3-缓冲内存" class="headerlink" title="2.3 缓冲内存"></a>2.3 缓冲内存</h2><p>缓冲内存包括客户端缓冲区、复制积压缓冲区和AOF缓冲区，这部分内存由 内存分配器(linux系统下为jemalloc) 分配，因此会统计在used_memory中。</p>
-<h2 id="2-4-内存碎片"><a href="#2-4-内存碎片" class="headerlink" title="2.4 内存碎片"></a>2.4 内存碎片</h2><p>Redis内存分配器有 libc、jemalloc、 tcmalloc，内存分配器的作用就是为了更好的管理和重复利用内存。<br>内存碎片是Redis在分配、回收物理内存过程中产生的。</p>
 <br>
 
-<h1 id="3-Redis数据结构维度的内存优化"><a href="#3-Redis数据结构维度的内存优化" class="headerlink" title="(3) Redis数据结构维度的内存优化"></a>(3) Redis数据结构维度的内存优化</h1><p>  这里以常用的2种数据类型来介绍对应的数据结构</p>
+
+
+
+<h1 id="3-Redis数据结构-data-structure-维度的内存优化"><a href="#3-Redis数据结构-data-structure-维度的内存优化" class="headerlink" title="(3) Redis数据结构(data-structure)维度的内存优化"></a>(3) Redis数据结构(data-structure)维度的内存优化</h1><p>术语</p>
+<table>
+<thead>
+<tr>
+<th align="left">名词</th>
+<th align="left">含义</th>
+<th align="left">备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Redis对象</td>
+<td align="left">Redis里的data-type、数据类型，常用的有 string、list、hash、set、sorted-set等</td>
+<td align="left">见源码 和 redis官网</td>
+</tr>
+<tr>
+<td align="left">Redis对象编码</td>
+<td align="left">encoding、data-structure 常见的有 int、enmstr、raw、ziplist、quicklist、intset、hashtable、skiplist 等</td>
+<td align="left">见源码</td>
+</tr>
+<tr>
+<td align="left">Redis对象类型</td>
+<td align="left">Redis里对象管理系统，redisObject</td>
+<td align="left">见源码</td>
+</tr>
+</tbody></table>
+<p>  这里以常用的2种Redis对象 <code>string</code>、<code>hash</code> 来介绍对应的数据结构(data-structure) <code>SDS</code>、<code>ziplist</code>、<code>hashtable</code> 。</p>
 <p>  数据类型(data-type)和数据结构(data-structure)间的关系</p>
-<p>  <img src=""></p>
-<h2 id="3-1-简单动态字符串-SDS"><a href="#3-1-简单动态字符串-SDS" class="headerlink" title="(3.1) 简单动态字符串-SDS"></a>(3.1) 简单动态字符串-SDS</h2><p>  SDS 结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
+<p>  <img src="/img/database/redis/redis-object-object-encoding-mapping.svg"></p>
+<br>
+
+
+<h2 id="3-1-简单动态字符串-SDS-embstr-raw"><a href="#3-1-简单动态字符串-SDS-embstr-raw" class="headerlink" title="(3.1) 简单动态字符串-SDS(embstr/raw)"></a>(3.1) 简单动态字符串-SDS(embstr/raw)</h2><p>  数据类型string对应的encoding有 int、embstr、raw，其中 embstr和raw用的 SDS</p>
+<p>  SDS 结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
 <p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构">  </p>
-<p>  类型 <code>sds</code> 是 <code>char*</code> 的别名（alias）<br>  结构 <code>sdshdr</code> 则保存了 <code>len</code> 、 <code>alloc</code> <code>flags</code>和 <code>buf[]</code> 四个属性<br>  SDS 本质还是字符数组，只是在字符数组基础上增加了额外的元数据。</p>
+<p>  类型 <code>sds</code> 是 <code>char*</code> 的别名（alias）<br>  结构 <code>sdshdr</code> 则保存了 <code>len</code>、 <code>alloc</code>、<code>flags</code>和 <code>buf[]</code> 四个属性<br>  SDS 本质还是char数组，只是在char数组基础上增加了额外的元数据。</p>
 <br>
 
 <h3 id="3-1-1-定义多种SDS在不同场景使用省内存"><a href="#3-1-1-定义多种SDS在不同场景使用省内存" class="headerlink" title="(3.1.1) 定义多种SDS在不同场景使用省内存"></a>(3.1.1) 定义多种SDS在不同场景使用省内存</h3><p>  为了节省内存，Redis定义了4种<code>sdshdr</code>，方便在不同场景使用。</p>
@@ -632,6 +673,7 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <p>  元数据各自占用的内存空间在 sdshdr8、sdshdr16、sdshdr32、sdshdr64 类型中，则分别是 1字节、2字节、4字节 和 8字节。</p>
 <p>  SDS之所以设计不同的结构头（即不同类型），是为了能灵活保存不同大小的字符串，从而有效节省内存空间。<br>  在保存不同大小的字符串时，结构头占用的内存空间也不一样，这样一来，在保存小字符串时，结构头占用空间也比较少。</p>
 <br>
+
 
 <h3 id="3-1-2-创建新字符串-内存预分配"><a href="#3-1-2-创建新字符串-内存预分配" class="headerlink" title="(3.1.2) 创建新字符串-内存预分配"></a>(3.1.2) 创建新字符串-内存预分配</h3><p>  在创建新的字符串时，Redis 会调用 SDS 创建函数 sdsnewlen。</p>
 <p>  <img src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
@@ -683,17 +725,324 @@ sds <span class="token function">sdsnewlen</span><span class="token punctuation"
 <br>
 
 
-<h2 id="3-2-哈希表-dict"><a href="#3-2-哈希表-dict" class="headerlink" title="(3.2) 哈希表-dict"></a>(3.2) 哈希表-dict</h2><br>
+
+<h2 id="3-2-压缩列表-ziplist"><a href="#3-2-压缩列表-ziplist" class="headerlink" title="(3.2) 压缩列表-ziplist"></a>(3.2) 压缩列表-ziplist</h2><p>  ziplist是一种特殊编码的双向链表，旨在提高内存效率。<br>  它存储字符串和整数值，其中整数被编码为实际整数而不是一系列字符。<br>  它允许在O(1)时间内对列表的任一侧进行推送和弹出操作。<br>  由于每个操作都需要重新分配 ziplist 使用的内存，因此实际的复杂性与 ziplist 使用的内存量有关。</p>
+<pre class="line-numbers language-log" data-language="log"><code class="language-log">area        <span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">----</span> ziplist header <span class="token separator comment">----</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token separator comment">-----------</span> entries <span class="token separator comment">-------------</span><span class="token operator">></span><span class="token operator">|</span><span class="token operator">&lt;</span><span class="token operator">-</span>end<span class="token operator">-</span><span class="token operator">></span><span class="token operator">|</span>
+
+size          <span class="token number">4</span> bytes  <span class="token number">4</span> bytes  <span class="token number">2</span> bytes    <span class="token operator">?</span>        <span class="token operator">?</span>        <span class="token operator">?</span>        <span class="token operator">?</span>     <span class="token number">1</span> byte
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+component   <span class="token operator">|</span> zlbytes <span class="token operator">|</span> zltail <span class="token operator">|</span> zllen <span class="token operator">|</span> entry1 <span class="token operator">|</span> entry2 <span class="token operator">|</span>  <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>   <span class="token operator">|</span> entryN <span class="token operator">|</span> zlend <span class="token operator">|</span>
+            <span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">-</span><span class="token operator">+</span>
+                                       <span class="token operator">^</span>                          <span class="token operator">^</span>        <span class="token operator">^</span>
+address                                <span class="token operator">|</span>                          <span class="token operator">|</span>        <span class="token operator">|</span>
+                                ZIPLIST_ENTRY_HEAD                <span class="token operator">|</span>   ZIPLIST_ENTRY_END
+                                                                  <span class="token operator">|</span>
+                                                         ZIPLIST_ENTRY_TAIL<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  压缩列表是一块连续的内存空间。<br>  为了方便查询，在头部记录了压缩列表占用的总字节数、entry尾部的地址 以及 压缩列表的元素个数。</p>
+<table>
+<thead>
+<tr>
+<th align="left">字段</th>
+<th align="left">长度</th>
+<th align="left">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">zlbytes</td>
+<td align="left">4字节</td>
+<td align="left">整个ziplist占用的内存字节数，对ziplist进行内存重分配，或者计算末端时使用。</td>
+</tr>
+<tr>
+<td align="left">zltail</td>
+<td align="left">4字节</td>
+<td align="left">ziplist尾节点的偏移量。通过这个偏移量，可以快速获取尾部节点。</td>
+</tr>
+<tr>
+<td align="left">zllen</td>
+<td align="left">2字节</td>
+<td align="left">快速获取ziplist长度</td>
+</tr>
+<tr>
+<td align="left">zlend</td>
+<td align="left">1字节</td>
+<td align="left">结束符</td>
+</tr>
+</tbody></table>
+<p>  <img src="/img/database/redis/data-structure/ziplist/ziplist-memory-structure.png"></p>
+<h3 id="压缩列表为什么省内存"><a href="#压缩列表为什么省内存" class="headerlink" title="压缩列表为什么省内存"></a>压缩列表为什么省内存</h3><ol>
+<li>如果使用链表存储元素，链表节点里 val、next 都需要占用内存，而使用压缩列表，只有val占用内存。  简单地讲把链表优化成数组。</li>
+<li>通过编码，尝试把字符串压缩成整数，节省内存。</li>
+<li>数字按整型编码存储，而且支持 1、2、3、4、8字节 多种整形，根据数字大小使用，节省内存。</li>
+</ol>
+<br>
 
 
-<h1 id="4-Redis数据类型-对象-维度的内存优化"><a href="#4-Redis数据类型-对象-维度的内存优化" class="headerlink" title="(4) Redis数据类型(对象)维度的内存优化"></a>(4) Redis数据类型(对象)维度的内存优化</h1><h2 id="4-1-Redis对象"><a href="#4-1-Redis对象" class="headerlink" title="4.1 Redis对象"></a>4.1 Redis对象</h2><h2 id="4-2-Redis对象不同编码-数据结构-内存优化"><a href="#4-2-Redis对象不同编码-数据结构-内存优化" class="headerlink" title="4.2 Redis对象不同编码(数据结构)内存优化"></a>4.2 Redis对象不同编码(数据结构)内存优化</h2><br>
+<h3 id="创建压缩列表怎么省内存"><a href="#创建压缩列表怎么省内存" class="headerlink" title="创建压缩列表怎么省内存"></a>创建压缩列表怎么省内存</h3><p>  创建一个空的压缩列表 ziplistNew</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: ziplist.c</span>
+
+<span class="token comment">/* 创建一个空的压缩列表 */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistNew</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 计算长度  </span>
+    <span class="token comment">// ZIPLIST_HEADER_SIZE = 32bits + 32bits + 16bits</span>
+    <span class="token comment">// ZIPLIST_END_SIZE = 8bits</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> bytes <span class="token operator">=</span> ZIPLIST_HEADER_SIZE<span class="token operator">+</span>ZIPLIST_END_SIZE<span class="token punctuation">;</span>
+    <span class="token comment">// 初始分配的大小</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span>bytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 压缩列表总字节长度</span>
+    <span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>bytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 尾部节点字节距离  结尾下标</span>
+    <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>ZIPLIST_HEADER_SIZE<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 长度设置为0</span>
+    <span class="token function">ZIPLIST_LENGTH</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 最后一个字节 设置成 结束符255，标记结束</span>
+    zl<span class="token punctuation">[</span>bytes<span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> ZIP_END<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  创建压缩列表时并没有按照容量分配内存，而是创建了一个空的压缩列表，在新增数据时再分配内存，插入数据，可以减少内存浪费。</p>
+<p>  反例: 创建列表时按照容量分配内存，结果列表没使用，分配的内存相当于全浪费了。</p>
+<br>
+
+
+<h3 id="压缩列表新增元素怎么省内存"><a href="#压缩列表新增元素怎么省内存" class="headerlink" title="压缩列表新增元素怎么省内存"></a>压缩列表新增元素怎么省内存</h3><p>  压缩列表新增元素-ziplistPush </p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 在压缩列表的entry头部或尾部插入元素 
+ *
+ * @param *zl 压缩列表
+ * @param *s 新增数据
+ * @param slen 长度
+ * @param where  
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">ziplistPush</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>s<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> slen<span class="token punctuation">,</span> <span class="token keyword">int</span> where<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">;</span>
+    <span class="token comment">// 判断在entry头部或尾部插入元素</span>
+    p <span class="token operator">=</span> <span class="token punctuation">(</span>where <span class="token operator">==</span> ZIPLIST_HEAD<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token function">ZIPLIST_ENTRY_HEAD</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token function">ZIPLIST_ENTRY_END</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 插入元素</span>
+    <span class="token keyword">return</span> <span class="token function">__ziplistInsert</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>p<span class="token punctuation">,</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 在entry指定位置插入元素 
+ * 
+ * @param *zl 压缩列表
+ * @param *p 插入下标的指针
+ * @param *s 要插入的数据
+ * @param slen 插入数据长度
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token function">__ziplistInsert</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>zl<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>p<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>s<span class="token punctuation">,</span> <span class="token keyword">unsigned</span> <span class="token keyword">int</span> slen<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// </span>
+    <span class="token class-name">size_t</span> curlen <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_BYTES</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> reqlen<span class="token punctuation">;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">int</span> prevlensize<span class="token punctuation">,</span> prevlen <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token class-name">size_t</span> offset<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> nextdiff <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">char</span> encoding <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> value <span class="token operator">=</span> <span class="token number">123456789</span><span class="token punctuation">;</span> <span class="token comment">/* initialized to avoid warning. Using a value
+                                    that is easy to see if for some reason
+                                    we use it uninitialized. */</span>
+    zlentry tail<span class="token punctuation">;</span>
+
+    <span class="token comment">// 找出插入的entry的 prevlen。 </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 插入位置不在尾部</span>
+        <span class="token function">ZIP_DECODE_PREVLEN</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> prevlensize<span class="token punctuation">,</span> prevlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 插入位置在尾部</span>
+        <span class="token comment">// 最后一个entry的指针</span>
+        <span class="token keyword">unsigned</span> <span class="token keyword">char</span> <span class="token operator">*</span>ptail <span class="token operator">=</span> <span class="token function">ZIPLIST_ENTRY_TAIL</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>ptail<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 不是结束标识</span>
+            <span class="token comment">// 前一个entry的长度</span>
+            prevlen <span class="token operator">=</span> <span class="token function">zipRawEntryLength</span><span class="token punctuation">(</span>ptail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 是否可以编码成整数</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">zipTryEncoding</span><span class="token punctuation">(</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">,</span><span class="token operator">&amp;</span>value<span class="token punctuation">,</span><span class="token operator">&amp;</span>encoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 'encoding' 设置为适当的整数编码</span>
+        reqlen <span class="token operator">=</span> <span class="token function">zipIntSize</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 'encoding' 未受影响，zipStoreEntryEncoding 将使用字符串长度来确定如何对其进行编码。</span>
+        reqlen <span class="token operator">=</span> slen<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 需要前一个entry的长度 和 有效载荷的长度 </span>
+    reqlen <span class="token operator">+=</span> <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>prevlen<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 加上前一个entry的长度</span>
+    reqlen <span class="token operator">+=</span> <span class="token function">zipStoreEntryEncoding</span><span class="token punctuation">(</span><span class="token constant">NULL</span><span class="token punctuation">,</span>encoding<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// 加上当前entry编码长度和当前entry数据长度</span>
+
+    <span class="token comment">// 当插入位置不等于尾部时，我们需要确保下一个entry可以在其 prevlen 字段中保存本entry的长度。 </span>
+    <span class="token keyword">int</span> forcelarge <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 用来判断插入位置元素的prevlen长度和实际所需的prevlen长度是否相等</span>
+    nextdiff <span class="token operator">=</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token function">zipPrevLenByteDiff</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>reqlen<span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">// 这个是为了修复一个bug    ziplist源码确实不太好读呀 😭  详细分析见:https://segmentfault.com/a/1190000018878466</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>nextdiff <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">4</span> <span class="token operator">&amp;&amp;</span> reqlen <span class="token operator">&lt;</span> <span class="token number">4</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        nextdiff <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        forcelarge <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 存储下标，因为重新分配内存可能更改ziplist的地址</span>
+    offset <span class="token operator">=</span> p<span class="token operator">-</span>zl<span class="token punctuation">;</span>
+    <span class="token comment">// 调整ziplist内存大小 // 当前长度 + 需要申请的长度 + nextdiff </span>
+    zl <span class="token operator">=</span> <span class="token function">ziplistResize</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>curlen<span class="token operator">+</span>reqlen<span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    p <span class="token operator">=</span> zl<span class="token operator">+</span>offset<span class="token punctuation">;</span>
+
+    <span class="token comment">// 必要时应用内存移动并更新尾部偏移量。</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 不是结束字符</span>
+        <span class="token comment">// 由于 ZIP_END 字节减一 /* Subtract one because of the ZIP_END bytes */</span>
+        <span class="token comment">// 将p节点后移(没有移动p节点前一节点长度信息)，留出当前节点位置</span>
+        <span class="token function">memmove</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span>p<span class="token operator">-</span>nextdiff<span class="token punctuation">,</span>curlen<span class="token operator">-</span>offset<span class="token operator">-</span><span class="token number">1</span><span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* Encode this entry's raw length in the next entry. */</span>
+        <span class="token comment">// 写入p节点前一节点长度信息(要插入节点的长度)</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>forcelarge<span class="token punctuation">)</span>
+            <span class="token function">zipStorePrevEntryLengthLarge</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">else</span>
+            <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 更新尾节点偏移量</span>
+        <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+            <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">+</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">/* When the tail contains more than one entry, we need to take
+         * "nextdiff" in account as well. Otherwise, a change in the
+         * size of prevlen doesn't have an effect on the *tail* offset. */</span>
+        <span class="token function">zipEntry</span><span class="token punctuation">(</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">,</span> <span class="token operator">&amp;</span>tail<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span>reqlen<span class="token operator">+</span>tail<span class="token punctuation">.</span>headersize<span class="token operator">+</span>tail<span class="token punctuation">.</span>len<span class="token punctuation">]</span> <span class="token operator">!=</span> ZIP_END<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span>
+                <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">intrev32ifbe</span><span class="token punctuation">(</span><span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">+</span>nextdiff<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span> <span class="token comment">// 是结束字符 也就是列表是空的 </span>
+        <span class="token comment">// 空列表插入，只更新尾节点偏移量 </span>
+        <span class="token comment">/* This element will be the new tail. */</span>
+        <span class="token function">ZIPLIST_TAIL_OFFSET</span><span class="token punctuation">(</span>zl<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token function">intrev32ifbe</span><span class="token punctuation">(</span>p<span class="token operator">-</span>zl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 这个类似于数组前插入元素，整体都要移动，这个复杂度 🍵  </span>
+    <span class="token comment">// 当 nextdiff != 0 时，下一个节点的prevlen需要改变，所以我们需要在整个 ziplist 中级联更新</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>nextdiff <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        offset <span class="token operator">=</span> p<span class="token operator">-</span>zl<span class="token punctuation">;</span>
+        <span class="token comment">// 连锁更新 </span>
+        zl <span class="token operator">=</span> <span class="token function">__ziplistCascadeUpdate</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span>p<span class="token operator">+</span>reqlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        p <span class="token operator">=</span> zl<span class="token operator">+</span>offset<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// 写入前一节点长度信息</span>
+    p <span class="token operator">+=</span> <span class="token function">zipStorePrevEntryLength</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>prevlen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 写入节点编码与长度信息</span>
+    p <span class="token operator">+=</span> <span class="token function">zipStoreEntryEncoding</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>encoding<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 写入数据</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">ZIP_IS_STR</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">memcpy</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>s<span class="token punctuation">,</span>slen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">zipSaveInteger</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span>value<span class="token punctuation">,</span>encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// 增加压缩列表长度</span>
+    <span class="token function">ZIPLIST_INCR_LENGTH</span><span class="token punctuation">(</span>zl<span class="token punctuation">,</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> zl<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到，在新增节点时首先会尝试编码，如果编码成数字使用整形数字编码，否则使用字符串编码<br>  但是不同编码占用的内存空间不同，整数编码占用 1/2/3/4/8 字节，字符串编码占用 slen 字节</p>
+<h3 id="压缩整数占用内存空间大小-zipIntSize"><a href="#压缩整数占用内存空间大小-zipIntSize" class="headerlink" title="压缩整数占用内存空间大小-zipIntSize"></a>压缩整数占用内存空间大小-zipIntSize</h3><p>  压缩整数占用内存空间大小-zipIntSize</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * 返回存储由'encoding'编码的整数所需的字节数。
+ */</span>
+<span class="token keyword">unsigned</span> <span class="token keyword">int</span> <span class="token function">zipIntSize</span><span class="token punctuation">(</span><span class="token keyword">unsigned</span> <span class="token keyword">char</span> encoding<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">switch</span><span class="token punctuation">(</span>encoding<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">case</span> ZIP_INT_8B<span class="token operator">:</span>  <span class="token keyword">return</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_16B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_24B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_32B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">4</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> ZIP_INT_64B<span class="token operator">:</span> <span class="token keyword">return</span> <span class="token number">8</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">// </span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>encoding <span class="token operator">>=</span> ZIP_INT_IMM_MIN <span class="token operator">&amp;&amp;</span> encoding <span class="token operator">&lt;=</span> ZIP_INT_IMM_MAX<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span> <span class="token comment">/* 4 bit immediate */</span>
+    <span class="token function">panic</span><span class="token punctuation">(</span><span class="token string">"Invalid integer encoding 0x%02X"</span><span class="token punctuation">,</span> encoding<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  ZIP_INT_8B 、 ZIP_INT_16B 、 ZIP_INT_24B 、 ZIP_INT_32B 、 ZIP_INT_64B，分表占用 1、2、3、4、8 字节内存空间</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_16B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">0</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_32B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_64B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">2</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_24B</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">0xc0</span> <span class="token operator">|</span> <span class="token number">3</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_8B</span> <span class="token expression"><span class="token number">0xfe</span></span></span>
+
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_IMM_MIN</span> <span class="token expression"><span class="token number">0xf1</span>    </span><span class="token comment">/* 11110001 */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZIP_INT_IMM_MAX</span> <span class="token expression"><span class="token number">0xfd</span>    </span><span class="token comment">/* 11111101 */</span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h2 id="3-3-哈希表-dict"><a href="#3-3-哈希表-dict" class="headerlink" title="(3.3) 哈希表-dict"></a>(3.3) 哈希表-dict</h2><p>  <img src="/img/database/redis/data-structure/hashtable/hashtable.svg" alt="哈希表"></p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
+ * 这是哈希表结构。
+ * 每个字典都有两个这样的字典，因为我们实现了增量重新哈希，从旧表到新表。 
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictht</span> <span class="token punctuation">&#123;</span>
+    dictEntry <span class="token operator">*</span><span class="token operator">*</span>table<span class="token punctuation">;</span>  <span class="token comment">// 哈希节点数组  一维数组的指针</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> size<span class="token punctuation">;</span>  <span class="token comment">// 哈希表大小</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> sizemask<span class="token punctuation">;</span>  <span class="token comment">// 哈希表大小掩码，用于计算索引值，等于 size - 1</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> used<span class="token punctuation">;</span>  <span class="token comment">// 哈希表已使用节点个数</span>
+<span class="token punctuation">&#125;</span> dictht<span class="token punctuation">;</span>
+```  
+ 
+
+```c
+<span class="token comment">/*
+ * 哈希表节点
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>key<span class="token punctuation">;</span> <span class="token comment">// key的指针</span>
+    <span class="token keyword">union</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">void</span> <span class="token operator">*</span>val<span class="token punctuation">;</span>
+        <span class="token class-name">uint64_t</span> u64<span class="token punctuation">;</span>
+        <span class="token class-name">int64_t</span> s64<span class="token punctuation">;</span>
+        <span class="token keyword">double</span> d<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> v<span class="token punctuation">;</span>  <span class="token comment">// value  联合结构体(不同场景使用不同大小，省内存)</span>
+    <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token operator">*</span>next<span class="token punctuation">;</span> <span class="token comment">// 链表的下一个节点的指针</span>
+<span class="token punctuation">&#125;</span> dictEntry<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到 哈希表dictht里定义了 二维数组(**table)、哈希表大小、<br>  哈希节点里定义了 键(key)、值(v)、链表的下一个节点(next)，其中值(v)是一个联合体，联合体中包含了指向实际值的指针 *val，还包含了无符号的 64 位整数、有符号的 64 位整数，以及 double 类的值。</p>
+<p>  为什么要使用联合体呢？<br>  节省内存，因为当值为整数或双精度浮点数时，由于其本身就是64位，就可以不用指针，而是可以直接存在键值对的结构体中，这样就避免了再用一个指针64位，从而节省了内存空间。</p>
+<p>  哈希表是通过空间换时间，所以整体上会比较费内存，这个无论在什么语言避免不了。</p>
+<p>  想优化哈希表的内存使用，可以考虑用其它数据结构，比如 字典树(分词)、跳表(Lucene3.0前词典的数据结构)、基数树(Redis Stream底层数据结构)、有向无环图(Elasticsearch底层Lucene词典数据结构FST) 等来节省内存。</p>
+<br>
+<br>
+
+
+
+<h1 id="4-Redis数据类型-对象-维度的内存优化"><a href="#4-Redis数据类型-对象-维度的内存优化" class="headerlink" title="(4) Redis数据类型(对象)维度的内存优化"></a>(4) Redis数据类型(对象)维度的内存优化</h1><p>  Redis对象都是由Redis对象系统(redisObject)管理。</p>
+<h2 id="4-1-Redis对象系统-redisObject怎么省内存"><a href="#4-1-Redis对象系统-redisObject怎么省内存" class="headerlink" title="4.1 Redis对象系统-redisObject怎么省内存"></a>4.1 Redis对象系统-redisObject怎么省内存</h2><p>  <img src="/img/database/redis/redis-object/redis-object.svg" alt="redisObject结构"></p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.h </span>
+
+<span class="token comment">/*
+ * redis对象
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisObject</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> type<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 数据类型 （string/list/hash/set/zset等）</span>
+    <span class="token keyword">unsigned</span> encoding<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 编码方式 </span>
+    <span class="token keyword">unsigned</span> lru<span class="token operator">:</span>LRU_BITS<span class="token punctuation">;</span>  <span class="token comment">// LRU时间(相对于全局 lru_clock) </span>
+                            <span class="token comment">// 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  </span>
+                            <span class="token comment">// LRU_BITS为24个bits</span>
+    <span class="token keyword">int</span> refcount<span class="token punctuation">;</span>  <span class="token comment">// 引用计数  4字节</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>ptr<span class="token punctuation">;</span>  <span class="token comment">// 指针 指向对象的值  8字节</span>
+<span class="token punctuation">&#125;</span> robj<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>  可以看到redisObject有一个字段是<code>refcount</code>引用计数，了解过垃圾回收的同学是不是很熟悉， 通过对象复用来节省内存，有点像享元模式。</p>
+<h2 id="4-2-Redis对象不同编码-数据结构-内存优化"><a href="#4-2-Redis对象不同编码-数据结构-内存优化" class="headerlink" title="4.2 Redis对象不同编码(数据结构)内存优化"></a>4.2 Redis对象不同编码(数据结构)内存优化</h2><p>  redisObject 、Redis对象(data-type) 以及 encoding(data-structure) 三者之间的关系：</p>
+<p>  <img src="/img/database/redis/redis-object-object-encoding-mapping.svg"></p>
+<h3 id="4-2-1-string对象不同编码"><a href="#4-2-1-string对象不同编码" class="headerlink" title="4.2.1 string对象不同编码"></a>4.2.1 string对象不同编码</h3><p>  todo</p>
+<h3 id="4-2-2-list对象不同编码"><a href="#4-2-2-list对象不同编码" class="headerlink" title="4.2.2 list对象不同编码"></a>4.2.2 list对象不同编码</h3><p>  todo</p>
+<h3 id="4-2-3-hash对象不同编码"><a href="#4-2-3-hash对象不同编码" class="headerlink" title="4.2.3 hash对象不同编码"></a>4.2.3 hash对象不同编码</h3><p>  todo</p>
+<h3 id="4-2-4-set对象不同编码"><a href="#4-2-4-set对象不同编码" class="headerlink" title="4.2.4 set对象不同编码"></a>4.2.4 set对象不同编码</h3><p>  todo</p>
+<h3 id="4-2-5-sorted-set对象不同编码"><a href="#4-2-5-sorted-set对象不同编码" class="headerlink" title="4.2.5 sorted-set对象不同编码"></a>4.2.5 sorted-set对象不同编码</h3><p>  todo</p>
+<br>
 
 
 <h1 id="5-内存分配器维度的优化"><a href="#5-内存分配器维度的优化" class="headerlink" title="(5) 内存分配器维度的优化"></a>(5) 内存分配器维度的优化</h1><p>  内存分配器的目的主要是为了方便管理内存<br>  redis内存分配器有 <code>jemalloc</code>、 <code>tcmalloc</code>、 <code>libc</code></p>
 <p>  mem_fragmentation_ratio = used_memory_rss / used_memory<br>  内存碎片率 = Redis进程占据操作系统的内存 / Redis分配器分配的内存总量</p>
 <p>  <a target="_blank" rel="noopener" href="https://developer.aliyun.com/article/803713">关于redis源码的内存分配,jemalloc,tcmalloc,libc</a></p>
-<h1 id="6-实验"><a href="#6-实验" class="headerlink" title="(6) 实验"></a>(6) 实验</h1><h2 id="6-1"><a href="#6-1" class="headerlink" title="(6.1)"></a>(6.1)</h2><h2 id="6-2-不同长度key占用内存对比"><a href="#6-2-不同长度key占用内存对比" class="headerlink" title="(6.2) 不同长度key占用内存对比"></a>(6.2) 不同长度key占用内存对比</h2><h1 id="7-其它"><a href="#7-其它" class="headerlink" title="(7) 其它"></a>(7) 其它</h1><p>  Redis删除数据不一定是是实时删除。</p>
+<h1 id="6-实验"><a href="#6-实验" class="headerlink" title="(6) 实验"></a>(6) 实验</h1><h2 id="6-1"><a href="#6-1" class="headerlink" title="(6.1)"></a>(6.1)</h2><h2 id="6-2-不同长度key占用内存对比"><a href="#6-2-不同长度key占用内存对比" class="headerlink" title="(6.2) 不同长度key占用内存对比"></a>(6.2) 不同长度key占用内存对比</h2><p>  todo </p>
+<h2 id="6-3-todo"><a href="#6-3-todo" class="headerlink" title="(6.3) todo"></a>(6.3) todo</h2><h1 id="7-其它"><a href="#7-其它" class="headerlink" title="(7) 其它"></a>(7) 其它</h1><p>  Redis删除数据不一定是是实时删除。</p>
 <p>  Redis在删除数据后并不是立马释放内存，需要重启Redis Server才能释放操作系统分配的内存。</p>
+<h1 id="8-研发注意事项"><a href="#8-研发注意事项" class="headerlink" title="(8) 研发注意事项"></a>(8) 研发注意事项</h1><p>  作为研发，在日常的开发中可以做到哪些优化？<br>  todo </p>
 <h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://youjiali1995.github.io/allocator/jemalloc/">jemalloc 源码分析</a><br>[2] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/547350961">浅谈Redis源码—内存分配zmalloc</a><br>[3] <a target="_blank" rel="noopener" href="https://juejin.cn/post/7068233325227278372">redis源码阅读——内存分配完全解析</a><br>[4] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6885710269406789645">Redis内存模型</a></p>
 
     </div>
@@ -776,7 +1125,7 @@ sds <span class="token function">sdsnewlen</span><span class="token punctuation"
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis内存使用概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis-Server%E5%86%85%E5%AD%98%E5%88%92%E5%88%86%E6%83%85%E5%86%B5"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis-Server内存划分情况</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E8%87%AA%E8%BA%AB%E8%BF%9B%E7%A8%8B%E5%86%85%E5%AD%98"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 自身进程内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E8%87%AA%E8%BA%AB%E6%95%B0%E6%8D%AE%E5%86%85%E5%AD%98"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 自身数据内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E7%BC%93%E5%86%B2%E5%86%85%E5%AD%98"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 缓冲内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-4-%E5%86%85%E5%AD%98%E7%A2%8E%E7%89%87"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 内存碎片</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis数据结构维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E7%AE%80%E5%8D%95%E5%8A%A8%E6%80%81%E5%AD%97%E7%AC%A6%E4%B8%B2-SDS"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 简单动态字符串-SDS</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-1-%E5%AE%9A%E4%B9%89%E5%A4%9A%E7%A7%8DSDS%E5%9C%A8%E4%B8%8D%E5%90%8C%E5%9C%BA%E6%99%AF%E4%BD%BF%E7%94%A8%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-number">3.1.1.</span> <span class="nav-text">(3.1.1) 定义多种SDS在不同场景使用省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-2-%E5%88%9B%E5%BB%BA%E6%96%B0%E5%AD%97%E7%AC%A6%E4%B8%B2-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-number">3.1.2.</span> <span class="nav-text">(3.1.2) 创建新字符串-内存预分配</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E5%93%88%E5%B8%8C%E8%A1%A8-dict"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 哈希表-dict</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-Redis%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B-%E5%AF%B9%E8%B1%A1-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">4.</span> <span class="nav-text">(4) Redis数据类型(对象)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-Redis%E5%AF%B9%E8%B1%A1"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Redis对象</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-Redis%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Redis对象不同编码(数据结构)内存优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8%E7%BB%B4%E5%BA%A6%E7%9A%84%E4%BC%98%E5%8C%96"><span class="nav-number">5.</span> <span class="nav-text">(5) 内存分配器维度的优化</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%AE%9E%E9%AA%8C"><span class="nav-number">6.</span> <span class="nav-text">(6) 实验</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1"><span class="nav-number">6.1.</span> <span class="nav-text">(6.1)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-%E4%B8%8D%E5%90%8C%E9%95%BF%E5%BA%A6key%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E5%AF%B9%E6%AF%94"><span class="nav-number">6.2.</span> <span class="nav-text">(6.2) 不同长度key占用内存对比</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E5%85%B6%E5%AE%83"><span class="nav-number">7.</span> <span class="nav-text">(7) 其它</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">8.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis-Server%E5%86%85%E5%AD%98%E5%88%92%E5%88%86%E6%83%85%E5%86%B5"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis-Server内存划分情况</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E8%87%AA%E8%BA%AB%E8%BF%9B%E7%A8%8B%E5%86%85%E5%AD%98"><span class="nav-number">1.1.</span> <span class="nav-text">1.1 自身进程内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E8%87%AA%E8%BA%AB%E6%95%B0%E6%8D%AE%E5%86%85%E5%AD%98"><span class="nav-number">1.2.</span> <span class="nav-text">1.2 自身数据内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-%E7%BC%93%E5%86%B2%E5%86%85%E5%AD%98"><span class="nav-number">1.3.</span> <span class="nav-text">1.3 缓冲内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-%E5%86%85%E5%AD%98%E7%A2%8E%E7%89%87"><span class="nav-number">1.4.</span> <span class="nav-text">1.4 内存碎片</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis-Server%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8%E6%A6%82%E8%A7%88"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis-Server内存使用概览</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-data-structure-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis数据结构(data-structure)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E7%AE%80%E5%8D%95%E5%8A%A8%E6%80%81%E5%AD%97%E7%AC%A6%E4%B8%B2-SDS-embstr-raw"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 简单动态字符串-SDS(embstr&#x2F;raw)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-1-%E5%AE%9A%E4%B9%89%E5%A4%9A%E7%A7%8DSDS%E5%9C%A8%E4%B8%8D%E5%90%8C%E5%9C%BA%E6%99%AF%E4%BD%BF%E7%94%A8%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-number">3.1.1.</span> <span class="nav-text">(3.1.1) 定义多种SDS在不同场景使用省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-2-%E5%88%9B%E5%BB%BA%E6%96%B0%E5%AD%97%E7%AC%A6%E4%B8%B2-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-number">3.1.2.</span> <span class="nav-text">(3.1.2) 创建新字符串-内存预分配</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8-ziplist"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 压缩列表-ziplist</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-number">3.2.1.</span> <span class="nav-text">压缩列表为什么省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-number">3.2.2.</span> <span class="nav-text">创建压缩列表怎么省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%96%B0%E5%A2%9E%E5%85%83%E7%B4%A0%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-number">3.2.3.</span> <span class="nav-text">压缩列表新增元素怎么省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E6%95%B4%E6%95%B0%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E5%A4%A7%E5%B0%8F-zipIntSize"><span class="nav-number">3.2.4.</span> <span class="nav-text">压缩整数占用内存空间大小-zipIntSize</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E5%93%88%E5%B8%8C%E8%A1%A8-dict"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 哈希表-dict</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-Redis%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B-%E5%AF%B9%E8%B1%A1-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">4.</span> <span class="nav-text">(4) Redis数据类型(对象)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-Redis%E5%AF%B9%E8%B1%A1%E7%B3%BB%E7%BB%9F-redisObject%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 Redis对象系统-redisObject怎么省内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-Redis%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 Redis对象不同编码(数据结构)内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-1-string%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-number">4.2.1.</span> <span class="nav-text">4.2.1 string对象不同编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-2-list%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-number">4.2.2.</span> <span class="nav-text">4.2.2 list对象不同编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-3-hash%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-number">4.2.3.</span> <span class="nav-text">4.2.3 hash对象不同编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-4-set%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-number">4.2.4.</span> <span class="nav-text">4.2.4 set对象不同编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-5-sorted-set%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-number">4.2.5.</span> <span class="nav-text">4.2.5 sorted-set对象不同编码</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8%E7%BB%B4%E5%BA%A6%E7%9A%84%E4%BC%98%E5%8C%96"><span class="nav-number">5.</span> <span class="nav-text">(5) 内存分配器维度的优化</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%AE%9E%E9%AA%8C"><span class="nav-number">6.</span> <span class="nav-text">(6) 实验</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1"><span class="nav-number">6.1.</span> <span class="nav-text">(6.1)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-%E4%B8%8D%E5%90%8C%E9%95%BF%E5%BA%A6key%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E5%AF%B9%E6%AF%94"><span class="nav-number">6.2.</span> <span class="nav-text">(6.2) 不同长度key占用内存对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-3-todo"><span class="nav-number">6.3.</span> <span class="nav-text">(6.3) todo</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E5%85%B6%E5%AE%83"><span class="nav-number">7.</span> <span class="nav-text">(7) 其它</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#8-%E7%A0%94%E5%8F%91%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9"><span class="nav-number">8.</span> <span class="nav-text">(8) 研发注意事项</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">9.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
