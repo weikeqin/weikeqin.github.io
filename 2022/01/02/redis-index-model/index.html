@@ -22,14 +22,14 @@
 
   <meta name="description" content="(1) redis整体存储结构">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Redis索引模型">
+<meta property="og:title" content="Redis索引模型-Redis是怎么根据key查找到对应value的？">
 <meta property="og:url" content="http://weikeqin.com/2022/01/02/redis-index-model/index.html">
 <meta property="og:site_name" content="天道酬勤">
 <meta property="og:description" content="(1) redis整体存储结构">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/index-model/redis-index-model.png">
 <meta property="article:published_time" content="2022-01-02T11:49:01.000Z">
-<meta property="article:modified_time" content="2023-06-28T00:08:14.136Z">
+<meta property="article:modified_time" content="2023-07-13T00:51:58.342Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta property="article:tag" content="database">
@@ -49,7 +49,7 @@
   };
 </script>
 
-  <title>Redis索引模型 | 天道酬勤</title>
+  <title>Redis索引模型-Redis是怎么根据key查找到对应value的？ | 天道酬勤</title>
   
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
     <script>
@@ -232,7 +232,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Redis索引模型
+          Redis索引模型-Redis是怎么根据key查找到对应value的？
         </h1>
 
         <div class="post-meta">
@@ -249,7 +249,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-06-28 08:08:14" itemprop="dateModified" datetime="2023-06-28T08:08:14+08:00">2023-06-28</time>
+                <time title="修改时间：2023-07-13 08:51:58" itemprop="dateModified" datetime="2023-07-13T08:51:58+08:00">2023-07-13</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -262,7 +262,7 @@
             </span>
 
           
-            <span id="/2022/01/02/redis-index-model/" class="post-meta-item leancloud_visitors" data-flag-title="Redis索引模型" title="阅读次数">
+            <span id="/2022/01/02/redis-index-model/" class="post-meta-item leancloud_visitors" data-flag-title="Redis索引模型-Redis是怎么根据key查找到对应value的？" title="阅读次数">
               <span class="post-meta-item-icon">
                 <i class="fa fa-eye"></i>
               </span>
@@ -295,7 +295,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>4.5k</span>
+              <span>4.6k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -317,114 +317,9 @@
         <h1 id="1-redis整体存储结构"><a href="#1-redis整体存储结构" class="headerlink" title="(1) redis整体存储结构"></a>(1) redis整体存储结构</h1><p>  <img src="/img/database/redis/index-model/redis-index-model.png" alt="redis索引模型"></p>
 <span id="more"></span>
 
-<h1 id="2-Redis索引模型"><a href="#2-Redis索引模型" class="headerlink" title="(2) Redis索引模型"></a>(2) Redis索引模型</h1><p>  Redis怎么根据key定位到value</p>
-<h2 id="2-1-哈希函数"><a href="#2-1-哈希函数" class="headerlink" title="(2.1) 哈希函数"></a>(2.1) 哈希函数</h2><p>  Redis使用的<code>siphash.c</code>文件里的<code>siphash</code></p>
-<h2 id="2-2-哈希冲突解决"><a href="#2-2-哈希冲突解决" class="headerlink" title="(2.2) 哈希冲突解决"></a>(2.2) 哈希冲突解决</h2><p>  1.Redis的hash表是全局的，所以当写入大量的key时，将会带来哈希冲突，已经rehash可能带来的操作阻塞<br>  2.Redis解决hash冲突的方式，是链式哈希：同一个哈希桶中的多个元素用一个链表来保存<br>  3.当哈希冲突链过长时，Redis会对hash表进行rehash操作。rehash就是增加现有的hash桶数量，分散entry元素。</p>
-<h2 id="2-3-哈希表扩容-渐进式rehash"><a href="#2-3-哈希表扩容-渐进式rehash" class="headerlink" title="(2.3) 哈希表扩容-渐进式rehash"></a>(2.3) 哈希表扩容-渐进式rehash</h2><p>  dict的渐进式rehash是为了避免扩容时的整体拷贝，这会给内存带来较大压力。</p>
-<p>渐进式rehash执行时，除了根据键值对的操作来进行数据迁移，Redis本身还会有一个定时任务在执行rehash，如果没有键值对操作时，这个定时任务会周期性地（例如每100ms一次）搬移一些数据到新的哈希表中，这样可以缩短整个rehash的过程。</p>
-<p>1.在进行渐进式 rehash 的过程中， 字典会同时使用 ht[0] 和 ht[1] 两个哈希表</p>
-<p>2.在渐进式 rehash 进行期间， 字典的删除（delete）、查找（find）、更新（update）等操作会在两个哈希表上进行：<br>比如说， 要在字典里面查找一个键的话， 程序会先在 ht[0] 里面进行查找， 如果没找到的话， 就会继续到 ht[1] 里面进行查找， 诸如此类。</p>
-<p>3.在渐进式 rehash 执行期间， 新添加到字典的键值对一律会被保存到 ht[1] 里面， 而 ht[0] 则不再进行任何添加操作： 这一措施保证了 ht[0] 包含的键值对数量会只减不增， 并随着 rehash 操作的执行而最终变成空表。</p>
-<p>  <a target="_blank" rel="noopener" href="http://www.petermao.com/redis/75.html">渐进式rehash</a></p>
-<br>
-
-
-<h1 id="3-Redis索引模型源码解读"><a href="#3-Redis索引模型源码解读" class="headerlink" title="(3) Redis索引模型源码解读"></a>(3) Redis索引模型源码解读</h1><h2 id="3-1-Redis服务端结构体-redisServer"><a href="#3-1-Redis服务端结构体-redisServer" class="headerlink" title="(3.1) Redis服务端结构体-redisServer"></a>(3.1) Redis服务端结构体-redisServer</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/server.h</span>
-
-<span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
-    <span class="token comment">/* General */</span>
-    <span class="token class-name">pid_t</span> pid<span class="token punctuation">;</span>                  <span class="token comment">/* 主进程pid */</span>
-    <span class="token class-name">pthread_t</span> main_thread_id<span class="token punctuation">;</span>   <span class="token comment">/* 主线程id */</span>
-    <span class="token keyword">char</span> <span class="token operator">*</span>configfile<span class="token punctuation">;</span>           <span class="token comment">/* 配置文件绝对路径，或 NULL */</span>
-    <span class="token keyword">char</span> <span class="token operator">*</span>executable<span class="token punctuation">;</span>           <span class="token comment">/* 可执行文件绝对路径。 */</span>
-    <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>exec_argv<span class="token punctuation">;</span>           <span class="token comment">/* 可执行 argv 向量（副本）。 */</span>
-    <span class="token keyword">int</span> dynamic_hz<span class="token punctuation">;</span>             <span class="token comment">/* 根据客户端数量更改 hz 值。 */</span>
-    <span class="token keyword">int</span> config_hz<span class="token punctuation">;</span>              <span class="token comment">/* 配置的 HZ 值。如果启用了动态hz，则可能与实际的“hz”字段值不同。 */</span>
-    <span class="token class-name">mode_t</span> umask<span class="token punctuation">;</span>               <span class="token comment">/* 进程启动时的 umask 值 */</span>
-    <span class="token keyword">int</span> hz<span class="token punctuation">;</span>                     <span class="token comment">/* serverCron() 调用频率  */</span>
-    <span class="token keyword">int</span> in_fork_child<span class="token punctuation">;</span>          <span class="token comment">/* 复制的子进程 */</span>
-    redisDb <span class="token operator">*</span>db<span class="token punctuation">;</span>                <span class="token comment">/* 数据库 */</span>    
-    dict <span class="token operator">*</span>commands<span class="token punctuation">;</span>             <span class="token comment">/* 命令表 */</span>
-    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
-<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-<h2 id="3-2-Redis数据库-redisDb"><a href="#3-2-Redis数据库-redisDb" class="headerlink" title="(3.2) Redis数据库-redisDb"></a>(3.2) Redis数据库-redisDb</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.h</span>
-
-<span class="token comment">/* Redis数据库表示。
-   有多个数据库由从 0（默认数据库）到最大配置数据库的整数标识。
-   数据库编号是结构中的“id”字段。 
-*/</span>
-<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisDb</span> <span class="token punctuation">&#123;</span>
-    dict <span class="token operator">*</span>dict<span class="token punctuation">;</span>                 <span class="token comment">/* 这个数据库存储的key集合 */</span>
-    dict <span class="token operator">*</span>expires<span class="token punctuation">;</span>              <span class="token comment">/* 设置了超时时间的key集合 */</span>
-    dict <span class="token operator">*</span>blocking_keys<span class="token punctuation">;</span>        <span class="token comment">/* 客户端等待数据的key集合 (BLPOP)*/</span>
-    dict <span class="token operator">*</span>ready_keys<span class="token punctuation">;</span>           <span class="token comment">/* Blocked keys that received a PUSH */</span>
-    dict <span class="token operator">*</span>watched_keys<span class="token punctuation">;</span>         <span class="token comment">/* WATCHED keys for MULTI/EXEC CAS */</span>
-    <span class="token keyword">int</span> id<span class="token punctuation">;</span>                     <span class="token comment">/* Database ID */</span>
-    <span class="token keyword">long</span> <span class="token keyword">long</span> avg_ttl<span class="token punctuation">;</span>          <span class="token comment">/* Average TTL, just for stats */</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> expires_cursor<span class="token punctuation">;</span> <span class="token comment">/* Cursor of the active expire cycle. */</span>
-    list <span class="token operator">*</span>defrag_later<span class="token punctuation">;</span>         <span class="token comment">/* List of key names to attempt to defrag one by one, gradually. */</span>
-<span class="token punctuation">&#125;</span> redisDb<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>　redis默认有16个db，每个db里保存了</p>
-<h2 id="3-3-dict"><a href="#3-3-dict" class="headerlink" title="(3.3) dict"></a>(3.3) dict</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.h</span>
-
-<span class="token comment">/*
- * 字典结构体
- */</span>
-<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dict</span> <span class="token punctuation">&#123;</span>
-    dictType <span class="token operator">*</span>type<span class="token punctuation">;</span>  <span class="token comment">/* 字典类型 */</span>
-    <span class="token keyword">void</span> <span class="token operator">*</span>privdata<span class="token punctuation">;</span>  <span class="token comment">/* 私有数据 */</span>
-    dictht ht<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">/* 全局哈希表 2个 默认使用第0个，扩容时使用第1个 */</span>
-    <span class="token keyword">long</span> rehashidx<span class="token punctuation">;</span>  <span class="token comment">/* rehashing not in progress if rehashidx == -1 */</span>
-    <span class="token class-name">int16_t</span> pauserehash<span class="token punctuation">;</span> <span class="token comment">/* If >0 rehashing is paused (&lt;0 indicates coding error) */</span>
-<span class="token punctuation">&#125;</span> dict<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="3-4-哈希表-dictht"><a href="#3-4-哈希表-dictht" class="headerlink" title="(3.4) 哈希表-dictht"></a>(3.4) 哈希表-dictht</h2><p>  Redis里的哈希表数据结构的实现是<code>dictht</code><br>  哈希函数使用 ``<br>  哈希冲突使用 <code>链地址法</code></p>
-<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.h</span>
-
-<span class="token comment">/* 
- * 这是哈希表结构。
- * 每个字典都有两个这样的字典，因为我们实现了增量重新哈希，从旧表到新表。 
- */</span>
-<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictht</span> <span class="token punctuation">&#123;</span>
-    dictEntry <span class="token operator">*</span><span class="token operator">*</span>table<span class="token punctuation">;</span>   <span class="token comment">// 一维数组的指针</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> size<span class="token punctuation">;</span>  <span class="token comment">// 哈希表大小  </span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> sizemask<span class="token punctuation">;</span>  <span class="token comment">// size-1 = (2^n - 1)，比2^n少1，用于计算key对应桶的下标</span>
-    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> used<span class="token punctuation">;</span>  <span class="token comment">// 已使用个数 </span>
-<span class="token punctuation">&#125;</span> dictht<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="3-5-dictEntry"><a href="#3-5-dictEntry" class="headerlink" title="(3.5) dictEntry"></a>(3.5) dictEntry</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/dict.h</span>
-
-<span class="token comment">/* 
- * 哈希表节点/Entry实体 
- */</span>
-<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token punctuation">&#123;</span>
-    <span class="token keyword">void</span> <span class="token operator">*</span>key<span class="token punctuation">;</span> <span class="token comment">// key的指针</span>
-    <span class="token keyword">union</span> <span class="token punctuation">&#123;</span>
-        <span class="token keyword">void</span> <span class="token operator">*</span>val<span class="token punctuation">;</span>
-        <span class="token class-name">uint64_t</span> u64<span class="token punctuation">;</span>
-        <span class="token class-name">int64_t</span> s64<span class="token punctuation">;</span>
-        <span class="token keyword">double</span> d<span class="token punctuation">;</span>
-    <span class="token punctuation">&#125;</span> v<span class="token punctuation">;</span>  <span class="token comment">// value  联合结构体(不同场景使用不同大小，省内存)</span>
-    <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token operator">*</span>next<span class="token punctuation">;</span>  <span class="token comment">// 链表的下一个节点的指针</span>
-<span class="token punctuation">&#125;</span> dictEntry<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<p>  uint64_t 8字节无符号整数<br>  int64_t 8字节带符号整数<br>  double  8字节</p>
-<p>　dictEntry里保存了<code>key指针</code>、<code>next指针</code>，各8字节</p>
-<h2 id="3-6-Redis对象类型-redisObject"><a href="#3-6-Redis对象类型-redisObject" class="headerlink" title="(3.6) Redis对象类型-redisObject"></a>(3.6) Redis对象类型-redisObject</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
- * Redis对象类型
- */</span>
-<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisObject</span> <span class="token punctuation">&#123;</span>
-    <span class="token keyword">unsigned</span> type<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 数据类型  4个bits</span>
-    <span class="token keyword">unsigned</span> encoding<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 编码方式 4个bits</span>
-    <span class="token keyword">unsigned</span> lru<span class="token operator">:</span>LRU_BITS<span class="token punctuation">;</span>  <span class="token comment">// LRU时间(相对于全局 lru_clock) 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  LRU_BITS为24个bits</span>
-    <span class="token keyword">int</span> refcount<span class="token punctuation">;</span>  <span class="token comment">// 引用计数  4字节</span>
-    <span class="token keyword">void</span> <span class="token operator">*</span>ptr<span class="token punctuation">;</span>  <span class="token comment">// 指针 指向对象的值  8字节</span>
-<span class="token punctuation">&#125;</span> robj<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>　redisObject保存了</p>
-<h2 id="3-7-redis查找key方法"><a href="#3-7-redis查找key方法" class="headerlink" title="(3.7) redis查找key方法"></a>(3.7) redis查找key方法</h2><h3 id="3-7-1-数据库里找对应的对象"><a href="#3-7-1-数据库里找对应的对象" class="headerlink" title="(3.7.1) 数据库里找对应的对象"></a>(3.7.1) 数据库里找对应的对象</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/db.c</span>
+<h1 id="2-Redis索引模型源码解读"><a href="#2-Redis索引模型源码解读" class="headerlink" title="(2) Redis索引模型源码解读"></a>(2) Redis索引模型源码解读</h1><p>  当查询时是怎么根据key查找到对应的value的？</p>
+<h2 id="2-1-redis查找key方法"><a href="#2-1-redis查找key方法" class="headerlink" title="(2.1) redis查找key方法"></a>(2.1) redis查找key方法</h2><h3 id="2-1-1-从redisDb的dict查找key"><a href="#2-1-1-从redisDb的dict查找key" class="headerlink" title="(2.1.1) 从redisDb的dict查找key"></a>(2.1.1) 从redisDb的dict查找key</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// redis 6.0</span>
+<span class="token comment">// file: /src/db.c</span>
 
 <span class="token comment">/*
  * 低级key查找API
@@ -459,10 +354,11 @@ robj <span class="token operator">*</span><span class="token function">lookupKey
     <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
         <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h3 id="3-7-2-字典里找对应的节点"><a href="#3-7-2-字典里找对应的节点" class="headerlink" title="(3.7.2) 字典里找对应的节点"></a>(3.7.2) 字典里找对应的节点</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.c</span>
+<h3 id="2-1-2-从dict查找key"><a href="#2-1-2-从dict查找key" class="headerlink" title="(2.1.2) 从dict查找key"></a>(2.1.2) 从dict查找key</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// redis 6.0</span>
+<span class="token comment">// file: /src/dict.c</span>
 
 <span class="token comment">/*
  * 从db的dict里去找key对应的节点
@@ -501,14 +397,126 @@ dictEntry <span class="token operator">*</span><span class="token function">dict
         <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">dictIsRehashing</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
-<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: dict.h</span>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// redis 6.0</span>
+<span class="token comment">// file: dict.h</span>
 
 <span class="token comment">/* 从节点里获取对应的对象 */</span>
-<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name function">dictGetVal</span><span class="token expression"><span class="token punctuation">(</span>he<span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>he<span class="token punctuation">)</span><span class="token operator">-></span>v<span class="token punctuation">.</span>val<span class="token punctuation">)</span></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name function">dictGetVal</span><span class="token expression"><span class="token punctuation">(</span>he<span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>he<span class="token punctuation">)</span><span class="token operator">-></span>v<span class="token punctuation">.</span>val<span class="token punctuation">)</span></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
+<br>
+
+
+<h2 id="2-2-用到的结构体"><a href="#2-2-用到的结构体" class="headerlink" title="(2.2) 用到的结构体"></a>(2.2) 用到的结构体</h2><h3 id="2-2-1-Redis服务端结构体-redisServer"><a href="#2-2-1-Redis服务端结构体-redisServer" class="headerlink" title="(2.2.1) Redis服务端结构体-redisServer"></a>(2.2.1) Redis服务端结构体-redisServer</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/server.h</span>
+
+<span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">/* General */</span>
+    <span class="token class-name">pid_t</span> pid<span class="token punctuation">;</span>                  <span class="token comment">/* 主进程pid */</span>
+    <span class="token class-name">pthread_t</span> main_thread_id<span class="token punctuation">;</span>   <span class="token comment">/* 主线程id */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>configfile<span class="token punctuation">;</span>           <span class="token comment">/* 配置文件绝对路径，或 NULL */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span>executable<span class="token punctuation">;</span>           <span class="token comment">/* 可执行文件绝对路径。 */</span>
+    <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>exec_argv<span class="token punctuation">;</span>           <span class="token comment">/* 可执行 argv 向量（副本）。 */</span>
+    <span class="token keyword">int</span> dynamic_hz<span class="token punctuation">;</span>             <span class="token comment">/* 根据客户端数量更改 hz 值。 */</span>
+    <span class="token keyword">int</span> config_hz<span class="token punctuation">;</span>              <span class="token comment">/* 配置的 HZ 值。如果启用了动态hz，则可能与实际的“hz”字段值不同。 */</span>
+    <span class="token class-name">mode_t</span> umask<span class="token punctuation">;</span>               <span class="token comment">/* 进程启动时的 umask 值 */</span>
+    <span class="token keyword">int</span> hz<span class="token punctuation">;</span>                     <span class="token comment">/* serverCron() 调用频率  */</span>
+    <span class="token keyword">int</span> in_fork_child<span class="token punctuation">;</span>          <span class="token comment">/* 复制的子进程 */</span>
+    redisDb <span class="token operator">*</span>db<span class="token punctuation">;</span>                <span class="token comment">/* 数据库 */</span>    
+    dict <span class="token operator">*</span>commands<span class="token punctuation">;</span>             <span class="token comment">/* 命令表 */</span>
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+<h3 id="2-2-2-Redis数据库-redisDb"><a href="#2-2-2-Redis数据库-redisDb" class="headerlink" title="(2.2.2) Redis数据库-redisDb"></a>(2.2.2) Redis数据库-redisDb</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.h</span>
+
+<span class="token comment">/* Redis数据库表示。
+   有多个数据库由从 0（默认数据库）到最大配置数据库的整数标识。
+   数据库编号是结构中的“id”字段。 
+*/</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisDb</span> <span class="token punctuation">&#123;</span>
+    dict <span class="token operator">*</span>dict<span class="token punctuation">;</span>                 <span class="token comment">/* 这个数据库存储的key集合 */</span>
+    dict <span class="token operator">*</span>expires<span class="token punctuation">;</span>              <span class="token comment">/* 设置了超时时间的key集合 */</span>
+    dict <span class="token operator">*</span>blocking_keys<span class="token punctuation">;</span>        <span class="token comment">/* 客户端等待数据的key集合 (BLPOP)*/</span>
+    dict <span class="token operator">*</span>ready_keys<span class="token punctuation">;</span>           <span class="token comment">/* Blocked keys that received a PUSH */</span>
+    dict <span class="token operator">*</span>watched_keys<span class="token punctuation">;</span>         <span class="token comment">/* WATCHED keys for MULTI/EXEC CAS */</span>
+    <span class="token keyword">int</span> id<span class="token punctuation">;</span>                     <span class="token comment">/* Database ID */</span>
+    <span class="token keyword">long</span> <span class="token keyword">long</span> avg_ttl<span class="token punctuation">;</span>          <span class="token comment">/* Average TTL, just for stats */</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> expires_cursor<span class="token punctuation">;</span> <span class="token comment">/* Cursor of the active expire cycle. */</span>
+    list <span class="token operator">*</span>defrag_later<span class="token punctuation">;</span>         <span class="token comment">/* List of key names to attempt to defrag one by one, gradually. */</span>
+<span class="token punctuation">&#125;</span> redisDb<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>　redis默认有16个db，每个db里保存了</p>
+<h3 id="2-2-3-字典-dict"><a href="#2-2-3-字典-dict" class="headerlink" title="(2.2.3) 字典-dict"></a>(2.2.3) 字典-dict</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.h</span>
+
+<span class="token comment">/*
+ * 字典结构体
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dict</span> <span class="token punctuation">&#123;</span>
+    dictType <span class="token operator">*</span>type<span class="token punctuation">;</span>  <span class="token comment">/* 字典类型 */</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>privdata<span class="token punctuation">;</span>  <span class="token comment">/* 私有数据 */</span>
+    dictht ht<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">;</span>    <span class="token comment">/* 全局哈希表 2个 默认使用第0个，扩容时使用第1个 */</span>
+    <span class="token keyword">long</span> rehashidx<span class="token punctuation">;</span>  <span class="token comment">/* rehashing not in progress if rehashidx == -1 */</span>
+    <span class="token class-name">int16_t</span> pauserehash<span class="token punctuation">;</span> <span class="token comment">/* If >0 rehashing is paused (&lt;0 indicates coding error) */</span>
+<span class="token punctuation">&#125;</span> dict<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="2-2-4-哈希表-dictht"><a href="#2-2-4-哈希表-dictht" class="headerlink" title="(2.2.4) 哈希表-dictht"></a>(2.2.4) 哈希表-dictht</h3><p>  Redis里的哈希表数据结构的实现是<code>dictht</code><br>  哈希函数使用 ``<br>  哈希冲突使用 <code>链地址法</code></p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: /src/dict.h</span>
+
+<span class="token comment">/* 
+ * 这是哈希表结构。
+ * 每个字典都有两个这样的字典，因为我们实现了增量重新哈希，从旧表到新表。 
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictht</span> <span class="token punctuation">&#123;</span>
+    dictEntry <span class="token operator">*</span><span class="token operator">*</span>table<span class="token punctuation">;</span>   <span class="token comment">// 一维数组的指针</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> size<span class="token punctuation">;</span>  <span class="token comment">// 哈希表大小  </span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> sizemask<span class="token punctuation">;</span>  <span class="token comment">// size-1 = (2^n - 1)，比2^n少1，用于计算key对应桶的下标</span>
+    <span class="token keyword">unsigned</span> <span class="token keyword">long</span> used<span class="token punctuation">;</span>  <span class="token comment">// 已使用个数 </span>
+<span class="token punctuation">&#125;</span> dictht<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="2-2-5-dictEntry"><a href="#2-2-5-dictEntry" class="headerlink" title="(2.2.5) dictEntry"></a>(2.2.5) dictEntry</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/dict.h</span>
+
+<span class="token comment">/* 
+ * 哈希表节点/Entry实体 
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>key<span class="token punctuation">;</span> <span class="token comment">// key的指针</span>
+    <span class="token keyword">union</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">void</span> <span class="token operator">*</span>val<span class="token punctuation">;</span>
+        <span class="token class-name">uint64_t</span> u64<span class="token punctuation">;</span>
+        <span class="token class-name">int64_t</span> s64<span class="token punctuation">;</span>
+        <span class="token keyword">double</span> d<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> v<span class="token punctuation">;</span>  <span class="token comment">// value  联合结构体(不同场景使用不同大小，省内存)</span>
+    <span class="token keyword">struct</span> <span class="token class-name">dictEntry</span> <span class="token operator">*</span>next<span class="token punctuation">;</span>  <span class="token comment">// 链表的下一个节点的指针</span>
+<span class="token punctuation">&#125;</span> dictEntry<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  uint64_t 8字节无符号整数<br>  int64_t 8字节带符号整数<br>  double  8字节</p>
+<p>　dictEntry里保存了<code>key指针</code>、<code>next指针</code>，各8字节</p>
+<h2 id="2-2-6-Redis对象类型-redisObject"><a href="#2-2-6-Redis对象类型-redisObject" class="headerlink" title="(2.2.6) Redis对象类型-redisObject"></a>(2.2.6) Redis对象类型-redisObject</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
+ * Redis对象类型
+ */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisObject</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">unsigned</span> type<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 数据类型  4个bits</span>
+    <span class="token keyword">unsigned</span> encoding<span class="token operator">:</span><span class="token number">4</span><span class="token punctuation">;</span>  <span class="token comment">// 编码方式 4个bits</span>
+    <span class="token keyword">unsigned</span> lru<span class="token operator">:</span>LRU_BITS<span class="token punctuation">;</span>  <span class="token comment">// LRU时间(相对于全局 lru_clock) 或 LFU数据(低8位保存频率 和 高16位保存访问时间)。  LRU_BITS为24个bits</span>
+    <span class="token keyword">int</span> refcount<span class="token punctuation">;</span>  <span class="token comment">// 引用计数  4字节</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>ptr<span class="token punctuation">;</span>  <span class="token comment">// 指针 指向对象的值  8字节</span>
+<span class="token punctuation">&#125;</span> robj<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>　redisObject保存了</p>
+<br>
+
+
+<h1 id="3-Redis索引模型"><a href="#3-Redis索引模型" class="headerlink" title="(3) Redis索引模型"></a>(3) Redis索引模型</h1><p>  Redis怎么根据key定位到value</p>
+<h2 id="3-1-哈希函数"><a href="#3-1-哈希函数" class="headerlink" title="(3.1) 哈希函数"></a>(3.1) 哈希函数</h2><p>  Redis使用的<code>siphash.c</code>文件里的<code>siphash</code></p>
+<h2 id="3-2-哈希冲突解决"><a href="#3-2-哈希冲突解决" class="headerlink" title="(3.2) 哈希冲突解决"></a>(3.2) 哈希冲突解决</h2><p>  1.Redis的hash表是全局的，所以当写入大量的key时，将会带来哈希冲突，已经rehash可能带来的操作阻塞<br>  2.Redis解决hash冲突的方式，是链式哈希：同一个哈希桶中的多个元素用一个链表来保存<br>  3.当哈希冲突链过长时，Redis会对hash表进行rehash操作。rehash就是增加现有的hash桶数量，分散entry元素。</p>
+<h2 id="3-3-哈希表扩容-渐进式rehash"><a href="#3-3-哈希表扩容-渐进式rehash" class="headerlink" title="(3.3) 哈希表扩容-渐进式rehash"></a>(3.3) 哈希表扩容-渐进式rehash</h2><p>  dict的渐进式rehash是为了避免扩容时的整体拷贝，这会给内存带来较大压力。</p>
+<p>渐进式rehash执行时，除了根据键值对的操作来进行数据迁移，Redis本身还会有一个定时任务在执行rehash，如果没有键值对操作时，这个定时任务会周期性地（例如每100ms一次）搬移一些数据到新的哈希表中，这样可以缩短整个rehash的过程。</p>
+<p>1.在进行渐进式 rehash 的过程中， 字典会同时使用 ht[0] 和 ht[1] 两个哈希表</p>
+<p>2.在渐进式 rehash 进行期间， 字典的删除（delete）、查找（find）、更新（update）等操作会在两个哈希表上进行：<br>比如说， 要在字典里面查找一个键的话， 程序会先在 ht[0] 里面进行查找， 如果没找到的话， 就会继续到 ht[1] 里面进行查找， 诸如此类。</p>
+<p>3.在渐进式 rehash 执行期间， 新添加到字典的键值对一律会被保存到 ht[1] 里面， 而 ht[0] 则不再进行任何添加操作： 这一措施保证了 ht[0] 包含的键值对数量会只减不增， 并随着 rehash 操作的执行而最终变成空表。</p>
+<p>  <a target="_blank" rel="noopener" href="http://www.petermao.com/redis/75.html">渐进式rehash</a></p>
+<br>
 
 
 
@@ -598,7 +606,7 @@ dictEntry <span class="token operator">*</span><span class="token function">dict
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-redis%E6%95%B4%E4%BD%93%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">(1) redis整体存储结构</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis索引模型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E5%93%88%E5%B8%8C%E5%87%BD%E6%95%B0"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 哈希函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E5%93%88%E5%B8%8C%E5%86%B2%E7%AA%81%E8%A7%A3%E5%86%B3"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 哈希冲突解决</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-%E5%93%88%E5%B8%8C%E8%A1%A8%E6%89%A9%E5%AE%B9-%E6%B8%90%E8%BF%9B%E5%BC%8Frehash"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) 哈希表扩容-渐进式rehash</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis索引模型源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-Redis%E6%9C%8D%E5%8A%A1%E7%AB%AF%E7%BB%93%E6%9E%84%E4%BD%93-redisServer"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) Redis服务端结构体-redisServer</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-Redis%E6%95%B0%E6%8D%AE%E5%BA%93-redisDb"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) Redis数据库-redisDb</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-dict"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) dict</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E5%93%88%E5%B8%8C%E8%A1%A8-dictht"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 哈希表-dictht</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-5-dictEntry"><span class="nav-number">3.5.</span> <span class="nav-text">(3.5) dictEntry</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-6-Redis%E5%AF%B9%E8%B1%A1%E7%B1%BB%E5%9E%8B-redisObject"><span class="nav-number">3.6.</span> <span class="nav-text">(3.6) Redis对象类型-redisObject</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-7-redis%E6%9F%A5%E6%89%BEkey%E6%96%B9%E6%B3%95"><span class="nav-number">3.7.</span> <span class="nav-text">(3.7) redis查找key方法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-7-1-%E6%95%B0%E6%8D%AE%E5%BA%93%E9%87%8C%E6%89%BE%E5%AF%B9%E5%BA%94%E7%9A%84%E5%AF%B9%E8%B1%A1"><span class="nav-number">3.7.1.</span> <span class="nav-text">(3.7.1) 数据库里找对应的对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-7-2-%E5%AD%97%E5%85%B8%E9%87%8C%E6%89%BE%E5%AF%B9%E5%BA%94%E7%9A%84%E8%8A%82%E7%82%B9"><span class="nav-number">3.7.2.</span> <span class="nav-text">(3.7.2) 字典里找对应的节点</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-redis%E6%95%B4%E4%BD%93%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">(1) redis整体存储结构</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis索引模型源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-redis%E6%9F%A5%E6%89%BEkey%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) redis查找key方法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-1-%E4%BB%8EredisDb%E7%9A%84dict%E6%9F%A5%E6%89%BEkey"><span class="nav-number">2.1.1.</span> <span class="nav-text">(2.1.1) 从redisDb的dict查找key</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-2-%E4%BB%8Edict%E6%9F%A5%E6%89%BEkey"><span class="nav-number">2.1.2.</span> <span class="nav-text">(2.1.2) 从dict查找key</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E7%94%A8%E5%88%B0%E7%9A%84%E7%BB%93%E6%9E%84%E4%BD%93"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) 用到的结构体</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-Redis%E6%9C%8D%E5%8A%A1%E7%AB%AF%E7%BB%93%E6%9E%84%E4%BD%93-redisServer"><span class="nav-number">2.2.1.</span> <span class="nav-text">(2.2.1) Redis服务端结构体-redisServer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-2-Redis%E6%95%B0%E6%8D%AE%E5%BA%93-redisDb"><span class="nav-number">2.2.2.</span> <span class="nav-text">(2.2.2) Redis数据库-redisDb</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-3-%E5%AD%97%E5%85%B8-dict"><span class="nav-number">2.2.3.</span> <span class="nav-text">(2.2.3) 字典-dict</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-4-%E5%93%88%E5%B8%8C%E8%A1%A8-dictht"><span class="nav-number">2.2.4.</span> <span class="nav-text">(2.2.4) 哈希表-dictht</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-5-dictEntry"><span class="nav-number">2.2.5.</span> <span class="nav-text">(2.2.5) dictEntry</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-6-Redis%E5%AF%B9%E8%B1%A1%E7%B1%BB%E5%9E%8B-redisObject"><span class="nav-number">2.3.</span> <span class="nav-text">(2.2.6) Redis对象类型-redisObject</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E7%B4%A2%E5%BC%95%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis索引模型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E5%93%88%E5%B8%8C%E5%87%BD%E6%95%B0"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 哈希函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E5%93%88%E5%B8%8C%E5%86%B2%E7%AA%81%E8%A7%A3%E5%86%B3"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 哈希冲突解决</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E5%93%88%E5%B8%8C%E8%A1%A8%E6%89%A9%E5%AE%B9-%E6%B8%90%E8%BF%9B%E5%BC%8Frehash"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 哈希表扩容-渐进式rehash</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">4.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
