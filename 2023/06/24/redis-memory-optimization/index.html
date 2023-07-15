@@ -27,9 +27,10 @@
 <meta property="og:site_name" content="天道酬勤">
 <meta property="og:description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时(2012年">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-division.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/index-model/redis-index-model.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-full.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object-object-encoding-mapping.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-struct.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-all.svg">
@@ -39,11 +40,11 @@
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/redis-object.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object-object-encoding-mapping.svg">
 <meta property="article:published_time" content="2023-06-24T00:54:14.000Z">
-<meta property="article:modified_time" content="2023-07-14T00:10:20.801Z">
+<meta property="article:modified_time" content="2023-07-15T15:02:07.784Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure.png">
+<meta name="twitter:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-main.png">
 
 <link rel="canonical" href="http://weikeqin.com/2023/06/24/redis-memory-optimization/">
 
@@ -82,6 +83,11 @@
   </script>
 
 
+  <script>
+    !function(e,t,n,g,i){e[i]=e[i]||function(){(e[i].q=e[i].q||[]).push(arguments)},n=t.createElement("script"),tag=t.getElementsByTagName("script")[0],n.async=1,n.src=('https:'==document.location.protocol?'https://':'http://')+g,tag.parentNode.insertBefore(n,tag)}(window,document,"script","assets.growingio.com/2.1/gio.js","gio");
+    gio('init', 'b1961366471d57d5', {});
+    gio('send');
+  </script>
 
 
   <noscript>
@@ -258,7 +264,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-07-14 08:10:20" itemprop="dateModified" datetime="2023-07-14T08:10:20+08:00">2023-07-14</time>
+                <time title="修改时间：2023-07-15 23:02:07" itemprop="dateModified" datetime="2023-07-15T23:02:07+08:00">2023-07-15</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -324,7 +330,7 @@
 
       
         <p>  我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。<br>  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用。</p>
-<p>  <img src="/img/database/redis/memory/redis-server-memory-structure.png" alt="Redis整体内存结构"></p>
+<p>  <img src="/img/database/redis/memory/redis-server-memory-structure-main.png" alt="Redis整体内存结构-主要"></p>
 <h1 id="1-2012年微博是怎么用缓存支撑千亿级数据存储的"><a href="#1-2012年微博是怎么用缓存支撑千亿级数据存储的" class="headerlink" title="(1) 2012年微博是怎么用缓存支撑千亿级数据存储的"></a>(1) 2012年微博是怎么用缓存支撑千亿级数据存储的</h1><p>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/08/30/weibo-counter-service-design-1/">[WeiDesign]微博计数器的设计(上)</a><br>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/09/09/weibo-counter-service-design-2/">[WeiDesign]微博计数器的设计(下)</a></p>
 <h2 id="1-1-背景"><a href="#1-1-背景" class="headerlink" title="(1.1) 背景"></a>(1.1) 背景</h2><p>当时(2012年)微博总数量<br>  千亿级而且每秒都在飞速增长中。<br>  每条微博都有一个64位的唯一id。</p>
 <p>访问量<br>  每秒百万级 还在稳步增长中。根据微博的id来访问。</p>
@@ -334,8 +340,9 @@
 <span id="more"></span>
 
 
-<h2 id="1-2-微博计数服务方案"><a href="#1-2-微博计数服务方案" class="headerlink" title="(1.2) 微博计数服务方案"></a>(1.2) 微博计数服务方案</h2><p>方案一 用MySQL 这里就直接过了，在业务早期数据量小的时候可以用， 想了解具体原因的可以看  <a href="./2022/02/20/counter-service-design/"></a><br>方案二 用缓存Redis  当时的Redis是<code>2.4.16</code>版本</p>
-<p>方案三 改Redis源码，优化内存占用</p>
+<h2 id="1-2-微博计数服务方案"><a href="#1-2-微博计数服务方案" class="headerlink" title="(1.2) 微博计数服务方案"></a>(1.2) 微博计数服务方案</h2><p>方案一 用MySQL 这里就直接过了，在业务早期数据量小的时候可以用， 想了解具体原因的可以看  <a href="./../../../../2022/02/20/counter-service-design/#3-1-%E4%BD%BF%E7%94%A8%E6%95%B0%E6%8D%AE%E5%BA%93%E5%81%9A%E8%AE%A1%E6%95%B0%E5%99%A8">计数器设计-数据库方案</a></p>
+<p>方案二 用缓存Redis  当时(2012年)的Redis是<code>2.4.16</code>版本</p>
+<p>方案三 优化Redis内存占用<br>  针对Redis内存利用率低的问题进行优化，改源码，牺牲扩展性，换取高内存利用率。</p>
 <br>
 <br>
 
@@ -609,11 +616,13 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 </tbody></table>
 <p>  <code>used_memory_rss</code> = <code>used_memory</code> + ``<br>  操作系统分配的内存 = Redis内存分配器分配的内存 + 其它</p>
 <p>  <code>used_memory</code> = <code>used_memory_startup</code> + <code>used_memory_dataset</code><br>  Redis内存分配器分配的内存大小 = Redis启动时内存大小 + 数据集大小</p>
+<p>  <img src="/img/database/redis/memory/redis-server-memory-structure-full.png" alt="Redis整体内存结构"></p>
 <br>
 
 <br>
 
 
+  
 
 
 <h1 id="4-Redis数据结构-data-structure-维度的内存优化"><a href="#4-Redis数据结构-data-structure-维度的内存优化" class="headerlink" title="(4) Redis数据结构(data-structure)维度的内存优化"></a>(4) Redis数据结构(data-structure)维度的内存优化</h1><p>术语</p>
@@ -1060,6 +1069,10 @@ address                                <span class="token operator">|</span>    
 
 <h2 id="7-4-其它"><a href="#7-4-其它" class="headerlink" title="(7.4) 其它"></a>(7.4) 其它</h2><p>  Redis删除数据不一定是是实时删除。</p>
 <p>  Redis在删除数据后并不是立马释放内存，需要重启Redis Server才能释放操作系统分配的内存。</p>
+<br>
+
+
+
 <h1 id="8-作为研发日常怎么优化内存"><a href="#8-作为研发日常怎么优化内存" class="headerlink" title="(8) 作为研发日常怎么优化内存"></a>(8) 作为研发日常怎么优化内存</h1><p>  作为研发，在不改Redis源码的情况下，在日常的开发中可以做到哪些优化？</p>
 <ol>
 <li>合理设置key的长度和类型</li>
@@ -1067,6 +1080,9 @@ address                                <span class="token operator">|</span>    
 <li>设计合理的业务模型</li>
 <li>根据Redis配置合理设置集合里的数据条数和大小</li>
 </ol>
+<br>
+
+
 <h2 id="8-1-合理设置key的长度和类型"><a href="#8-1-合理设置key的长度和类型" class="headerlink" title="(8.1) 合理设置key的长度和类型"></a>(8.1) 合理设置key的长度和类型</h2><ol>
 <li>从性能和内存角度考虑，使用数字类型(8字节)性能最高，而且省内存。 type=string encoding=int<br>  注意不要多个业务共用缓存，存在key冲突(一样)的情况</li>
 <li>如果无法使用数字类型，建议字符串长度不要超过44字节。</li>
