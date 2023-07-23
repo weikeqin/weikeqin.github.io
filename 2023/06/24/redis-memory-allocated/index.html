@@ -17,18 +17,18 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"right","display":"hide","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="(1) Redis内存分配器(2) 为什么要设置内存分配器(3) 内存分配的原理(4) 源码解读  由于redis要求满足跨平台性，而每个平台又会有自己的内存管理函数。  zmalloc.c和zmalloc.h主要功能就是对原有库里的内存分配函数进行封装，形成独立的一套内存管理函数。   根据系统的不同，使用不同的内存管理函数，例如jemalloc, tcmalloc, cmalloc。">
+  <meta name="description" content="像大家原来使用纸币，平时用的纸币只有 1元 5元 10元 20元 50元 100元，为什么没有 1.5元 3元 ？  因为有了 3元 人们使用不方便，也不方便管理。 (1) Redis内存分配器  Redis在内存使用时也是类似纸币，为了方便管理，Redis在分配内存时按照设计的大小分配。 (1.1) 为什么要设置内存分配器  举个简单的例子，你找妈妈要零花钱，你想要1.5元，但是她没有1.5">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis内存分配">
 <meta property="og:url" content="http://weikeqin.com/2023/06/24/redis-memory-allocated/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="(1) Redis内存分配器(2) 为什么要设置内存分配器(3) 内存分配的原理(4) 源码解读  由于redis要求满足跨平台性，而每个平台又会有自己的内存管理函数。  zmalloc.c和zmalloc.h主要功能就是对原有库里的内存分配函数进行封装，形成独立的一套内存管理函数。   根据系统的不同，使用不同的内存管理函数，例如jemalloc, tcmalloc, cmalloc。">
+<meta property="og:description" content="像大家原来使用纸币，平时用的纸币只有 1元 5元 10元 20元 50元 100元，为什么没有 1.5元 3元 ？  因为有了 3元 人们使用不方便，也不方便管理。 (1) Redis内存分配器  Redis在内存使用时也是类似纸币，为了方便管理，Redis在分配内存时按照设计的大小分配。 (1.1) 为什么要设置内存分配器  举个简单的例子，你找妈妈要零花钱，你想要1.5元，但是她没有1.5">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2023-06-23T22:54:51.000Z">
-<meta property="article:modified_time" content="2023-06-24T15:25:13.997Z">
+<meta property="article:modified_time" content="2023-07-23T15:23:11.340Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
@@ -123,7 +123,7 @@
       <h1 class="site-title">天道酬勤</h1>
       <span class="logo-line-after"><i></i></span>
     </a>
-      <p class="site-subtitle" itemprop="description">天下事有难易乎？为之，则难者亦易矣；不为，则易者亦难矣。</p>
+      <p class="site-subtitle" itemprop="description">让好事发生</p>
   </div>
 
   <div class="site-nav-right">
@@ -243,10 +243,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2023-06-24 06:54:51 / 修改时间：23:25:13" itemprop="dateCreated datePublished" datetime="2023-06-24T06:54:51+08:00">2023-06-24</time>
+              <time title="创建时间：2023-06-24 06:54:51" itemprop="dateCreated datePublished" datetime="2023-06-24T06:54:51+08:00">2023-06-24</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2023-07-23 23:23:11" itemprop="dateModified" datetime="2023-07-23T23:23:11+08:00">2023-07-23</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -291,14 +297,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.2k</span>
+              <span>7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>6 分钟</span>
             </span>
 
         </div>
@@ -310,11 +316,20 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <h1 id="1-Redis内存分配器"><a href="#1-Redis内存分配器" class="headerlink" title="(1) Redis内存分配器"></a>(1) Redis内存分配器</h1><h1 id="2-为什么要设置内存分配器"><a href="#2-为什么要设置内存分配器" class="headerlink" title="(2) 为什么要设置内存分配器"></a>(2) 为什么要设置内存分配器</h1><h1 id="3-内存分配的原理"><a href="#3-内存分配的原理" class="headerlink" title="(3) 内存分配的原理"></a>(3) 内存分配的原理</h1><h1 id="4-源码解读"><a href="#4-源码解读" class="headerlink" title="(4) 源码解读"></a>(4) 源码解读</h1><p>  由于redis要求满足跨平台性，而每个平台又会有自己的内存管理函数。<br>  <code>zmalloc.c</code>和<code>zmalloc.h</code>主要功能就是对原有库里的内存分配函数进行封装，形成独立的一套内存管理函数。</p>
+        <p>  像大家原来使用纸币，平时用的纸币只有 1元 5元 10元 20元 50元 100元，为什么没有 1.5元 3元 ？<br>  因为有了 3元 人们使用不方便，也不方便管理。</p>
+<h1 id="1-Redis内存分配器"><a href="#1-Redis内存分配器" class="headerlink" title="(1) Redis内存分配器"></a>(1) Redis内存分配器</h1><p>  Redis在内存使用时也是类似纸币，为了方便管理，Redis在分配内存时按照设计的大小分配。</p>
+<h2 id="1-1-为什么要设置内存分配器"><a href="#1-1-为什么要设置内存分配器" class="headerlink" title="(1.1) 为什么要设置内存分配器"></a>(1.1) 为什么要设置内存分配器</h2><p>  举个简单的例子，你找妈妈要零花钱，你想要1.5元，但是她没有1.5元，给了个你5元。</p>
+<p>  Redis在分配内存时也有类似的情况。</p>
+<h2 id="1-2-内存分配器配置"><a href="#1-2-内存分配器配置" class="headerlink" title="(1.2) 内存分配器配置"></a>(1.2) 内存分配器配置</h2><p>  <code>Linux</code>上默认内存分配器是<code>jemalloc</code></p>
+<p>  Mac OS 系统Redis默认内存分配器是<code>libc</code>，可以通过 <code>info memory</code> 结果里的 <code>mem_allocator</code>指标 查看；<br>  如果需要使用 jemalloc 内存分配器，在执行<code>make</code>命令时通过 <code>MALLOC=jemalloc</code> 指定  </p>
+<br>
+
+
+<h1 id="2-内存分配的原理"><a href="#2-内存分配的原理" class="headerlink" title="(2) 内存分配的原理"></a>(2) 内存分配的原理</h1><h1 id="3-源码解读"><a href="#3-源码解读" class="headerlink" title="(3) 源码解读"></a>(3) 源码解读</h1><p>  由于redis要求满足跨平台性，而每个平台又会有自己的内存管理函数。<br>  <code>zmalloc.c</code>和<code>zmalloc.h</code>主要功能就是对原有库里的内存分配函数进行封装，形成独立的一套内存管理函数。</p>
 <p>  根据系统的不同，使用不同的内存管理函数，例如<code>jemalloc</code>, <code>tcmalloc</code>, <code>cmalloc</code>。</p>
 <span id="more"></span>
 
-<h2 id="4-1-zmalloc-h"><a href="#4-1-zmalloc-h" class="headerlink" title="(4.1) zmalloc.h"></a>(4.1) zmalloc.h</h2><p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/zmalloc.h">https://github.com/redis/redis/blob/6.0/src/zmalloc.h</a> </p>
+<h2 id="3-1-zmalloc-h"><a href="#3-1-zmalloc-h" class="headerlink" title="(3.1) zmalloc.h"></a>(3.1) zmalloc.h</h2><p>  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/zmalloc.h">https://github.com/redis/redis/blob/6.0/src/zmalloc.h</a> </p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// tcmalloc</span>
 <span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">if</span> <span class="token expression"><span class="token function">defined</span><span class="token punctuation">(</span>USE_TCMALLOC<span class="token punctuation">)</span></span></span>
 <span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">ZMALLOC_LIB</span> <span class="token expression"><span class="token punctuation">(</span></span><span class="token string">"tcmalloc-"</span> <span class="token expression"><span class="token function">__xstr</span><span class="token punctuation">(</span>TC_VERSION_MAJOR<span class="token punctuation">)</span> </span><span class="token string">"."</span> <span class="token expression"><span class="token function">__xstr</span><span class="token punctuation">(</span>TC_VERSION_MINOR<span class="token punctuation">)</span><span class="token punctuation">)</span></span></span>
@@ -455,7 +470,111 @@
 <span class="token class-name">pthread_mutex_t</span> used_memory_mutex <span class="token operator">=</span> PTHREAD_MUTEX_INITIALIZER<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>  redis用一个静态原子变量used_memory来记录已使用的内存大小。</p>
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.cn/post/7068233325227278372">redis源码阅读——内存分配完全解析</a><br>[2] <a target="_blank" rel="noopener" href="https://developer.aliyun.com/article/803713">关于redis源码的内存分配,jemalloc,tcmalloc,libc</a></p>
+<br>
+
+
+<h1 id="4-主动碎片整理"><a href="#4-主动碎片整理" class="headerlink" title="(4) 主动碎片整理"></a>(4) 主动碎片整理</h1><pre class="line-numbers language-conf" data-language="conf"><code class="language-conf">########################### ACTIVE DEFRAGMENTATION #######################
+#
+# What is active defragmentation?
+# -------------------------------
+#
+# Active (online) defragmentation allows a Redis server to compact the
+# spaces left between small allocations and deallocations of data in memory,
+# thus allowing to reclaim back memory.
+#
+# Fragmentation is a natural process that happens with every allocator (but
+# less so with Jemalloc, fortunately) and certain workloads. Normally a server
+# restart is needed in order to lower the fragmentation, or at least to flush
+# away all the data and create it again. However thanks to this feature
+# implemented by Oran Agra for Redis 4.0 this process can happen at runtime
+# in a &quot;hot&quot; way, while the server is running.
+#
+# Basically when the fragmentation is over a certain level (see the
+# configuration options below) Redis will start to create new copies of the
+# values in contiguous memory regions by exploiting certain specific Jemalloc
+# features (in order to understand if an allocation is causing fragmentation
+# and to allocate it in a better place), and at the same time, will release the
+# old copies of the data. This process, repeated incrementally for all the keys
+# will cause the fragmentation to drop back to normal values.
+#
+# Important things to understand:
+#
+# 1. This feature is disabled by default, and only works if you compiled Redis
+#    to use the copy of Jemalloc we ship with the source code of Redis.
+#    This is the default with Linux builds.
+#
+# 2. You never need to enable this feature if you don&#39;t have fragmentation
+#    issues.
+#
+# 3. Once you experience fragmentation, you can enable this feature when
+#    needed with the command &quot;CONFIG SET activedefrag yes&quot;.
+#
+# The configuration parameters are able to fine tune the behavior of the
+# defragmentation process. If you are not sure about what they mean it is
+# a good idea to leave the defaults untouched.
+
+# Active defragmentation is disabled by default
+# activedefrag no
+
+# Minimum amount of fragmentation waste to start active defrag
+# active-defrag-ignore-bytes 100mb
+
+# Minimum percentage of fragmentation to start active defrag
+# active-defrag-threshold-lower 10
+
+# Maximum percentage of fragmentation at which we use maximum effort
+# active-defrag-threshold-upper 100
+
+# Minimal effort for defrag in CPU percentage, to be used when the lower
+# threshold is reached
+# active-defrag-cycle-min 1
+
+# Maximal effort for defrag in CPU percentage, to be used when the upper
+# threshold is reached
+# active-defrag-cycle-max 25
+
+# Maximum number of set&#x2F;hash&#x2F;zset&#x2F;list fields that will be processed from
+# the main dictionary scan
+# active-defrag-max-scan-fields 1000
+
+# Jemalloc background thread for purging will be enabled by default
+jemalloc-bg-thread yes
+
+# It is possible to pin different threads and processes of Redis to specific
+# CPUs in your system, in order to maximize the performances of the server.
+# This is useful both in order to pin different Redis threads in different
+# CPUs, but also in order to make sure that multiple Redis instances running
+# in the same host will be pinned to different CPUs.
+#
+# Normally you can do this using the &quot;taskset&quot; command, however it is also
+# possible to this via Redis configuration directly, both in Linux and FreeBSD.
+#
+# You can pin the server&#x2F;IO threads, bio threads, aof rewrite child process, and
+# the bgsave child process. The syntax to specify the cpu list is the same as
+# the taskset command:
+#
+# Set redis server&#x2F;io threads to cpu affinity 0,2,4,6:
+# server_cpulist 0-7:2
+#
+# Set bio threads to cpu affinity 1,3:
+# bio_cpulist 1,3
+#
+# Set aof rewrite child process to cpu affinity 8,9,10,11:
+# aof_rewrite_cpulist 8-11
+#
+# Set bgsave child process to cpu affinity 1,10,11
+# bgsave_cpulist 1,10-11
+
+# In some cases redis will emit warnings and even refuse to start if it detects
+# that the system is in bad state, it is possible to suppress these warnings
+# by setting the following config which takes a space delimited list of warnings
+# to suppress
+#
+# ignore-warnings ARM64-COW-BUG<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://juejin.cn/post/7068233325227278372">redis源码阅读——内存分配完全解析</a><br>[2] <a target="_blank" rel="noopener" href="https://developer.aliyun.com/article/803713">关于redis源码的内存分配,jemalloc,tcmalloc,libc</a><br>[3] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/redis.conf#L1780">redis.conf</a></p>
 
     </div>
 
@@ -478,8 +597,8 @@
       <i class="fa fa-chevron-left"></i> Redis AOF 重写
     </a></div>
       <div class="post-nav-item">
-    <a href="/2023/06/24/redis-memory-optimization/" rel="next" title="Redis内存优化">
-      Redis内存优化 <i class="fa fa-chevron-right"></i>
+    <a href="/2023/06/24/redis-memory-optimization/" rel="next" title="Redis内存优化-怎么用缓存支持千亿级数据">
+      Redis内存优化-怎么用缓存支持千亿级数据 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -540,7 +659,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis内存分配器</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E8%AE%BE%E7%BD%AE%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要设置内存分配器</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) 内存分配的原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">4.</span> <span class="nav-text">(4) 源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-zmalloc-h"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) zmalloc.h</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-zmalloc-c"><span class="nav-number">4.2.</span> <span class="nav-text">(4.2) zmalloc.c</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-Redis%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8"><span class="nav-number">1.</span> <span class="nav-text">(1) Redis内存分配器</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E8%AE%BE%E7%BD%AE%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 为什么要设置内存分配器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8%E9%85%8D%E7%BD%AE"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) 内存分配器配置</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">(2) 内存分配的原理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">3.</span> <span class="nav-text">(3) 源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-zmalloc-h"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) zmalloc.h</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-zmalloc-c"><span class="nav-number">3.2.</span> <span class="nav-text">(4.2) zmalloc.c</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%B8%BB%E5%8A%A8%E7%A2%8E%E7%89%87%E6%95%B4%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">(4) 主动碎片整理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">5.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -578,15 +697,6 @@
       </span>
       <span class="links-of-author-item">
         <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
-      </span>
-      <span class="links-of-author-item">
-        <a href="https://plus.google.com/u/0/107737814703120725006" title="Google → https:&#x2F;&#x2F;plus.google.com&#x2F;u&#x2F;0&#x2F;107737814703120725006" rel="noopener" target="_blank"><i class="fab fa-google fa-fw"></i>Google</a>
-      </span>
-      <span class="links-of-author-item">
-        <a href="https://twitter.com/wkq278276130" title="Twitter → https:&#x2F;&#x2F;twitter.com&#x2F;wkq278276130" rel="noopener" target="_blank"><i class="fab fa-twitter fa-fw"></i>Twitter</a>
-      </span>
-      <span class="links-of-author-item">
-        <a href="https://www.facebook.com/keqin.wei.5" title="FB Page → https:&#x2F;&#x2F;www.facebook.com&#x2F;keqin.wei.5" rel="noopener" target="_blank"><i class="fab fa-facebook fa-fw"></i>FB Page</a>
       </span>
       <span class="links-of-author-item">
         <a href="https://stackoverflow.com/users/8054088/wkq" title="StackOverflow → https:&#x2F;&#x2F;stackoverflow.com&#x2F;users&#x2F;8054088&#x2F;wkq" rel="noopener" target="_blank"><i class="fab fa-stack-overflow fa-fw"></i>StackOverflow</a>
