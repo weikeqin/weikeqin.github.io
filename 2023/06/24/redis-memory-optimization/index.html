@@ -41,7 +41,7 @@
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure-v2.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/hashtable/hashtable.svg">
 <meta property="article:published_time" content="2023-06-24T00:54:14.000Z">
-<meta property="article:modified_time" content="2023-08-06T15:36:50.108Z">
+<meta property="article:modified_time" content="2023-08-06T15:54:21.247Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
@@ -259,7 +259,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-08-06 23:36:50" itemprop="dateModified" datetime="2023-08-06T23:36:50+08:00">2023-08-06</time>
+                <time title="修改时间：2023-08-06 23:54:21" itemprop="dateModified" datetime="2023-08-06T23:54:21+08:00">2023-08-06</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -771,13 +771,27 @@ robj <span class="token operator">*</span><span class="token function">createStr
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<p>  创建字符串</p>
-<pre class="line-numbers language-c" data-language="c"><code class="language-c">```
+<p>  创建emb_str字符串</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Create a string object with EMBSTR encoding if it is smaller than
+ * OBJ_ENCODING_EMBSTR_SIZE_LIMIT, otherwise the RAW encoding is
+ * used.
+ *
+ * The current limit of 44 is chosen so that the biggest string object
+ * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">OBJ_ENCODING_EMBSTR_SIZE_LIMIT</span> <span class="token expression"><span class="token number">44</span></span></span>
+robj <span class="token operator">*</span><span class="token function">createStringObject</span><span class="token punctuation">(</span><span class="token keyword">const</span> <span class="token keyword">char</span> <span class="token operator">*</span>ptr<span class="token punctuation">,</span> <span class="token class-name">size_t</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>len <span class="token operator">&lt;=</span> OBJ_ENCODING_EMBSTR_SIZE_LIMIT<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token function">createEmbeddedStringObject</span><span class="token punctuation">(</span>ptr<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span>
+        <span class="token keyword">return</span> <span class="token function">createRawStringObject</span><span class="token punctuation">(</span>ptr<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-  创建 
-
-```c
-<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>  创建raw</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Create a string object with encoding OBJ_ENCODING_RAW, that is a plain
+ * string object where o->ptr points to a proper sds string. */</span>
+robj <span class="token operator">*</span><span class="token function">createRawStringObject</span><span class="token punctuation">(</span><span class="token keyword">const</span> <span class="token keyword">char</span> <span class="token operator">*</span>ptr<span class="token punctuation">,</span> <span class="token class-name">size_t</span> len<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">createObject</span><span class="token punctuation">(</span>OBJ_STRING<span class="token punctuation">,</span> <span class="token function">sdsnewlen</span><span class="token punctuation">(</span>ptr<span class="token punctuation">,</span>len<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <h4 id="3-1-2-2-list对象不同编码"><a href="#3-1-2-2-list对象不同编码" class="headerlink" title="3.1.2.2 list对象不同编码"></a>3.1.2.2 list对象不同编码</h4><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
  * 创建快速列表对象
@@ -1043,13 +1057,13 @@ address                                <span class="token operator">|</span>    
   <div class="popular-posts-header">相关文章</div>
   <ul class="popular-posts">
     <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2022/01/16/redis-aof/" rel="bookmark">Redis AOF</a></div>
-    </li>
-    <li class="popular-posts-item">
       <div class="popular-posts-title"><a href="/2023/04/16/redis-aof-rewrite/" rel="bookmark">Redis AOF 重写</a></div>
     </li>
     <li class="popular-posts-item">
       <div class="popular-posts-title"><a href="/2022/02/26/redis-command-execution-process/" rel="bookmark">Redis命令执行流程</a></div>
+    </li>
+    <li class="popular-posts-item">
+      <div class="popular-posts-title"><a href="/2022/01/16/redis-aof/" rel="bookmark">Redis AOF</a></div>
     </li>
     <li class="popular-posts-item">
       <div class="popular-posts-title"><a href="/2020/05/24/redis-commands/" rel="bookmark">Redis命令</a></div>
