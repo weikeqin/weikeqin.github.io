@@ -20,18 +20,22 @@
     var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":true,"width":240},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时(">
+  <meta name="description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。   在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis内存优化-怎么用缓存支持千亿级数据">
 <meta property="og:url" content="http://weikeqin.com/2023/06/24/redis-memory-optimization/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时(">
+<meta property="og:description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。   在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/weibo-redis-2.4-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-info-memory.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-full.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-command-with-variables.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-generic-command.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-generic-command-generic-set-key.png">
+<meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-key-expire.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/redis-object.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/redis-data-structure-data-object.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/redis-data-structure-data-object.png">
@@ -41,7 +45,7 @@
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure-v2.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/hashtable/hashtable.svg">
 <meta property="article:published_time" content="2023-06-24T00:54:14.000Z">
-<meta property="article:modified_time" content="2023-08-06T15:54:21.247Z">
+<meta property="article:modified_time" content="2023-08-07T01:26:05.903Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
@@ -259,7 +263,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-08-06 23:54:21" itemprop="dateModified" datetime="2023-08-06T23:54:21+08:00">2023-08-06</time>
+                <time title="修改时间：2023-08-07 09:26:05" itemprop="dateModified" datetime="2023-08-07T09:26:05+08:00">2023-08-07</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -305,14 +309,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>12k</span>
+              <span>15k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
+              <span>13 分钟</span>
             </span>
 
         </div>
@@ -324,7 +328,8 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>  我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。<br>  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。</p>
+        <p>  我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。</p>
+<p>  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。</p>
 <p>  <img data-src="/img/database/redis/memory/redis-server-memory-structure-main.png" alt="Redis整体内存结构-主要"></p>
 <h1 id="1-2012年微博是怎么用缓存支撑千亿级数据存储的"><a href="#1-2012年微博是怎么用缓存支撑千亿级数据存储的" class="headerlink" title="(1) 2012年微博是怎么用缓存支撑千亿级数据存储的"></a>(1) 2012年微博是怎么用缓存支撑千亿级数据存储的</h1><p>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/08/30/weibo-counter-service-design-1/">[WeiDesign]微博计数器的设计(上)</a><br>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/09/09/weibo-counter-service-design-2/">[WeiDesign]微博计数器的设计(下)</a></p>
 <h2 id="1-1-背景"><a href="#1-1-背景" class="headerlink" title="(1.1) 背景"></a>(1.1) 背景</h2><p>当时(2012年)微博总数量<br>  千亿级而且每秒都在飞速增长中。<br>  每条微博都有一个64位的唯一id。</p>
@@ -350,13 +355,15 @@
 <br>
 
 
-<h1 id="2-从不同角度看Redis-Server内存使用"><a href="#2-从不同角度看Redis-Server内存使用" class="headerlink" title="(2) 从不同角度看Redis-Server内存使用"></a>(2) 从不同角度看Redis-Server内存使用</h1><ol>
+<h1 id="2-Redis-Server内存使用概览"><a href="#2-Redis-Server内存使用概览" class="headerlink" title="(2) Redis-Server内存使用概览"></a>(2) Redis-Server内存使用概览</h1><ol>
 <li>从源码和统计信息看Redis内存大概使用情况。</li>
 <li>从结果看Redis内存详细使用情况。</li>
 <li>从数据结构维度看存储的数据以及元数据消耗多少内存。</li>
 </ol>
 <h2 id="2-1-从源码和统计信息看Redis内存大概使用情况"><a href="#2-1-从源码和统计信息看Redis内存大概使用情况" class="headerlink" title="(2.1) 从源码和统计信息看Redis内存大概使用情况"></a>(2.1) 从源码和统计信息看Redis内存大概使用情况</h2><p>  结合 Redis 源码 和 <code>info memory</code> 结果，Redis内存大概使用情况如下</p>
 <p>  <img data-src="/img/database/redis/memory/redis-server-info-memory.png" alt="Redis Server info memory"></p>
+<p>  <code>used_memory_rss</code> = <code>used_memory</code> + <code>其它</code><br>  操作系统分配的内存 = Redis内存分配器分配的内存 + <code>其它</code></p>
+<p>  <code>used_memory</code> = <code>used_memory_overhead</code> + <code>used_memory_dataset</code><br>  Redis内存分配器分配的内存大小 = 服务器分配用于管理其内部数据结构的所有开销的总和 + 数据集大小</p>
 <p>  详细分析见 <a href="./../../../../2023/08/06/redis-info/">Redis info</a></p>
 <br>
 
@@ -699,7 +706,7 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <td align="left">0</td>
 </tr>
 </tbody></table>
-<p>  <code>used_memory_rss</code> = <code>used_memory</code> + ``<br>  操作系统分配的内存 = Redis内存分配器分配的内存 + 内存碎片</p>
+<p>  <code>used_memory_rss</code> = <code>used_memory</code> + <code>其它</code><br>  操作系统分配的内存 = Redis内存分配器分配的内存 + <code>其它</code></p>
 <p>  <code>used_memory</code> = <code>used_memory_overhead</code> + <code>used_memory_dataset</code><br>  Redis内存分配器分配的内存大小 = 服务器分配用于管理其内部数据结构的所有开销的总和 + 数据集大小</p>
 <br>
 <br>
@@ -707,6 +714,38 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 
 <h2 id="2-2-从数据结构维度看Redis内存使用"><a href="#2-2-从数据结构维度看Redis内存使用" class="headerlink" title="(2.2) 从数据结构维度看Redis内存使用"></a>(2.2) 从数据结构维度看Redis内存使用</h2><p>  根据 Redis 6.0 源码整理出的，按照结构体维度的整体内存占用情况</p>
 <p>  <img data-src="/img/database/redis/memory/redis-server-memory-structure-full.png" alt="Redis整体内存结构"></p>
+<p>  从上图可以看出，Redis为了扩展性，存储缓存数据的结构体元数据其实很大。</p>
+<h3 id="2-2-1-小试牛刀"><a href="#2-2-1-小试牛刀" class="headerlink" title="(2.2.1) 小试牛刀"></a>(2.2.1) 小试牛刀</h3><p>  如果要存简单的 用户评论数，用string类型，会耗费多少内存？</p>
+<p>  如果使用 <code>set key val</code>，key Long类型 8字节，val Int类型 4字节，有效业务数据12字节，但是Redis会耗费77字节</p>
+<ol>
+<li>指向dictEntry的指针，需要8个字节</li>
+<li>dictEntry 24字节</li>
+<li>存储key的sdshdr 29字节 (sdshdr64占用9字节 + 字符长度19字节 + 结束字符1字节)</li>
+<li>存储val的16字节 (RedisObject 16字节 + Redis存储ebmstr内存优化，把redisObject的指针ptr直接存储int类型，节省了一个指针的开销)</li>
+</ol>
+  <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-command-with-variables.png" width=50% />
+  
+  <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-generic-command.png" width=50% /> 
+
+<p>  <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-generic-command-generic-set-key.png" width=50% /> <br></p>
+<p>  有效业务数据 12字节<br>  Redis内存开销 77字节<br>  单条数据内存利用率 12字节 / 77字节 ≈ 0.1558</p>
+<br>
+
+<p>  如果使用 <code> set key val ex 86400000</code>，内存开销会更大</p>
+<p>  如果考虑上缓存过期，还会在 <code>expires dict</code> 创建一个 key，消耗内存69字节<br>  过期key的内存开销</p>
+<ol>
+<li>指向dictEntry的指针，需要8个字节。</li>
+<li>dictEntry 24字节。</li>
+<li>存储key的sdshdr 29字节 (sdshdr64占用9字节 + 字符长度19字节 + 结束字符1字节)。</li>
+<li>存储过期时间的8字节。</li>
+</ol>
+<p>  <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-key-expire.png" width=50% /> <br></p>
+<p>  有效业务数据 12字节<br>  Redis内存开销 77字节 + 69字节 = 146字节<br>  单条数据内存利用率 12字节 / 146字节 ≈ 0.0821</p>
+<br>
+
+<p>  如果再考虑上 内存分配器jemalloc 内存分配和内存碎片的开销，数据利用率会更小。</p>
+<p>  也就是说从业务角度看，我其实想存12字节数据，但是却耗费146字节内存，绝大部分内存是浪费的。真是大冤种。</p>
+<p>  如果有上亿个评论数据要存储，其实浪费的内存挺多的。</p>
 <br>
 
 <br>
@@ -728,7 +767,7 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <tbody><tr>
 <td align="left">Redis对象</td>
 <td align="left">Redis里的data-type、数据类型，常用的有 string、list、hash、set、sorted-set等</td>
-<td align="left">见源码 和 redis官网</td>
+<td align="left">见源码 和 redis官网 <a target="_blank" rel="noopener" href="https://redis.io/docs/data-types/">https://redis.io/docs/data-types/</a></td>
 </tr>
 <tr>
 <td align="left">Redis对象编码</td>
@@ -1014,39 +1053,58 @@ address                                <span class="token operator">|</span>    
 
 <h2 id="3-3-内存分配器维度的优化"><a href="#3-3-内存分配器维度的优化" class="headerlink" title="(3.3) 内存分配器维度的优化"></a>(3.3) 内存分配器维度的优化</h2><p>  内存分配器的目的主要是为了方便管理内存<br>  redis内存分配器有 <code>jemalloc</code>、 <code>tcmalloc</code>、 <code>libc</code></p>
 <p>  mem_fragmentation_ratio = used_memory_rss / used_memory<br>  内存碎片率 = Redis进程占据操作系统的内存 / Redis分配器分配的内存总量</p>
-<p>  <a target="_blank" rel="noopener" href="https://developer.aliyun.com/article/803713">关于redis源码的内存分配,jemalloc,tcmalloc,libc</a></p>
-<h1 id="4-作为研发可以做的Redis内存优化"><a href="#4-作为研发可以做的Redis内存优化" class="headerlink" title="(4) 作为研发可以做的Redis内存优化"></a>(4) 作为研发可以做的Redis内存优化</h1><p>  作为研发，在不改Redis源码的情况下，在日常的开发中可以做到哪些优化？</p>
-<p>  TODO </p>
+<br>
+
+
+<h1 id="4-实验"><a href="#4-实验" class="headerlink" title="(4) 实验"></a>(4) 实验</h1><h2 id="4-1-key是否过期内存占用对比"><a href="#4-1-key是否过期内存占用对比" class="headerlink" title="(4.1) key是否过期内存占用对比"></a>(4.1) key是否过期内存占用对比</h2><p>  todo</p>
+<h2 id="4-2-不同长度key内存占用对比"><a href="#4-2-不同长度key内存占用对比" class="headerlink" title="(4.2) 不同长度key内存占用对比"></a>(4.2) 不同长度key内存占用对比</h2><h2 id="4-3-同一数据对象不同数据编码-encoding-内存占用对比"><a href="#4-3-同一数据对象不同数据编码-encoding-内存占用对比" class="headerlink" title="(4.3) 同一数据对象不同数据编码(encoding)内存占用对比"></a>(4.3) 同一数据对象不同数据编码(encoding)内存占用对比</h2><p>  todo </p>
+<h2 id="4-4-不同内存分配器内存占用对比"><a href="#4-4-不同内存分配器内存占用对比" class="headerlink" title="(4.4) 不同内存分配器内存占用对比"></a>(4.4) 不同内存分配器内存占用对比</h2><p>  todo</p>
+<h2 id="4-5-存在大key内存占用对比"><a href="#4-5-存在大key内存占用对比" class="headerlink" title="(4.5) 存在大key内存占用对比"></a>(4.5) 存在大key内存占用对比</h2><p>  todo</p>
+<h2 id="4-6-主从复制内存占用对比"><a href="#4-6-主从复制内存占用对比" class="headerlink" title="(4.6) 主从复制内存占用对比"></a>(4.6) 主从复制内存占用对比</h2><p>  todo</p>
+<h2 id="4-7-客户端连接数内存占用对比"><a href="#4-7-客户端连接数内存占用对比" class="headerlink" title="(4.7) 客户端连接数内存占用对比"></a>(4.7) 客户端连接数内存占用对比</h2><p>  todo</p>
+<h2 id="4-8-有AOF和AOF重写内存占用对比"><a href="#4-8-有AOF和AOF重写内存占用对比" class="headerlink" title="(4.8) 有AOF和AOF重写内存占用对比"></a>(4.8) 有AOF和AOF重写内存占用对比</h2><p>  todo</p>
+<h2 id="4-9-lua内存占用对比"><a href="#4-9-lua内存占用对比" class="headerlink" title="(4.9) lua内存占用对比"></a>(4.9) lua内存占用对比</h2><p>  todo</p>
+<br>
+
+
+<h2 id="4-10-其它"><a href="#4-10-其它" class="headerlink" title="(4.10) 其它"></a>(4.10) 其它</h2><p>  Redis删除数据不一定是是实时删除。</p>
+<p>  Redis在删除数据后并不是立马释放内存，需要重启 Redis Server 才能释放操作系统分配的内存。</p>
+<br>
+
+
+<h1 id="5-作为研发可以做的Redis内存优化"><a href="#5-作为研发可以做的Redis内存优化" class="headerlink" title="(5) 作为研发可以做的Redis内存优化"></a>(5) 作为研发可以做的Redis内存优化</h1><p>  作为研发，在不改Redis源码的情况下，在日常的开发中可以做到哪些优化？</p>
 <ol>
-<li>合理设置key的长度和类型</li>
-<li>设置合理过期时间</li>
+<li>选择合适的数据类型(string、list、hash、set、zset)</li>
+<li>根据业务场景和数据量合理选择key是否过期；<br>甲. key不带过期时间可以减小内存占用。<br>乙. 如果key数量上千万，可以考虑MQ+key不过期方案，通过MQ定时删过期数据。</li>
+<li>合理设置key的长度。<br>甲. 如果key有过期时间，key会用在keyspace的dict里，也会用在expire的dict里，如果key长度比较长，会比较消耗内存。<br>乙. 如果key数量较多，内存消耗比比较大。</li>
+<li>并发场景，val的长度尽量别超过1KB，尽量小。</li>
 <li>设计合理的业务模型</li>
 <li>根据Redis配置合理设置集合里的数据条数和大小</li>
 </ol>
 <p>  TODO </p>
 <br>
 
-
-<h2 id="8-1-合理设置key的长度和类型"><a href="#8-1-合理设置key的长度和类型" class="headerlink" title="(8.1) 合理设置key的长度和类型"></a>(8.1) 合理设置key的长度和类型</h2><ol>
+<h2 id="8-1-选择合适的数据类型-string、list、hash、set、zset"><a href="#8-1-选择合适的数据类型-string、list、hash、set、zset" class="headerlink" title="(8.1) 选择合适的数据类型(string、list、hash、set、zset)"></a>(8.1) 选择合适的数据类型(string、list、hash、set、zset)</h2><p>  比如统计每日活跃用户数、app弹窗频率限制、用户是否绑定银行卡等场景，可以不适用 <code>set key val</code></p>
+<h3 id="8-1-1-统计每日活跃用户数"><a href="#8-1-1-统计每日活跃用户数" class="headerlink" title="(8.1.1) 统计每日活跃用户数"></a>(8.1.1) 统计每日活跃用户数</h3><p>  统计每日活跃用户数，可以使用set，通过 <code>SADD key val</code>添加当日活跃用户，通过<code>SCARD key</code>获取当日活跃用户总数；<br>  但是set是比较耗费内存的，可以考虑使用 bitmap、HyperLogLog 来节省内存。</p>
+<p>  假设有一亿用户，set耗费的内存大概是x (todo)。</p>
+<p>  如果把上亿用户减去同一个基数后，区间在 <code>1 ~　2^31 - 1</code>，使用bitemap，最多消耗512M内存。</p>
+<p>  如果使用 HyperLogLog 来统计大概得活跃用户数据，只消耗12KB内存，误差率大概是0.81% 。  详细介绍可以看 <a target="_blank" rel="noopener" href="https://redis.io/docs/data-types/probabilistic/hyperloglogs/">https://redis.io/docs/data-types/probabilistic/hyperloglogs/</a> </p>
+<h3 id="8-1-2-app弹窗频率限制"><a href="#8-1-2-app弹窗频率限制" class="headerlink" title="(8.1.2) app弹窗频率限制"></a>(8.1.2) app弹窗频率限制</h3><p>  app弹窗</p>
+<h3 id="8-1-3-用户是否绑定银行卡"><a href="#8-1-3-用户是否绑定银行卡" class="headerlink" title="(8.1.3) 用户是否绑定银行卡"></a>(8.1.3) 用户是否绑定银行卡</h3><p>  用户是否绑定银行卡</p>
+<ol>
+<li>可以用 string类型， 通过 <code>set key val</code> 添加数据，通过 <code>get key</code> 来判断用户是否绑卡。</li>
+<li>可以用 set类型，通过 <code>SADD key val</code> 添加数据，通过 <code>SISMEMBER key member</code> 来判断用户是否绑卡。</li>
+<li>也可以用 bitmap，把用户ID减去共同的计数使其在 <code>1 ~　2^31 - 1</code> 这个区间，通过 <code>SETBIT key offset 1</code> 添加数据，通过 <code>GETBIT key offset</code> 来判断用户是否绑卡。</li>
+<li>也可以用 bloomfilter，通过 <code>BF.ADD key item</code> 添加数据，通过<code>BF.EXISTS key item</code> 来判断用户是否绑卡。</li>
+</ol>
+<p>  但是上面4种方法消耗的内存差距很大<br>  假设有1亿用户，<br>  用string类型，大概消耗 xx 内存<br>  用 set 类型，大概消耗 xx 内存<br>  用 bitmap，大概消耗 xx 内存<br>  用 bloomfilter，误差率设置为 0.00001(万分之一) 大概消耗 20KB 内存。</p>
+<h2 id="8-2-根据业务场景和数据量合理选择key是否过期"><a href="#8-2-根据业务场景和数据量合理选择key是否过期" class="headerlink" title="(8.2) 根据业务场景和数据量合理选择key是否过期"></a>(8.2) 根据业务场景和数据量合理选择key是否过期</h2><h2 id="8-1-合理设置key的长度和类型"><a href="#8-1-合理设置key的长度和类型" class="headerlink" title="(8.1) 合理设置key的长度和类型"></a>(8.1) 合理设置key的长度和类型</h2><ol>
 <li>从性能和内存角度考虑，使用数字类型(8字节)性能最高，而且省内存。 type=string encoding=int<br>  注意不要多个业务共用缓存，存在key冲突(一样)的情况</li>
 <li>如果无法使用数字类型，建议字符串长度不要超过44字节。</li>
 <li>最坏的情况就是字符串长度大于44字节，这种情况下，内存利用率会打折 </li>
 <li></li>
 </ol>
-<h1 id="5-实验"><a href="#5-实验" class="headerlink" title="(5) 实验"></a>(5) 实验</h1><h2 id="5-1-不同长度key占用内存对比"><a href="#5-1-不同长度key占用内存对比" class="headerlink" title="(5.1) 不同长度key占用内存对比"></a>(5.1) 不同长度key占用内存对比</h2><h2 id="5-2-同一数据对象不同数据编码-encoding-占用内存对比"><a href="#5-2-同一数据对象不同数据编码-encoding-占用内存对比" class="headerlink" title="(5.2) 同一数据对象不同数据编码(encoding)占用内存对比"></a>(5.2) 同一数据对象不同数据编码(encoding)占用内存对比</h2><p>  todo </p>
-<h2 id="5-3-todo"><a href="#5-3-todo" class="headerlink" title="(5.3) todo"></a>(5.3) todo</h2><br>
-
-
-<h2 id="5-4-其它"><a href="#5-4-其它" class="headerlink" title="(5.4) 其它"></a>(5.4) 其它</h2><p>  Redis删除数据不一定是是实时删除。</p>
-<p>  Redis在删除数据后并不是立马释放内存，需要重启Redis Server才能释放操作系统分配的内存。</p>
-<br>
-
-
-
-
-
-
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://youjiali1995.github.io/allocator/jemalloc/">jemalloc 源码分析</a><br>[2] <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/547350961">浅谈Redis源码—内存分配zmalloc</a><br>[3] <a target="_blank" rel="noopener" href="https://juejin.cn/post/7068233325227278372">redis源码阅读——内存分配完全解析</a><br>[4] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6885710269406789645">Redis内存模型</a><br>[5] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/jyopFvoQgfKTBfbJxom1PA">解码Redis最易被忽视的CPU和内存占用高问题-张鹏义-腾讯云数据库高级工程师</a></p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/">Redis-6.0源码</a><br>[2] <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/redis.conf">redis.conf</a><br>[3] <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/09/09/weibo-counter-service-design-2/">[WeiDesign]微博计数器的设计(下)</a><br>[4] <a target="_blank" rel="noopener" href="https://instagram-engineering.com/storing-hundreds-of-millions-of-simple-key-value-pairs-in-redis-1091ae80f74c">Storing hundreds of millions of simple key-value pairs in Redis</a><br>[5] <a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/jyopFvoQgfKTBfbJxom1PA">解码Redis最易被忽视的CPU和内存占用高问题-张鹏义-腾讯云数据库高级工程师</a><br>[6] <a target="_blank" rel="noopener" href="https://help.aliyun.com/zh/redis/user-guide/troubleshoot-the-high-memory-usage-of-an-apsaradb-for-redis-instance">排查Redis实例内存使用率高的问题</a><br>[7] <a target="_blank" rel="noopener" href="https://juejin.cn/post/6844903967298682893">一文了解 Redis 内存监控和内存消耗</a><br>[8] <a target="_blank" rel="noopener" href="https://support.huaweicloud.com/dcs_faq/dcs-faq-0521001.html">如何估算Redis内存占用量</a></p>
 
     </div>
 
@@ -1060,10 +1118,10 @@ address                                <span class="token operator">|</span>    
       <div class="popular-posts-title"><a href="/2023/04/16/redis-aof-rewrite/" rel="bookmark">Redis AOF 重写</a></div>
     </li>
     <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2022/02/26/redis-command-execution-process/" rel="bookmark">Redis命令执行流程</a></div>
+      <div class="popular-posts-title"><a href="/2022/01/16/redis-aof/" rel="bookmark">Redis AOF</a></div>
     </li>
     <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2022/01/16/redis-aof/" rel="bookmark">Redis AOF</a></div>
+      <div class="popular-posts-title"><a href="/2022/02/26/redis-command-execution-process/" rel="bookmark">Redis命令执行流程</a></div>
     </li>
     <li class="popular-posts-item">
       <div class="popular-posts-title"><a href="/2020/05/24/redis-commands/" rel="bookmark">Redis命令</a></div>
@@ -1171,7 +1229,7 @@ address                                <span class="token operator">|</span>    
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-2012%E5%B9%B4%E5%BE%AE%E5%8D%9A%E6%98%AF%E6%80%8E%E4%B9%88%E7%94%A8%E7%BC%93%E5%AD%98%E6%94%AF%E6%92%91%E5%8D%83%E4%BA%BF%E7%BA%A7%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E7%9A%84"><span class="nav-text">(1) 2012年微博是怎么用缓存支撑千亿级数据存储的</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E8%83%8C%E6%99%AF"><span class="nav-text">(1.1) 背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E5%BE%AE%E5%8D%9A%E8%AE%A1%E6%95%B0%E6%9C%8D%E5%8A%A1%E6%96%B9%E6%A1%88"><span class="nav-text">(1.2) 微博计数服务方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E6%96%B9%E6%A1%88%E4%B8%80-%E7%94%A8MySQL"><span class="nav-text">(1.2.1) 方案一 用MySQL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-%E6%96%B9%E6%A1%88%E4%BA%8C-%E7%94%A8%E7%BC%93%E5%AD%98Redis"><span class="nav-text">(1.2.2) 方案二 用缓存Redis</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-3-%E6%96%B9%E6%A1%88%E4%B8%89-%E4%BC%98%E5%8C%96Redis%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8"><span class="nav-text">(1.2.3) 方案三 优化Redis内存占用</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%BB%8E%E4%B8%8D%E5%90%8C%E8%A7%92%E5%BA%A6%E7%9C%8BRedis-Server%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8"><span class="nav-text">(2) 从不同角度看Redis-Server内存使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E4%BB%8E%E6%BA%90%E7%A0%81%E5%92%8C%E7%BB%9F%E8%AE%A1%E4%BF%A1%E6%81%AF%E7%9C%8BRedis%E5%86%85%E5%AD%98%E5%A4%A7%E6%A6%82%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-text">(2.1) 从源码和统计信息看Redis内存大概使用情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E4%BB%8E%E7%BB%93%E6%9E%9C%E7%9C%8BRedis%E5%86%85%E5%AD%98%E8%AF%A6%E7%BB%86%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-text">(2.2) 从结果看Redis内存详细使用情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E4%BB%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BB%B4%E5%BA%A6%E7%9C%8BRedis%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8"><span class="nav-text">(2.2) 从数据结构维度看Redis内存使用</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis-Server%E6%9C%AC%E8%BA%AB%E6%8F%90%E4%BE%9B%E5%93%AA%E4%BA%9B%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3) Redis-Server本身提供哪些内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-Redis%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B-%E5%AF%B9%E8%B1%A1-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3.1) Redis数据类型(对象)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-1-Redis%E5%AF%B9%E8%B1%A1%E7%B3%BB%E7%BB%9F-redisObject%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.1.1) Redis对象系统-redisObject怎么省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-2-Redis%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3.1.2) Redis对象不同编码(数据结构)内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-1-string%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.1 string对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-2-list%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.2 list对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-3-hash%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.3 hash对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-4-set%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.4 set对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-5-sorted-set%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.5 sorted-set对象不同编码</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-Redis%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-data-structure-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3.2) Redis数据结构(data-structure)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-%E7%AE%80%E5%8D%95%E5%8A%A8%E6%80%81%E5%AD%97%E7%AC%A6%E4%B8%B2-SDS-embstr-raw"><span class="nav-text">(3.2.1) 简单动态字符串-SDS(embstr&#x2F;raw)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-1-%E5%AE%9A%E4%B9%89%E5%A4%9A%E7%A7%8DSDS%E5%9C%A8%E4%B8%8D%E5%90%8C%E5%9C%BA%E6%99%AF%E4%BD%BF%E7%94%A8%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.1.1) 定义多种SDS在不同场景使用省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-2-%E5%88%9B%E5%BB%BA%E6%96%B0%E5%AD%97%E7%AC%A6%E4%B8%B2-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-text">(3.2.1.2) 创建新字符串-内存预分配</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8-ziplist"><span class="nav-text">(3.2.2) 压缩列表-ziplist</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.2.1) 压缩列表为什么省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-2-%E5%88%9B%E5%BB%BA%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.2.2) 创建压缩列表怎么省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-3-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%96%B0%E5%A2%9E%E5%85%83%E7%B4%A0%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.2.3) 压缩列表新增元素怎么省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-4-%E5%8E%8B%E7%BC%A9%E6%95%B4%E6%95%B0%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E5%A4%A7%E5%B0%8F-zipIntSize"><span class="nav-text">(3.2.2.4) 压缩整数占用内存空间大小-zipIntSize</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-3-%E5%93%88%E5%B8%8C%E8%A1%A8-dict"><span class="nav-text">(3.2.3) 哈希表-dict</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8%E7%BB%B4%E5%BA%A6%E7%9A%84%E4%BC%98%E5%8C%96"><span class="nav-text">(3.3) 内存分配器维度的优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%BD%9C%E4%B8%BA%E7%A0%94%E5%8F%91%E5%8F%AF%E4%BB%A5%E5%81%9A%E7%9A%84Redis%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(4) 作为研发可以做的Redis内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#8-1-%E5%90%88%E7%90%86%E8%AE%BE%E7%BD%AEkey%E7%9A%84%E9%95%BF%E5%BA%A6%E5%92%8C%E7%B1%BB%E5%9E%8B"><span class="nav-text">(8.1) 合理设置key的长度和类型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%AE%9E%E9%AA%8C"><span class="nav-text">(5) 实验</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E4%B8%8D%E5%90%8C%E9%95%BF%E5%BA%A6key%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E5%AF%B9%E6%AF%94"><span class="nav-text">(5.1) 不同长度key占用内存对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-%E5%90%8C%E4%B8%80%E6%95%B0%E6%8D%AE%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E6%95%B0%E6%8D%AE%E7%BC%96%E7%A0%81-encoding-%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E5%AF%B9%E6%AF%94"><span class="nav-text">(5.2) 同一数据对象不同数据编码(encoding)占用内存对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-todo"><span class="nav-text">(5.3) todo</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-%E5%85%B6%E5%AE%83"><span class="nav-text">(5.4) 其它</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-text">参考资料</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-2012%E5%B9%B4%E5%BE%AE%E5%8D%9A%E6%98%AF%E6%80%8E%E4%B9%88%E7%94%A8%E7%BC%93%E5%AD%98%E6%94%AF%E6%92%91%E5%8D%83%E4%BA%BF%E7%BA%A7%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E7%9A%84"><span class="nav-text">(1) 2012年微博是怎么用缓存支撑千亿级数据存储的</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E8%83%8C%E6%99%AF"><span class="nav-text">(1.1) 背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-%E5%BE%AE%E5%8D%9A%E8%AE%A1%E6%95%B0%E6%9C%8D%E5%8A%A1%E6%96%B9%E6%A1%88"><span class="nav-text">(1.2) 微博计数服务方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-1-%E6%96%B9%E6%A1%88%E4%B8%80-%E7%94%A8MySQL"><span class="nav-text">(1.2.1) 方案一 用MySQL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-2-%E6%96%B9%E6%A1%88%E4%BA%8C-%E7%94%A8%E7%BC%93%E5%AD%98Redis"><span class="nav-text">(1.2.2) 方案二 用缓存Redis</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-3-%E6%96%B9%E6%A1%88%E4%B8%89-%E4%BC%98%E5%8C%96Redis%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8"><span class="nav-text">(1.2.3) 方案三 优化Redis内存占用</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis-Server%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8%E6%A6%82%E8%A7%88"><span class="nav-text">(2) Redis-Server内存使用概览</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E4%BB%8E%E6%BA%90%E7%A0%81%E5%92%8C%E7%BB%9F%E8%AE%A1%E4%BF%A1%E6%81%AF%E7%9C%8BRedis%E5%86%85%E5%AD%98%E5%A4%A7%E6%A6%82%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-text">(2.1) 从源码和统计信息看Redis内存大概使用情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E4%BB%8E%E7%BB%93%E6%9E%9C%E7%9C%8BRedis%E5%86%85%E5%AD%98%E8%AF%A6%E7%BB%86%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-text">(2.2) 从结果看Redis内存详细使用情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-%E4%BB%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BB%B4%E5%BA%A6%E7%9C%8BRedis%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8"><span class="nav-text">(2.2) 从数据结构维度看Redis内存使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-1-%E5%B0%8F%E8%AF%95%E7%89%9B%E5%88%80"><span class="nav-text">(2.2.1) 小试牛刀</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis-Server%E6%9C%AC%E8%BA%AB%E6%8F%90%E4%BE%9B%E5%93%AA%E4%BA%9B%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3) Redis-Server本身提供哪些内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-Redis%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B-%E5%AF%B9%E8%B1%A1-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3.1) Redis数据类型(对象)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-1-Redis%E5%AF%B9%E8%B1%A1%E7%B3%BB%E7%BB%9F-redisObject%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.1.1) Redis对象系统-redisObject怎么省内存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-2-Redis%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3.1.2) Redis对象不同编码(数据结构)内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-1-string%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.1 string对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-2-list%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.2 list对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-3-hash%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.3 hash对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-4-set%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.4 set对象不同编码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-1-2-5-sorted-set%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E7%BC%96%E7%A0%81"><span class="nav-text">3.1.2.5 sorted-set对象不同编码</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-Redis%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-data-structure-%E7%BB%B4%E5%BA%A6%E7%9A%84%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(3.2) Redis数据结构(data-structure)维度的内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-1-%E7%AE%80%E5%8D%95%E5%8A%A8%E6%80%81%E5%AD%97%E7%AC%A6%E4%B8%B2-SDS-embstr-raw"><span class="nav-text">(3.2.1) 简单动态字符串-SDS(embstr&#x2F;raw)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-1-%E5%AE%9A%E4%B9%89%E5%A4%9A%E7%A7%8DSDS%E5%9C%A8%E4%B8%8D%E5%90%8C%E5%9C%BA%E6%99%AF%E4%BD%BF%E7%94%A8%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.1.1) 定义多种SDS在不同场景使用省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-1-2-%E5%88%9B%E5%BB%BA%E6%96%B0%E5%AD%97%E7%AC%A6%E4%B8%B2-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-text">(3.2.1.2) 创建新字符串-内存预分配</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-2-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8-ziplist"><span class="nav-text">(3.2.2) 压缩列表-ziplist</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-1-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E4%B8%BA%E4%BB%80%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.2.1) 压缩列表为什么省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-2-%E5%88%9B%E5%BB%BA%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.2.2) 创建压缩列表怎么省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-3-%E5%8E%8B%E7%BC%A9%E5%88%97%E8%A1%A8%E6%96%B0%E5%A2%9E%E5%85%83%E7%B4%A0%E6%80%8E%E4%B9%88%E7%9C%81%E5%86%85%E5%AD%98"><span class="nav-text">(3.2.2.3) 压缩列表新增元素怎么省内存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-2-2-4-%E5%8E%8B%E7%BC%A9%E6%95%B4%E6%95%B0%E5%8D%A0%E7%94%A8%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E5%A4%A7%E5%B0%8F-zipIntSize"><span class="nav-text">(3.2.2.4) 压缩整数占用内存空间大小-zipIntSize</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-3-%E5%93%88%E5%B8%8C%E8%A1%A8-dict"><span class="nav-text">(3.2.3) 哈希表-dict</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8%E7%BB%B4%E5%BA%A6%E7%9A%84%E4%BC%98%E5%8C%96"><span class="nav-text">(3.3) 内存分配器维度的优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%AE%9E%E9%AA%8C"><span class="nav-text">(4) 实验</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-key%E6%98%AF%E5%90%A6%E8%BF%87%E6%9C%9F%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.1) key是否过期内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E4%B8%8D%E5%90%8C%E9%95%BF%E5%BA%A6key%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.2) 不同长度key内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E5%90%8C%E4%B8%80%E6%95%B0%E6%8D%AE%E5%AF%B9%E8%B1%A1%E4%B8%8D%E5%90%8C%E6%95%B0%E6%8D%AE%E7%BC%96%E7%A0%81-encoding-%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.3) 同一数据对象不同数据编码(encoding)内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E4%B8%8D%E5%90%8C%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E5%99%A8%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.4) 不同内存分配器内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-5-%E5%AD%98%E5%9C%A8%E5%A4%A7key%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.5) 存在大key内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-6-%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.6) 主从复制内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-7-%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%BF%9E%E6%8E%A5%E6%95%B0%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.7) 客户端连接数内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-8-%E6%9C%89AOF%E5%92%8CAOF%E9%87%8D%E5%86%99%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.8) 有AOF和AOF重写内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-9-lua%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E5%AF%B9%E6%AF%94"><span class="nav-text">(4.9) lua内存占用对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-10-%E5%85%B6%E5%AE%83"><span class="nav-text">(4.10) 其它</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E4%BD%9C%E4%B8%BA%E7%A0%94%E5%8F%91%E5%8F%AF%E4%BB%A5%E5%81%9A%E7%9A%84Redis%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(5) 作为研发可以做的Redis内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#8-1-%E9%80%89%E6%8B%A9%E5%90%88%E9%80%82%E7%9A%84%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B-string%E3%80%81list%E3%80%81hash%E3%80%81set%E3%80%81zset"><span class="nav-text">(8.1) 选择合适的数据类型(string、list、hash、set、zset)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-1-%E7%BB%9F%E8%AE%A1%E6%AF%8F%E6%97%A5%E6%B4%BB%E8%B7%83%E7%94%A8%E6%88%B7%E6%95%B0"><span class="nav-text">(8.1.1) 统计每日活跃用户数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-2-app%E5%BC%B9%E7%AA%97%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6"><span class="nav-text">(8.1.2) app弹窗频率限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-3-%E7%94%A8%E6%88%B7%E6%98%AF%E5%90%A6%E7%BB%91%E5%AE%9A%E9%93%B6%E8%A1%8C%E5%8D%A1"><span class="nav-text">(8.1.3) 用户是否绑定银行卡</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-2-%E6%A0%B9%E6%8D%AE%E4%B8%9A%E5%8A%A1%E5%9C%BA%E6%99%AF%E5%92%8C%E6%95%B0%E6%8D%AE%E9%87%8F%E5%90%88%E7%90%86%E9%80%89%E6%8B%A9key%E6%98%AF%E5%90%A6%E8%BF%87%E6%9C%9F"><span class="nav-text">(8.2) 根据业务场景和数据量合理选择key是否过期</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8-1-%E5%90%88%E7%90%86%E8%AE%BE%E7%BD%AEkey%E7%9A%84%E9%95%BF%E5%BA%A6%E5%92%8C%E7%B1%BB%E5%9E%8B"><span class="nav-text">(8.1) 合理设置key的长度和类型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-text">参考资料</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
