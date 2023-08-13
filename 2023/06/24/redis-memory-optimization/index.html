@@ -20,21 +20,19 @@
     var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":true,"width":240},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。   在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时">
+  <meta name="description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。   在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时(2012年)微博总数量，千亿级而且每秒都在飞速">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis内存优化-怎么用缓存支持千亿级数据">
 <meta property="og:url" content="http://weikeqin.com/2023/06/24/redis-memory-optimization/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。   在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(上)  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时">
+<meta property="og:description" content="我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。   在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。    (1) 2012年微博是怎么用缓存支撑千亿级数据存储的  [WeiDesign]微博计数器的设计(下) (1.1) 背景当时(2012年)微博总数量，千亿级而且每秒都在飞速">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/weibo-redis-2.4-memory-structure-main.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-info-memory.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/memory/redis-server-memory-structure-full.png">
-<meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-command-with-variables.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-generic-command.png">
-<meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-generic-command-generic-set-key.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/debug/set-command/redis-debug-set-key-expire.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/redis-object/redis-object.svg">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/redis-data-structure-data-object.png">
@@ -45,7 +43,7 @@
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/ziplist/ziplist-memory-structure-v2.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/data-structure/hashtable/hashtable.svg">
 <meta property="article:published_time" content="2023-06-24T00:54:14.000Z">
-<meta property="article:modified_time" content="2023-08-12T00:31:56.339Z">
+<meta property="article:modified_time" content="2023-08-13T15:30:34.124Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
@@ -263,7 +261,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-08-12 08:31:56" itemprop="dateModified" datetime="2023-08-12T08:31:56+08:00">2023-08-12</time>
+                <time title="修改时间：2023-08-13 23:30:34" itemprop="dateModified" datetime="2023-08-13T23:30:34+08:00">2023-08-13</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -309,14 +307,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>15k</span>
+              <span>11k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>13 分钟</span>
+              <span>10 分钟</span>
             </span>
 
         </div>
@@ -331,12 +329,10 @@
         <p>  我们经常会计算我们有多少钱，每个月吃饭开销多少，交通开销多少，以及其它开销多少，方便管理，避免透支。</p>
 <p>  在使用Redis时也要有同样的意识，各种数据占用多少内存，要做到心中有数，避免Redis内存不够用，造成问题。</p>
 <p>  <img data-src="/img/database/redis/memory/redis-server-memory-structure-main.png" alt="Redis整体内存结构-主要"></p>
-<h1 id="1-2012年微博是怎么用缓存支撑千亿级数据存储的"><a href="#1-2012年微博是怎么用缓存支撑千亿级数据存储的" class="headerlink" title="(1) 2012年微博是怎么用缓存支撑千亿级数据存储的"></a>(1) 2012年微博是怎么用缓存支撑千亿级数据存储的</h1><p>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/08/30/weibo-counter-service-design-1/">[WeiDesign]微博计数器的设计(上)</a><br>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/09/09/weibo-counter-service-design-2/">[WeiDesign]微博计数器的设计(下)</a></p>
-<h2 id="1-1-背景"><a href="#1-1-背景" class="headerlink" title="(1.1) 背景"></a>(1.1) 背景</h2><p>当时(2012年)微博总数量<br>  千亿级而且每秒都在飞速增长中。<br>  每条微博都有一个64位的唯一id。</p>
-<p>访问量<br>  每秒百万级 还在稳步增长中。根据微博的id来访问。</p>
-<p>主要接口<br>  获取评论数<br>  获取转发数<br>  获取评论数 + 获取转发数 (这个接口访问量最大)<br>  评论数和转发数，你都可以认为是32位的整形数值。不会是负数，默认是0。</p>
-<p>要求<br>  由于用户对于数字非常的敏感(想想你好不容易拉到一位粉丝，但是粉丝数没涨的痛苦吧。)，所以我们要求数据非常准确，延迟极低(1s以内)，服务稳定性极高(千万别因为某大妈扫个地拨了插座就把数字弄没了…)</p>
-<p>  做为架构师，当然也需要全方位地考虑架构成本问题，然后去做各种的折衷。<br>  这里主要考虑的成本是: 机器成本，开发成本，维护成本</p>
+<h1 id="1-2012年微博是怎么用缓存支撑千亿级数据存储的"><a href="#1-2012年微博是怎么用缓存支撑千亿级数据存储的" class="headerlink" title="(1) 2012年微博是怎么用缓存支撑千亿级数据存储的"></a>(1) 2012年微博是怎么用缓存支撑千亿级数据存储的</h1><p>  <a target="_blank" rel="noopener" href="https://blog.cydu.net/weidesign/2012/09/09/weibo-counter-service-design-2/">[WeiDesign]微博计数器的设计(下)</a></p>
+<h2 id="1-1-背景"><a href="#1-1-背景" class="headerlink" title="(1.1) 背景"></a>(1.1) 背景</h2><p>当时(2012年)微博总数量，千亿级而且每秒都在飞速增长中。每条微博都有一个64位的唯一id。</p>
+<p>访问量 每秒百万级 还在稳步增长中。根据微博的id来访问。</p>
+<p>主要接口  获取评论数 + 获取转发数 。</p>
 <span id="more"></span>
 
 
@@ -369,50 +365,18 @@
 
 
 <h2 id="2-2-从结果看Redis内存详细使用情况"><a href="#2-2-从结果看Redis内存详细使用情况" class="headerlink" title="(2.2) 从结果看Redis内存详细使用情况"></a>(2.2) 从结果看Redis内存详细使用情况</h2><p>  通过 <code>info</code>命令可以查看Redis Server的基本信息、CPU、内存、持久化、客户端连接信息等等；<br>  通过 <code>info memory</code> 可以查看Redis Server的内存相关信息。</p>
+<p>  这里列出部分主要的参数，详细所有参数见 <a href="./../../../../2023/08/06/redis-info/">Redis info</a></p>
 <pre class="line-numbers language-log" data-language="log"><code class="language-log"><span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span> info memory
 <span class="token operator">#</span> Memory
 used_memory<span class="token operator">:</span><span class="token number">153492864</span>
 used_memory_human<span class="token operator">:</span><span class="token number">146.38M</span>
 used_memory_rss<span class="token operator">:</span><span class="token number">163676160</span>
 used_memory_rss_human<span class="token operator">:</span><span class="token number">156.09M</span>
-used_memory_peak<span class="token operator">:</span><span class="token number">153510864</span>
-used_memory_peak_human<span class="token operator">:</span><span class="token number">146.40M</span>
-used_memory_peak_perc<span class="token operator">:</span><span class="token number">99.99</span><span class="token operator">%</span>
 used_memory_overhead<span class="token operator">:</span><span class="token number">49426784</span>
 used_memory_startup<span class="token operator">:</span><span class="token number">1020736</span>
 used_memory_dataset<span class="token operator">:</span><span class="token number">104066080</span>
 used_memory_dataset_perc<span class="token operator">:</span><span class="token number">68.25</span><span class="token operator">%</span>
-allocator_allocated<span class="token operator">:</span><span class="token number">153427264</span>
-allocator_active<span class="token operator">:</span><span class="token number">163639296</span>
-allocator_resident<span class="token operator">:</span><span class="token number">163639296</span>
-total_system_memory<span class="token operator">:</span><span class="token number">34359738368</span>
-total_system_memory_human<span class="token operator">:</span><span class="token number">32.00G</span>
-used_memory_lua<span class="token operator">:</span><span class="token number">36864</span>
-used_memory_lua_human<span class="token operator">:</span><span class="token number">36.00K</span>
-used_memory_scripts<span class="token operator">:</span><span class="token number">0</span>
-used_memory_scripts_human<span class="token operator">:</span><span class="token number">0B</span>
-number_of_cached_scripts<span class="token operator">:</span><span class="token number">0</span>
-maxmemory<span class="token operator">:</span><span class="token number">0</span>
-maxmemory_human<span class="token operator">:</span><span class="token number">0B</span>
-maxmemory_policy<span class="token operator">:</span>noeviction
-allocator_frag_ratio<span class="token operator">:</span><span class="token number">1.07</span>
-allocator_frag_bytes<span class="token operator">:</span><span class="token number">10212032</span>
-allocator_rss_ratio<span class="token operator">:</span><span class="token number">1.00</span>
-allocator_rss_bytes<span class="token operator">:</span><span class="token number">0</span>
-rss_overhead_ratio<span class="token operator">:</span><span class="token number">1.00</span>
-rss_overhead_bytes<span class="token operator">:</span><span class="token number">36864</span>
-mem_fragmentation_ratio<span class="token operator">:</span><span class="token number">1.07</span>
-mem_fragmentation_bytes<span class="token operator">:</span><span class="token number">10248896</span>
-mem_not_counted_for_evict<span class="token operator">:</span><span class="token number">0</span>
-mem_replication_backlog<span class="token operator">:</span><span class="token number">0</span>
-mem_clients_slaves<span class="token operator">:</span><span class="token number">0</span>
-mem_clients_normal<span class="token operator">:</span><span class="token number">17440</span>
-mem_aof_buffer<span class="token operator">:</span><span class="token number">0</span>
-mem_allocator<span class="token operator">:</span>libc
-active_defrag_running<span class="token operator">:</span><span class="token number">0</span>
-lazyfree_pending_objects<span class="token operator">:</span><span class="token number">0</span>
-<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
+<span class="token ip-address constant">127.0.0.1</span><span class="token operator">:</span><span class="token number">6379</span><span class="token operator">></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>  参数对应说明参考  <a target="_blank" rel="noopener" href="https://redis.io/commands/info/">https://redis.io/commands/info/</a> </p>
 <table>
@@ -426,53 +390,18 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 </tr>
 </thead>
 <tbody><tr>
-<td align="left">used_memory</td>
-<td align="left">Redis使用其分配器(标准libc、jemalloc 或替代分配器，如 tcmalloc)分配的字节总数</td>
-<td align="left">1104032</td>
-<td align="left">153492864</td>
-<td align="left">145462944</td>
-</tr>
-<tr>
 <td align="left">used_memory_human</td>
-<td align="left">人类可读的已使用内存数</td>
+<td align="left">Redis使用其分配器(标准libc、jemalloc 或替代分配器，如 tcmalloc)分配的字节总数</td>
 <td align="left">1.05M</td>
 <td align="left">146.38M</td>
 <td align="left">138.72M</td>
 </tr>
 <tr>
-<td align="left">used_memory_rss</td>
-<td align="left">操作系统层看到的Redis分配的字节数（也称为驻留集大小）。 例如 top(1) 和 ps(1) 等工具报告的数字</td>
-<td align="left">2342912</td>
-<td align="left">163676160</td>
-<td align="left">150941696</td>
-</tr>
-<tr>
 <td align="left">used_memory_rss_human</td>
-<td align="left">人类可读的实际使用内存数</td>
+<td align="left">操作系统实际给Redis分配的内存数</td>
 <td align="left">2.23M</td>
 <td align="left">156.09M</td>
 <td align="left">143.95M</td>
-</tr>
-<tr>
-<td align="left">used_memory_peak</td>
-<td align="left">Redis消耗的峰值内存（以字节为单位）</td>
-<td align="left">1162544</td>
-<td align="left">153510864</td>
-<td align="left">145483976</td>
-</tr>
-<tr>
-<td align="left">used_memory_peak_human</td>
-<td align="left">人类可读</td>
-<td align="left">1.11M</td>
-<td align="left">146.40M</td>
-<td align="left">138.74M</td>
-</tr>
-<tr>
-<td align="left">used_memory_peak_perc</td>
-<td align="left">used_memory_peak 占 used_memory 的百分比</td>
-<td align="left">94.97%</td>
-<td align="left">99.99%</td>
-<td align="left">99.99%</td>
 </tr>
 <tr>
 <td align="left">used_memory_overhead</td>
@@ -496,219 +425,15 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <td align="left">96041480</td>
 </tr>
 <tr>
-<td align="left">used_memory_dataset_perc</td>
-<td align="left">used_memory_dataset 占净内存使用量的百分比 ( used_memory 减去 used_memory_startup )</td>
-<td align="left">79.12%</td>
-<td align="left">68.25%</td>
-<td align="left">66.49%</td>
-</tr>
-<tr>
-<td align="left">allocator_allocated</td>
-<td align="left">从分配器分配的总字节数，包括内部碎片。 通常与used_memory相同。</td>
-<td align="left">1038432</td>
-<td align="left">153427264</td>
-<td align="left">145490728</td>
-</tr>
-<tr>
-<td align="left">allocator_active</td>
-<td align="left">分配器活动页中的总字节数，包括外部碎片。</td>
-<td align="left">2306048</td>
-<td align="left">163639296</td>
-<td align="left">145793024</td>
-</tr>
-<tr>
-<td align="left">allocator_resident</td>
-<td align="left">分配器中驻留的总字节数 (RSS)，这包括可以释放到操作系统的页面（通过内存清除，或只是等待）。</td>
-<td align="left">2306048</td>
-<td align="left">163639296</td>
-<td align="left">151691264</td>
-</tr>
-<tr>
-<td align="left">total_system_memory</td>
-<td align="left">Redis主机拥有的内存总量</td>
-<td align="left">34359738368</td>
-<td align="left">34359738368</td>
-<td align="left">34359738368</td>
-</tr>
-<tr>
-<td align="left">total_system_memory_human</td>
-<td align="left">机器内存</td>
-<td align="left">32.00G</td>
-<td align="left">32.00G</td>
-<td align="left">32.00G</td>
-</tr>
-<tr>
-<td align="left">used_memory_lua</td>
-<td align="left">Lua引擎使用的字节数</td>
-<td align="left">36864</td>
-<td align="left">36864</td>
-<td align="left">36864</td>
-</tr>
-<tr>
-<td align="left">used_memory_lua_human</td>
-<td align="left"></td>
-<td align="left">36.00K</td>
-<td align="left">36.00K</td>
-<td align="left">36.00K</td>
-</tr>
-<tr>
-<td align="left">used_memory_scripts</td>
-<td align="left">缓存的Lua脚本使用的字节数</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">used_memory_scripts_human</td>
-<td align="left"></td>
-<td align="left">0B</td>
-<td align="left">0B</td>
-<td align="left">0B</td>
-</tr>
-<tr>
-<td align="left">number_of_cached_scripts</td>
-<td align="left"></td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">maxmemory</td>
-<td align="left">maxmemory配置指令的值</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">maxmemory_human</td>
-<td align="left"></td>
-<td align="left">0B</td>
-<td align="left">0B</td>
-<td align="left">0B</td>
-</tr>
-<tr>
-<td align="left">maxmemory_policy</td>
-<td align="left">maxmemory-policy配置指令的值</td>
-<td align="left">noeviction</td>
-<td align="left">noeviction</td>
-<td align="left">noeviction</td>
-</tr>
-<tr>
-<td align="left">allocator_frag_ratio</td>
-<td align="left">分配器碎片比率，allocator_active 和 allocator_alulated 之间的比率。 这是真正的(外部)碎片指标 (不是 mem_fragmentation_ratio )。</td>
-<td align="left">2.22</td>
-<td align="left">1.07</td>
-<td align="left">1.00</td>
-</tr>
-<tr>
-<td align="left">allocator_frag_bytes</td>
-<td align="left">分配器碎片，allocator_active 和 allocator_alulated 之间的增量。 请参阅有关 mem_fragmentation_bytes 的注释。</td>
-<td align="left">1267616</td>
-<td align="left">10212032</td>
-<td align="left">302296</td>
-</tr>
-<tr>
-<td align="left">allocator_rss_ratio</td>
-<td align="left">allocator_resident 和 allocator_active 之间的比率。 这通常表明分配器可以而且可能很快就会将页面释放回操作系统。</td>
-<td align="left">1.00</td>
-<td align="left">1.00</td>
-<td align="left">1.04</td>
-</tr>
-<tr>
-<td align="left">allocator_rss_bytes</td>
-<td align="left">allocator_resident 和 allocator_active 之间的差值</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">5898240</td>
-</tr>
-<tr>
-<td align="left">rss_overhead_ratio</td>
-<td align="left">used_memory_rss (进程RSS) 和 allocator_resident 之间的比率。 这包括与分配器或堆无关的 RSS 开销。</td>
-<td align="left">1.02</td>
-<td align="left">1.00</td>
-<td align="left">1.00</td>
-</tr>
-<tr>
-<td align="left">rss_overhead_bytes</td>
-<td align="left">used_memory_rss (进程RSS) 和 allocator_resident 之间的增量</td>
-<td align="left">36864</td>
-<td align="left">36864</td>
-<td align="left">-749568</td>
-</tr>
-<tr>
-<td align="left">mem_fragmentation_ratio</td>
-<td align="left">内存碎片率， used_memory_rss 与used_memory 之间的比率。 请注意，这不仅包括碎片，还包括其他进程开销（请参阅 allocator_* 指标），以及代码、共享库、堆栈等开销。</td>
-<td align="left">2.26</td>
-<td align="left">1.07</td>
-<td align="left">1.04</td>
-</tr>
-<tr>
-<td align="left">mem_fragmentation_bytes</td>
-<td align="left">内存碎片字节数，used_memory_rss 和used_memory 之间的增量。 请注意，当总碎片字节数较低(几兆字节)时，较高的比率（例如 1.5 及以上）并不表示存在问题。</td>
-<td align="left">1304480</td>
-<td align="left">10248896</td>
-<td align="left">5519768</td>
-</tr>
-<tr>
-<td align="left">mem_not_counted_for_evict</td>
-<td align="left">已使用的内存不计入键驱逐。 这基本上是瞬态副本和 AOF 缓冲区。</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">mem_replication_backlog</td>
-<td align="left">复制积压使用的内存</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">mem_clients_slaves</td>
-<td align="left">副本客户端使用的内存 - 从 Redis 7.0 开始，副本缓冲区与复制积压共享内存，因此当副本不触发内存使用量增加时，此字段可以显示 0。</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">mem_clients_normal</td>
-<td align="left">普通客户端使用的内存</td>
-<td align="left">17440</td>
-<td align="left">17440</td>
-<td align="left">20504</td>
-</tr>
-<tr>
-<td align="left">mem_aof_buffer</td>
-<td align="left">用于 AOF 和 AOF 重写缓冲区的临时内存</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
 <td align="left">mem_allocator</td>
 <td align="left">内存分配器，在编译时选择。</td>
 <td align="left">libc</td>
 <td align="left">libc</td>
 <td align="left">jemalloc-5.1.0</td>
 </tr>
-<tr>
-<td align="left">active_defrag_running</td>
-<td align="left">当启用 activedefrag 时，这表明碎片整理当前是否处于活动状态，以及它打算使用的 CPU 百分比。</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
-<tr>
-<td align="left">lazyfree_pending_objects</td>
-<td align="left">等待释放的对象数量（调用 UNLINK 或带有 ASYNC 选项的 FLUSHDB 和 FLUSHALL 的结果）</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">0</td>
-</tr>
 </tbody></table>
 <p>  <code>used_memory_rss</code> = <code>used_memory</code> + <code>其它</code><br>  操作系统分配的内存 = Redis内存分配器分配的内存 + <code>其它</code></p>
 <p>  <code>used_memory</code> = <code>used_memory_overhead</code> + <code>used_memory_dataset</code><br>  Redis内存分配器分配的内存大小 = 服务器分配用于管理其内部数据结构的所有开销的总和 + 数据集大小</p>
-<br>
 <br>
 
 
@@ -723,11 +448,8 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <li>存储key的sdshdr 29字节 (sdshdr64占用9字节 + 字符长度19字节 + 结束字符1字节)</li>
 <li>存储val的16字节 (RedisObject 16字节 + Redis存储ebmstr内存优化，把redisObject的指针ptr直接存储int类型，节省了一个指针的开销)</li>
 </ol>
-  <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-command-with-variables.png" width=50% />
-  
   <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-generic-command.png" width=50% /> 
 
-<p>  <img alt="Redis-set-key-val-ex" data-src="/img/database/redis/debug/set-command/redis-debug-set-generic-command-generic-set-key.png" width=50% /> <br></p>
 <p>  有效业务数据 12字节<br>  Redis内存开销 77字节<br>  单条数据内存利用率 12字节 / 77字节 ≈ 0.1558</p>
 <br>
 
@@ -746,8 +468,6 @@ lazyfree_pending_objects<span class="token operator">:</span><span class="token 
 <p>  如果再考虑上 内存分配器jemalloc 内存分配和内存碎片的开销，数据利用率会更小。</p>
 <p>  也就是说从业务角度看，我其实想存12字节数据，但是却耗费146字节内存，绝大部分内存是浪费的。真是大冤种。</p>
 <p>  如果有上亿个评论数据要存储，其实浪费的内存挺多的。</p>
-<br>
-
 <br>
 
 
@@ -1118,16 +838,16 @@ address                                <span class="token operator">|</span>    
       <div class="popular-posts-title"><a href="/2023/04/16/redis-aof-rewrite/" rel="bookmark">Redis AOF 重写</a></div>
     </li>
     <li class="popular-posts-item">
+      <div class="popular-posts-title"><a href="/2022/01/16/redis-aof/" rel="bookmark">Redis AOF</a></div>
+    </li>
+    <li class="popular-posts-item">
       <div class="popular-posts-title"><a href="/2022/02/26/redis-command-execution-process/" rel="bookmark">Redis命令执行流程</a></div>
     </li>
     <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/01/07/redis-data-structure-hash-tables/" rel="bookmark">Redis 数据结构 哈希表(hashtable/dict/map)</a></div>
+      <div class="popular-posts-title"><a href="/2020/05/24/redis-commands/" rel="bookmark">Redis命令</a></div>
     </li>
     <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/01/15/redis-data-structure-intset/" rel="bookmark">Redis 数据结构 整数集合(intset)</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/01/01/redis-data-structure-simple-dynamic-string/" rel="bookmark">Redis 数据结构 简单动态字符串(SDS)</a></div>
+      <div class="popular-posts-title"><a href="/2022/12/31/redis-core-knowledge/" rel="bookmark">Redis核心知识</a></div>
     </li>
   </ul>
 
