@@ -2,25 +2,27 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
-<meta name="theme-color" content="#222">
-<meta name="generator" content="Hexo 5.4.2">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.2">
+
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
   <link rel="mask-icon" href="/images/logo.svg" color="#222">
+  <meta name="msvalidate.01" content="CBB4A6675274A9B82BB82B104F7915A7">
+  <meta name="yandex-verification" content="4fa4531dcc9e1bfd">
+  <meta name="baidu-site-verification" content="1d263b839540cec80d3497b2f877c5da">
 
 <link rel="stylesheet" href="/css/main.css">
 
-<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&display=swap&subset=latin,latin-ext">
-<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
 
-<script id="hexo-configurations">
-    var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":true,"width":240},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
-  </script>
 
-  <meta name="description" content="文件是如何分布到集群的，又是如何从集群中获取的。 (1) 路由一个文档到一个分片中  当索引一个文档的时候，文档会被存储到一个主分片中。  这个过程是根据下面这个公式决定的：  shard &#x3D; hash(routing) % number_of_primary_shards   routing 是一个可变值，默认是文档的 _id ，也可以设置成一个自定义的值。 routing 通过 hash">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha256-CTSx/A06dm1B063156EVh15m6Y67pAjZZaQc89LLSrU=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.18.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"waline","storage":true,"lazyload":false,"nav":null,"activeClass":"waline"},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="文件是如何分布到集群的，又是如何从集群中获取的。 (1) 路由一个文档到一个分片中  当索引一个文档的时候，文档会被存储到一个主分片中。  这个过程是根据下面这个公式决定的：  shard &#x3D; hash(routing) % number_of_primary_shards   routing 是一个可变值，默认是文档的 _id ，也可以设置成一个自定义的值。 routing 通过 hash">
 <meta property="og:type" content="article">
 <meta property="og:title" content="elasticsearch 分布式文档存储">
 <meta property="og:url" content="http://weikeqin.com/2020/01/20/elasticsearch-distributed-docs/index.html">
@@ -39,96 +41,57 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://weikeqin.com/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-write.png">
 
+
 <link rel="canonical" href="http://weikeqin.com/2020/01/20/elasticsearch-distributed-docs/">
 
 
-<script id="page-configurations">
-  // https://hexo.io/docs/variables.html
-  CONFIG.page = {
-    sidebar: "",
-    isHome : false,
-    isPost : true,
-    lang   : 'zh-CN'
-  };
-</script>
 
-  <title>elasticsearch 分布式文档存储 | 天道酬勤</title>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2020/01/20/elasticsearch-distributed-docs/","path":"2020/01/20/elasticsearch-distributed-docs/","title":"elasticsearch 分布式文档存储"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>elasticsearch 分布式文档存储 | 天道酬勤</title>
   
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
-    <script>
-      if (CONFIG.hostname === location.hostname) {
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'UA-113485469-1');
-      }
-    </script>
 
-
-  <script>
-    var _hmt = _hmt || [];
-    (function() {
-      var hm = document.createElement("script");
-      hm.src = "https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365";
-      var s = document.getElementsByTagName("script")[0];
-      s.parentNode.insertBefore(hm, s);
-    })();
-  </script>
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
 
 
 
 
+
+
+<link rel="dns-prefetch" href="waline-server-one-omega.vercel.app">
   <noscript>
-  <style>
-  .use-motion .brand,
-  .use-motion .menu-item,
-  .sidebar-inner,
-  .use-motion .post-block,
-  .use-motion .pagination,
-  .use-motion .comments,
-  .use-motion .post-header,
-  .use-motion .post-body,
-  .use-motion .collection-header { opacity: initial; }
-
-  .use-motion .site-title,
-  .use-motion .site-subtitle {
-    opacity: initial;
-    top: initial;
-  }
-
-  .use-motion .logo-line-before i { left: initial; }
-  .use-motion .logo-line-after i { right: initial; }
-  </style>
-</noscript>
-
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
 </head>
 
-<body itemscope itemtype="http://schema.org/WebPage">
-  <div class="container use-motion">
-    <div class="headband"></div>
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
 
-    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
-      <div class="header-inner"><div class="site-brand-container">
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
   <div class="site-nav-toggle">
-    <div class="toggle" aria-label="切换导航栏">
-      <span class="toggle-line toggle-line-first"></span>
-      <span class="toggle-line toggle-line-middle"></span>
-      <span class="toggle-line toggle-line-last"></span>
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
     </div>
   </div>
 
   <div class="site-meta">
 
     <a href="/" class="brand" rel="start">
-      <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">天道酬勤</h1>
-      <span class="logo-line-after"><i></i></span>
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
     </a>
       <p class="site-subtitle" itemprop="description">坚持，努力，让好事发生</p>
   </div>
 
   <div class="site-nav-right">
-    <div class="toggle popup-trigger">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
         <i class="fa fa-search fa-fw fa-lg"></i>
     </div>
   </div>
@@ -136,34 +99,8 @@
 
 
 
-
 <nav class="site-nav">
-  <ul id="menu" class="main-menu menu">
-        <li class="menu-item menu-item-home">
-
-    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
-
-  </li>
-        <li class="menu-item menu-item-archives">
-
-    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
-
-  </li>
-        <li class="menu-item menu-item-about">
-
-    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
-
-  </li>
-        <li class="menu-item menu-item-tags">
-
-    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
-
-  </li>
-        <li class="menu-item menu-item-categories">
-
-    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
-
-  </li>
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
       <li class="menu-item menu-item-search">
         <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
         </a>
@@ -174,138 +111,191 @@
 
 
   <div class="search-pop-overlay">
-    <div class="popup search-popup">
-        <div class="search-header">
+    <div class="popup search-popup"><div class="search-header">
   <span class="search-icon">
     <i class="fa fa-search"></i>
   </span>
   <div class="search-input-container">
-    <input autocomplete="off" autocapitalize="off"
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
            placeholder="搜索..." spellcheck="false"
            type="search" class="search-input">
   </div>
-  <span class="popup-btn-close">
+  <span class="popup-btn-close" role="button">
     <i class="fa fa-times-circle"></i>
   </span>
 </div>
-<div id="search-result">
-  <div id="no-result">
-    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
   </div>
 </div>
 
     </div>
   </div>
 
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E8%B7%AF%E7%94%B1%E4%B8%80%E4%B8%AA%E6%96%87%E6%A1%A3%E5%88%B0%E4%B8%80%E4%B8%AA%E5%88%86%E7%89%87%E4%B8%AD"><span class="nav-number">1.</span> <span class="nav-text">(1) 路由一个文档到一个分片中</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BB%E5%88%86%E7%89%87%E5%92%8C%E5%89%AF%E6%9C%AC%E5%88%86%E7%89%87%E5%A6%82%E4%BD%95%E4%BA%A4%E4%BA%92"><span class="nav-number">2.</span> <span class="nav-text">(2) 主分片和副本分片如何交互</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%96%B0%E5%BB%BA%E3%80%81%E7%B4%A2%E5%BC%95%E5%92%8C%E5%88%A0%E9%99%A4%E6%96%87%E6%A1%A3"><span class="nav-number">3.</span> <span class="nav-text">(3) 新建、索引和删除文档</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%8F%96%E5%9B%9E%E4%B8%80%E4%B8%AA%E6%96%87%E6%A1%A3"><span class="nav-number">4.</span> <span class="nav-text">(4) 取回一个文档</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%B1%80%E9%83%A8%E6%9B%B4%E6%96%B0%E6%96%87%E6%A1%A3"><span class="nav-number">5.</span> <span class="nav-text">(5) 局部更新文档</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%A4%9A%E6%96%87%E6%A1%A3%E6%A8%A1%E5%BC%8F"><span class="nav-number">6.</span> <span class="nav-text">(6) 多文档模式</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-number">7.</span> <span class="nav-text">References</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
 </div>
-    </header>
-
-    
-  <div class="back-to-top">
-    <i class="fa fa-arrow-up"></i>
-    <span>0%</span>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">315</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener me" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
   </div>
-  <div class="reading-progress-bar"></div>
-  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+<script type="text/javascript" src="//rf.revolvermaps.com/0/0/6.js?i=5rcgvdncuwu&amp;m=7&amp;c=e63100&amp;cr1=ffffff&amp;f=arial&amp;l=0&amp;bv=90&amp;lx=-420&amp;ly=420&amp;hi=20&amp;he=7&amp;hc=a8ddff&amp;rs=80" async="async"></script>
 
 
-    <main class="main">
-      <div class="main-inner">
-        <div class="content-wrap">
-          
-
-          <div class="content post posts-expand">
-            
+        </div>
+      </div>
+    </div>
 
     
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
   
   
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2020/01/20/elasticsearch-distributed-docs/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
       <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
       <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="elasticsearch 分布式文档存储 | 天道酬勤">
+      <meta itemprop="description" content="">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           elasticsearch 分布式文档存储
         </h1>
 
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-01-20 16:41:10" itemprop="dateCreated datePublished" datetime="2020-01-20T16:41:10+08:00">2020-01-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
-                </span>
-            </span>
+      <time title="创建时间：2020-01-20 16:41:10" itemprop="dateCreated datePublished" datetime="2020-01-20T16:41:10+08:00">2020-01-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-28 11:51:47" itemprop="dateModified" datetime="2022-05-28T11:51:47+08:00">2022-05-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/elasticsearch/" itemprop="url" rel="index"><span itemprop="name">elasticsearch</span></a>
+        </span>
+    </span>
 
-          
-            <span id="/2020/01/20/elasticsearch-distributed-docs/" class="post-meta-item leancloud_visitors" data-flag-title="elasticsearch 分布式文档存储" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span id="busuanzi_value_page_pv"></span>
-            </span>
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
   
   <span class="post-meta-item">
     
-      <span class="post-meta-item-icon">
-        <i class="far fa-comment"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2020/01/20/elasticsearch-distributed-docs/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2020/01/20/elasticsearch-distributed-docs/" itemprop="commentCount"></span>
+    <span class="post-meta-item-icon">
+      <i class="far fa-comment"></i>
+    </span>
+    <span class="post-meta-item-text">Waline：</span>
+  
+    <a title="waline" href="/2020/01/20/elasticsearch-distributed-docs/#waline" itemprop="discussionUrl">
+      <span class="post-comments-count waline-comment-count" data-path="/2020/01/20/elasticsearch-distributed-docs/" itemprop="commentCount"></span>
     </a>
   </span>
   
-  <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.5k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
-            </span>
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>3.5k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>3 分钟</span>
+    </span>
+</div>
 
         </div>
       </header>
@@ -313,10 +303,7 @@
     
     
     
-    <div class="post-body" itemprop="articleBody">
-
-      
-        <p>  文件是如何分布到集群的，又是如何从集群中获取的。</p>
+    <div class="post-body" itemprop="articleBody"><p>  文件是如何分布到集群的，又是如何从集群中获取的。</p>
 <h1 id="1-路由一个文档到一个分片中"><a href="#1-路由一个文档到一个分片中" class="headerlink" title="(1) 路由一个文档到一个分片中"></a>(1) 路由一个文档到一个分片中</h1><p>  当索引一个文档的时候，文档会被存储到一个主分片中。<br>  这个过程是根据下面这个公式决定的：<br>  <code>shard = hash(routing) % number_of_primary_shards</code></p>
 <p>  routing 是一个可变值，默认是文档的 _id ，也可以设置成一个自定义的值。 routing 通过 hash 函数生成一个数字，然后这个数字再除以 number_of_primary_shards （主分片的数量）后得到 余数 。这个分布在 0 到 number_of_primary_shards-1 之间的余数，就是我们所寻求的文档所在分片的位置。</p>
 <p>  这就解释了为什么我们要在创建索引的时候就确定好主分片的数量 并且永远不会改变这个数量：因为如果数量变化了，那么所有之前路由的值都会无效，文档也再也找不到了。</p>
@@ -328,7 +315,7 @@
 <p>  在下面的例子中，将所有的请求发送到 Node 1 ，我们将其称为 协调节点(coordinating node) 。</p>
 <p>  当发送请求的时候， 为了扩展负载，更好的做法是轮询集群中所有的节点。</p>
 <h1 id="3-新建、索引和删除文档"><a href="#3-新建、索引和删除文档" class="headerlink" title="(3) 新建、索引和删除文档"></a>(3) 新建、索引和删除文档</h1><p>  新建、索引和删除 请求都是 写 操作， 必须在主分片上面完成之后才能被复制到相关的副本分片。</p>
-<p>  <img data-src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-write.png" alt="elasticsearch-distrib-write"></p>
+<p>  <img src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-write.png" alt="elasticsearch-distrib-write"></p>
 <p>  以下是在主副分片和任何副本分片上面 成功新建，索引和删除文档所需要的步骤顺序：<br>    1. 客户端向 Node 1 发送新建、索引或者删除请求。<br>    2. 节点使用文档的 _id 确定文档属于分片 0 。请求会被转发到 Node 3，因为分片 0 的主分片目前被分配在 Node 3 上。<br>    3. Node 3 在主分片上面执行请求。如果成功了，它将请求并行转发到 Node 1 和 Node 2 的副本分片上。一旦所有的副本分片都报告成功, Node 3 将向协调节点报告成功，协调节点向客户端报告成功。<br>  在客户端收到成功响应时，文档变更已经在主分片和所有副本分片执行完成，变更是安全的。</p>
 <p>有一些可选的请求参数允许影响这个过程，可能以数据安全为代价提升性能。这些选项很少使用，因为Elasticsearch已经很快，但是为了完整起见，在这里阐述如下：</p>
 <p> <code>consistency</code></p>
@@ -342,10 +329,10 @@
 <p>  如果没有足够的副本分片会发生什么？ Elasticsearch会等待，希望更多的分片出现。默认情况下，它最多等待1分钟。 如果你需要，你可以使用 timeout 参数 使它更早终止： 100 100毫秒，30s 是30秒。</p>
 <p>  新索引默认有 1 个副本分片，这意味着为满足 规定数量 应该 需要两个活动的分片副本。 但是，这些默认的设置会阻止我们在单一节点上做任何事情。为了避免这个问题，要求只有当 number_of_replicas 大于1的时候，规定数量才会执行。</p>
 <h1 id="4-取回一个文档"><a href="#4-取回一个文档" class="headerlink" title="(4) 取回一个文档"></a>(4) 取回一个文档</h1><p>  可以从主分片或者从其它任意副本分片检索文档。</p>
-<p>  <img data-src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-read.png" alt="elasticsearch-distrib-read"><br>  以下是从主分片或者副本分片检索文档的步骤顺序：<br>  1、客户端向 Node 1 发送获取请求。<br>  2、节点使用文档的 _id 来确定文档属于分片 0 。分片 0 的副本分片存在于所有的三个节点上。 在这种情况下，它将请求转发到 Node 2 。<br>  3、Node 2 将文档返回给 Node 1 ，然后将文档返回给客户端。</p>
+<p>  <img src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-read.png" alt="elasticsearch-distrib-read"><br>  以下是从主分片或者副本分片检索文档的步骤顺序：<br>  1、客户端向 Node 1 发送获取请求。<br>  2、节点使用文档的 _id 来确定文档属于分片 0 。分片 0 的副本分片存在于所有的三个节点上。 在这种情况下，它将请求转发到 Node 2 。<br>  3、Node 2 将文档返回给 Node 1 ，然后将文档返回给客户端。</p>
 <p>  在处理读取请求时，协调结点在每次请求的时候都会通过轮询所有的副本分片来达到负载均衡。</p>
 <p>  在文档被检索时，已经被索引的文档可能已经存在于主分片上但是还没有复制到副本分片。 在这种情况下，副本分片可能会报告文档不存在，但是主分片可能成功返回文档。 一旦索引请求成功返回给用户，文档在主分片和副本分片都是可用的。</p>
-<h1 id="5-局部更新文档"><a href="#5-局部更新文档" class="headerlink" title="(5) 局部更新文档"></a>(5) 局部更新文档</h1><p> <img data-src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-update.png" alt="elasticsearch-distrib-update.png"></p>
+<h1 id="5-局部更新文档"><a href="#5-局部更新文档" class="headerlink" title="(5) 局部更新文档"></a>(5) 局部更新文档</h1><p> <img src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-update.png" alt="elasticsearch-distrib-update.png"></p>
 <p>以下是部分更新一个文档的步骤：</p>
 <ol>
 <li>客户端向 Node 1 发送更新请求。</li>
@@ -356,13 +343,13 @@
 <p>基于文档的复制<br>  当主分片把更改转发到副本分片时， 它不会转发更新请求。 相反，它转发完整文档的新版本。请记住，这些更改将会异步转发到副本分片，并且不能保证它们以发送它们相同的顺序到达。 如果Elasticsearch仅转发更改请求，则可能以错误的顺序应用更改，导致得到损坏的文档。</p>
 <h1 id="6-多文档模式"><a href="#6-多文档模式" class="headerlink" title="(6) 多文档模式"></a>(6) 多文档模式</h1><p>  mget 和 bulk API 的模式类似于单文档模式。区别在于协调节点知道每个文档存在于哪个分片中。 它将整个多文档请求分解成 每个分片 的多文档请求，并且将这些请求并行转发到每个参与节点。</p>
 <p>  协调节点一旦收到来自每个节点的应答，就将每个节点的响应收集整理成单个响应，返回给客户端。</p>
-<p> <img data-src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-mget.png" alt="elasticsearch-distrib-mget.png"></p>
+<p> <img src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-mget.png" alt="elasticsearch-distrib-mget.png"></p>
 <p>以下是使用单个 mget 请求取回多个文档所需的步骤顺序：</p>
 <ol>
 <li>客户端向 Node 1 发送 mget 请求。</li>
 <li>Node 1 为每个分片构建多文档获取请求，然后并行转发这些请求到托管在每个所需的主分片或者副本分片的节点上。一旦收到所有答复， Node 1 构建响应并将其返回给客户端。<br>可以对 docs 数组中每个文档设置 routing 参数。</li>
 </ol>
-<p> <img data-src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-bulk.png" alt="elasticsearch-distrib-bulk.png"><br>bulk API 按如下步骤顺序执行：</p>
+<p> <img src="/img/database/elasticsearch/distributed-docs/elasticsearch-distrib-bulk.png" alt="elasticsearch-distrib-bulk.png"><br>bulk API 按如下步骤顺序执行：</p>
 <ol>
 <li>客户端向 Node 1 发送 bulk 请求。</li>
 <li>Node 1 为每个节点创建一个批量请求，并将这些请求并行转发到每个包含主分片的节点主机。</li>
@@ -377,203 +364,52 @@
     
     
     
-      
-  <div class="popular-posts-header">相关文章</div>
-  <ul class="popular-posts">
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2020/01/20/elasticsearch-data-in-data-out/" rel="bookmark">elasticsearch 数据输入和输出</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2018/08/03/elasticsearch-cluster/" rel="bookmark">elasticsearch 集群</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2019/01/20/elasticsearch-index-management/" rel="bookmark">elasticsearch 索引管理</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2022/03/26/elasticsearch-index-model/" rel="bookmark">elasticsearch索引模型</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2019/11/13/elasticsearch-error-notes/" rel="bookmark">elasticsearch-error-notes</a></div>
-    </li>
-  </ul>
 
-        <div class="reward-container">
-  <div></div>
-  <button onclick="var qr = document.getElementById('qr'); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
-    打赏
-  </button>
-  <div id="qr" style="display: none;">
-      
-      <div style="display: inline-block;">
-        <img src="/img/pay/wechatpay.png" alt="WKQ 微信支付">
-        <p>微信支付</p>
-      </div>
-      
-      <div style="display: inline-block;">
-        <img src="/img/pay/alipay.png" alt="WKQ 支付宝">
-        <p>支付宝</p>
-      </div>
-
-  </div>
-</div>
-
-
-      <footer class="post-footer">
+    <footer class="post-footer">
           <div class="post-tags">
               <a href="/tags/elasticsearch/" rel="tag"># elasticsearch</a>
           </div>
 
         
 
-
-        
-    <div class="post-nav">
-      <div class="post-nav-item">
-    <a href="/2020/01/20/elasticsearch-data-in-data-out/" rel="prev" title="elasticsearch 数据输入和输出">
-      <i class="fa fa-chevron-left"></i> elasticsearch 数据输入和输出
-    </a></div>
-      <div class="post-nav-item">
-    <a href="/2020/01/20/elasticsearch-search/" rel="next" title="elasticsearch-search">
-      elasticsearch-search <i class="fa fa-chevron-right"></i>
-    </a></div>
-    </div>
-      </footer>
-    
-  </article>
-  
-  
-  
-
-
-
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2020/01/20/elasticsearch-data-in-data-out/" rel="prev" title="elasticsearch 数据输入和输出">
+                  <i class="fa fa-angle-left"></i> elasticsearch 数据输入和输出
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2020/01/20/elasticsearch-search/" rel="next" title="elasticsearch-search">
+                  elasticsearch-search <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
           </div>
-          
-    <div class="comments" id="valine-comments"></div>
-
-<script>
-  window.addEventListener('tabs:register', () => {
-    let { activeClass } = CONFIG.comments;
-    if (CONFIG.comments.storage) {
-      activeClass = localStorage.getItem('comments_active') || activeClass;
-    }
-    if (activeClass) {
-      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
-      if (activeTab) {
-        activeTab.click();
-      }
-    }
-  });
-  if (CONFIG.comments.storage) {
-    window.addEventListener('tabs:click', event => {
-      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
-      let commentClass = event.target.classList[1];
-      localStorage.setItem('comments_active', commentClass);
-    });
-  }
-</script>
-
-        </div>
-          
-  
-  <div class="toggle sidebar-toggle">
-    <span class="toggle-line toggle-line-first"></span>
-    <span class="toggle-line toggle-line-middle"></span>
-    <span class="toggle-line toggle-line-last"></span>
-  </div>
-
-  <aside class="sidebar">
-    <div class="sidebar-inner">
-
-      <ul class="sidebar-nav motion-element">
-        <li class="sidebar-nav-toc">
-          文章目录
-        </li>
-        <li class="sidebar-nav-overview">
-          站点概览
-        </li>
-      </ul>
-
-      <!--noindex-->
-      <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E8%B7%AF%E7%94%B1%E4%B8%80%E4%B8%AA%E6%96%87%E6%A1%A3%E5%88%B0%E4%B8%80%E4%B8%AA%E5%88%86%E7%89%87%E4%B8%AD"><span class="nav-text">(1) 路由一个文档到一个分片中</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BB%E5%88%86%E7%89%87%E5%92%8C%E5%89%AF%E6%9C%AC%E5%88%86%E7%89%87%E5%A6%82%E4%BD%95%E4%BA%A4%E4%BA%92"><span class="nav-text">(2) 主分片和副本分片如何交互</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-%E6%96%B0%E5%BB%BA%E3%80%81%E7%B4%A2%E5%BC%95%E5%92%8C%E5%88%A0%E9%99%A4%E6%96%87%E6%A1%A3"><span class="nav-text">(3) 新建、索引和删除文档</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E5%8F%96%E5%9B%9E%E4%B8%80%E4%B8%AA%E6%96%87%E6%A1%A3"><span class="nav-text">(4) 取回一个文档</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E5%B1%80%E9%83%A8%E6%9B%B4%E6%96%B0%E6%96%87%E6%A1%A3"><span class="nav-text">(5) 局部更新文档</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%A4%9A%E6%96%87%E6%A1%A3%E6%A8%A1%E5%BC%8F"><span class="nav-text">(6) 多文档模式</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#References"><span class="nav-text">References</span></a></li></ol></div>
-      </div>
-      <!--/noindex-->
-
-      <div class="site-overview-wrap sidebar-panel">
-        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-  <p class="site-author-name" itemprop="name">WKQ</p>
-  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+    </footer>
+  </article>
 </div>
-<div class="site-state-wrap motion-element">
-  <nav class="site-state">
-      <div class="site-state-item site-state-posts">
-          <a href="/archives/">
-        
-          <span class="site-state-item-count">313</span>
-          <span class="site-state-item-name">日志</span>
-        </a>
-      </div>
-      <div class="site-state-item site-state-categories">
-            <a href="/categories/">
-          
-        <span class="site-state-item-count">17</span>
-        <span class="site-state-item-name">分类</span></a>
-      </div>
-      <div class="site-state-item site-state-tags">
-            <a href="/tags/">
-          
-        <span class="site-state-item-count">58</span>
-        <span class="site-state-item-name">标签</span></a>
-      </div>
-  </nav>
+
+
+
+
+
+
+    <div class="comments" id="waline"></div>
 </div>
-  <div class="sidebar-button motion-element"><i class="fa fa-comment"></i>
-    Chat
-  </a>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2023</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">WKQ</span>
   </div>
-  <div class="links-of-author motion-element">
-      <span class="links-of-author-item">
-        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
-      </span>
-  </div>
-
-
-
-<script type="text/javascript" src="//rf.revolvermaps.com/0/0/6.js?i=5rcgvdncuwu&amp;m=7&amp;c=e63100&amp;cr1=ffffff&amp;f=arial&amp;l=0&amp;bv=90&amp;lx=-420&amp;ly=420&amp;hi=20&amp;he=7&amp;hc=a8ddff&amp;rs=80" async="async"></script>
-
-
-      </div>
-
-    </div>
-  </aside>
-  <div id="sidebar-dimmer"></div>
-
-
-      </div>
-    </main>
-
-    <footer class="footer">
-      <div class="footer-inner">
-        
-
-        
-
-<div class="copyright">
-  
-  &copy; 
-  <span itemprop="copyrightYear">2023</span>
-  <span class="with-love">
-    <i class="fa fa-heart"></i>
-  </span>
-  <span class="author" itemprop="copyrightHolder">WKQ</span>
-</div>
-  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
-  </div>
-
-        
 <div class="busuanzi-count">
-  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
-    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
       <span class="post-meta-item-icon">
         <i class="fa fa-user"></i>
       </span>
@@ -581,8 +417,7 @@
         <span id="busuanzi_value_site_uv"></span>
       </span>
     </span>
-    <span class="post-meta-divider">|</span>
-    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
       <span class="post-meta-item-icon">
         <i class="fa fa-eye"></i>
       </span>
@@ -591,52 +426,35 @@
       </span>
     </span>
 </div>
-
-
-
-
-
-
-
-
-      </div>
-    </footer>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
   </div>
 
-  
-  <script src="/lib/anime.min.js"></script>
-  <script src="//cdnjs.cloudflare.com/ajax/libs/lozad.js/1.14.0/lozad.min.js"></script>
-  <script src="/lib/velocity/velocity.min.js"></script>
-  <script src="/lib/velocity/velocity.ui.min.js"></script>
-
-<script src="/js/utils.js"></script>
-
-<script src="/js/motion.js"></script>
-
-
-<script src="/js/schemes/muse.js"></script>
-
-
-<script src="/js/next-boot.js"></script>
-
-<script src="/js/bookmark.js"></script>
-
-
-
+    </div>
+  </footer>
 
   
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
 
-
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
 
 
   
-<script src="/js/local-search.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
 
-
-
-
-
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.4.1/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
 
 
 
@@ -645,35 +463,20 @@
 
 
   
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 
-  
 
 
+
+<script class="next-config" data-name="waline" type="application/json">{"lang":"zh-cn","enable":true,"serverURL":"waline-server-one-omega.vercel.app","cssUrl":"https://unpkg.com/@waline/client@v2/dist/waline.css","commentCount":true,"pageview":false,"placeholder":"欢迎评论","avatar":"mm","meta":["nick","mail","link"],"pageSize":10,"visitor":false,"comment_count":true,"requiredFields":[],"libUrl":"//unpkg.com/@waline/client@v2/dist/waline.js","el":"#waline","comment":true,"path":"/2020/01/20/elasticsearch-distributed-docs/"}</script>
+<link rel="stylesheet" href="https://unpkg.com/@waline/client@v2/dist/waline.css">
 <script>
-NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
-  NexT.utils.getScript('//cdnjs.cloudflare.com/ajax/libs/valine/1.5.1/Valine.min.js', () => {
-    var GUEST = ['nick', 'mail', 'link'];
-    var guest = 'nick,mail,link';
-    guest = guest.split(',').filter(item => {
-      return GUEST.includes(item);
-    });
-    new Valine({
-      el         : '#valine-comments',
-      verify     : false,
-      notify     : true,
-      appId      : 'Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz',
-      appKey     : 'IeozLmM20GuvfcslfWgdNXP0',
-      placeholder: "期待您的评论",
-      avatar     : 'mm',
-      meta       : guest,
-      pageSize   : '10' || 10,
-      visitor    : true,
-      lang       : 'zh-cn' || 'zh-cn',
-      path       : location.pathname,
-      recordIP   : true,
-      serverURLs : ''
-    });
-  }, window.Valine);
+document.addEventListener('page:loaded', () => {
+  NexT.utils.loadComments(CONFIG.waline.el).then(() =>
+    NexT.utils.getScript(CONFIG.waline.libUrl, { condition: window.Waline })
+  ).then(() => 
+    Waline.init(Object.assign({}, CONFIG.waline,{ el: document.querySelector(CONFIG.waline.el) }))
+  );
 });
 </script>
 

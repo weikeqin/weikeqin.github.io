@@ -2,25 +2,27 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
-<meta name="theme-color" content="#222">
-<meta name="generator" content="Hexo 5.4.2">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 5.4.2">
+
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
   <link rel="mask-icon" href="/images/logo.svg" color="#222">
+  <meta name="msvalidate.01" content="CBB4A6675274A9B82BB82B104F7915A7">
+  <meta name="yandex-verification" content="4fa4531dcc9e1bfd">
+  <meta name="baidu-site-verification" content="1d263b839540cec80d3497b2f877c5da">
 
 <link rel="stylesheet" href="/css/main.css">
 
-<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&display=swap&subset=latin,latin-ext">
-<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
 
-<script id="hexo-configurations">
-    var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"weikeqin.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":true,"width":240},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":"valine","storage":true,"lazyload":false,"nav":null,"activeClass":"valine"},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
-  </script>
 
-  <meta name="description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。 (1) SDS是什么  Redis 是 Simple Dynamic">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha256-CTSx/A06dm1B063156EVh15m6Y67pAjZZaQc89LLSrU=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.18.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"waline","storage":true,"lazyload":false,"nav":null,"activeClass":"waline"},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？   Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。 (1) SDS是什么  Redis 是 Simple Dynamic">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis 数据结构 简单动态字符串(SDS)">
 <meta property="og:url" content="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/index.html">
@@ -42,96 +44,57 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://weikeqin.com/img/database/redis/data-structure/sds/sds-hdr-struct.svg">
 
+
 <link rel="canonical" href="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/">
 
 
-<script id="page-configurations">
-  // https://hexo.io/docs/variables.html
-  CONFIG.page = {
-    sidebar: "",
-    isHome : false,
-    isPost : true,
-    lang   : 'zh-CN'
-  };
-</script>
 
-  <title>Redis 数据结构 简单动态字符串(SDS) | 天道酬勤</title>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/","path":"2023/01/01/redis-data-structure-simple-dynamic-string/","title":"Redis 数据结构 简单动态字符串(SDS)"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis 数据结构 简单动态字符串(SDS) | 天道酬勤</title>
   
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-113485469-1"></script>
-    <script>
-      if (CONFIG.hostname === location.hostname) {
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'UA-113485469-1');
-      }
-    </script>
 
-
-  <script>
-    var _hmt = _hmt || [];
-    (function() {
-      var hm = document.createElement("script");
-      hm.src = "https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365";
-      var s = document.getElementsByTagName("script")[0];
-      s.parentNode.insertBefore(hm, s);
-    })();
-  </script>
+  <script src="/js/third-party/analytics/baidu-analytics.js"></script>
+  <script async src="https://hm.baidu.com/hm.js?d1ad0ae2a9976c44d556abc07cda1365"></script>
 
 
 
 
+
+
+<link rel="dns-prefetch" href="waline-server-one-omega.vercel.app">
   <noscript>
-  <style>
-  .use-motion .brand,
-  .use-motion .menu-item,
-  .sidebar-inner,
-  .use-motion .post-block,
-  .use-motion .pagination,
-  .use-motion .comments,
-  .use-motion .post-header,
-  .use-motion .post-body,
-  .use-motion .collection-header { opacity: initial; }
-
-  .use-motion .site-title,
-  .use-motion .site-subtitle {
-    opacity: initial;
-    top: initial;
-  }
-
-  .use-motion .logo-line-before i { left: initial; }
-  .use-motion .logo-line-after i { right: initial; }
-  </style>
-</noscript>
-
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
 </head>
 
-<body itemscope itemtype="http://schema.org/WebPage">
-  <div class="container use-motion">
-    <div class="headband"></div>
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
 
-    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
-      <div class="header-inner"><div class="site-brand-container">
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
   <div class="site-nav-toggle">
-    <div class="toggle" aria-label="切换导航栏">
-      <span class="toggle-line toggle-line-first"></span>
-      <span class="toggle-line toggle-line-middle"></span>
-      <span class="toggle-line toggle-line-last"></span>
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
     </div>
   </div>
 
   <div class="site-meta">
 
     <a href="/" class="brand" rel="start">
-      <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">天道酬勤</h1>
-      <span class="logo-line-after"><i></i></span>
+      <i class="logo-line"></i>
+      <p class="site-title">天道酬勤</p>
+      <i class="logo-line"></i>
     </a>
       <p class="site-subtitle" itemprop="description">坚持，努力，让好事发生</p>
   </div>
 
   <div class="site-nav-right">
-    <div class="toggle popup-trigger">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
         <i class="fa fa-search fa-fw fa-lg"></i>
     </div>
   </div>
@@ -139,34 +102,8 @@
 
 
 
-
 <nav class="site-nav">
-  <ul id="menu" class="main-menu menu">
-        <li class="menu-item menu-item-home">
-
-    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
-
-  </li>
-        <li class="menu-item menu-item-archives">
-
-    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
-
-  </li>
-        <li class="menu-item menu-item-about">
-
-    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
-
-  </li>
-        <li class="menu-item menu-item-tags">
-
-    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
-
-  </li>
-        <li class="menu-item menu-item-categories">
-
-    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
-
-  </li>
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
       <li class="menu-item menu-item-search">
         <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
         </a>
@@ -177,138 +114,191 @@
 
 
   <div class="search-pop-overlay">
-    <div class="popup search-popup">
-        <div class="search-header">
+    <div class="popup search-popup"><div class="search-header">
   <span class="search-icon">
     <i class="fa fa-search"></i>
   </span>
   <div class="search-input-container">
-    <input autocomplete="off" autocapitalize="off"
+    <input autocomplete="off" autocapitalize="off" maxlength="80"
            placeholder="搜索..." spellcheck="false"
            type="search" class="search-input">
   </div>
-  <span class="popup-btn-close">
+  <span class="popup-btn-close" role="button">
     <i class="fa fa-times-circle"></i>
   </span>
 </div>
-<div id="search-result">
-  <div id="no-result">
-    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+<div class="search-result-container no-result">
+  <div class="search-result-icon">
+    <i class="fa fa-spinner fa-pulse fa-5x"></i>
   </div>
 </div>
 
     </div>
   </div>
 
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-SDS%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">(1) SDS是什么</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E9%87%8C%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8D%E7%94%A8char-%EF%BC%9F"><span class="nav-number">1.1.</span> <span class="nav-text">(1.1) 为什么Redis里的字符串不用char*？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-SDS%E4%BC%98%E5%8A%BF"><span class="nav-number">1.2.</span> <span class="nav-text">(1.2) SDS优势</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8SDS"><span class="nav-number">2.</span> <span class="nav-text">(2) 为什么要用SDS</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-SDS%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">3.</span> <span class="nav-text">(3) SDS提供的功能</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-SDS%E5%8E%9F%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">(4) SDS原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-SDS%E5%AE%9A%E4%B9%89"><span class="nav-number">4.1.</span> <span class="nav-text">(4.1) SDS定义</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-SDS%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">5.</span> <span class="nav-text">(5) SDS源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E5%88%9B%E5%BB%BA%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) 创建字符串</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-SDS%E9%87%8A%E6%94%BE"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) SDS释放</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-SDS%E4%BF%AE%E6%94%B9"><span class="nav-number">5.3.</span> <span class="nav-text">(5.3) SDS修改</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-%E8%8E%B7%E5%8F%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E9%95%BF%E5%BA%A6"><span class="nav-number">5.4.</span> <span class="nav-text">(5.4) 获取字符串长度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-5-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-number">5.5.</span> <span class="nav-text">(5.5) 内存预分配</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-SDS%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-number">6.</span> <span class="nav-text">(6) SDS内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1-%E7%B4%A7%E5%87%91%E5%9E%8B%E8%AE%BE%E8%AE%A1"><span class="nav-number">6.1.</span> <span class="nav-text">(6.1) 紧凑型设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96"><span class="nav-number">6.2.</span> <span class="nav-text">(6.2) 编译优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E4%BD%BF%E7%94%A8SDS%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%9C%B0%E6%96%B9"><span class="nav-number">7.</span> <span class="nav-text">(7) 使用SDS字符串的地方</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">8.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">WKQ</p>
+  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
 </div>
-    </header>
-
-    
-  <div class="back-to-top">
-    <i class="fa fa-arrow-up"></i>
-    <span>0%</span>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">315</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author animated">
+      <span class="links-of-author-item">
+        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener me" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
   </div>
-  <div class="reading-progress-bar"></div>
-  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+<script type="text/javascript" src="//rf.revolvermaps.com/0/0/6.js?i=5rcgvdncuwu&amp;m=7&amp;c=e63100&amp;cr1=ffffff&amp;f=arial&amp;l=0&amp;bv=90&amp;lx=-420&amp;ly=420&amp;hi=20&amp;he=7&amp;hc=a8ddff&amp;rs=80" async="async"></script>
 
 
-    <main class="main">
-      <div class="main-inner">
-        <div class="content-wrap">
-          
-
-          <div class="content post posts-expand">
-            
+        </div>
+      </div>
+    </div>
 
     
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
   
   
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://weikeqin.com/2023/01/01/redis-data-structure-simple-dynamic-string/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
       <meta itemprop="name" content="WKQ">
-      <meta itemprop="description" content="不积跬步无以至千里">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
       <meta itemprop="name" content="天道酬勤">
+      <meta itemprop="description" content="不积跬步无以至千里">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis 数据结构 简单动态字符串(SDS) | 天道酬勤">
+      <meta itemprop="description" content="">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           Redis 数据结构 简单动态字符串(SDS)
         </h1>
 
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2023-01-01 15:55:11" itemprop="dateCreated datePublished" datetime="2023-01-01T15:55:11+08:00">2023-01-01</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2023-07-29 23:23:47" itemprop="dateModified" datetime="2023-07-29T23:23:47+08:00">2023-07-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
-                </span>
-            </span>
+      <time title="创建时间：2023-01-01 15:55:11" itemprop="dateCreated datePublished" datetime="2023-01-01T15:55:11+08:00">2023-01-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2023-07-29 23:23:47" itemprop="dateModified" datetime="2023-07-29T23:23:47+08:00">2023-07-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/redis/" itemprop="url" rel="index"><span itemprop="name">redis</span></a>
+        </span>
+    </span>
 
-          
-            <span id="/2023/01/01/redis-data-structure-simple-dynamic-string/" class="post-meta-item leancloud_visitors" data-flag-title="Redis 数据结构 简单动态字符串(SDS)" title="阅读次数">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span class="leancloud-visitors-count"></span>
-            </span>
-            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span id="busuanzi_value_page_pv"></span>
-            </span>
+  
+    <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">阅读次数：</span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
   
   <span class="post-meta-item">
     
-      <span class="post-meta-item-icon">
-        <i class="far fa-comment"></i>
-      </span>
-      <span class="post-meta-item-text">Valine：</span>
-    
-    <a title="valine" href="/2023/01/01/redis-data-structure-simple-dynamic-string/#valine-comments" itemprop="discussionUrl">
-      <span class="post-comments-count valine-comment-count" data-xid="/2023/01/01/redis-data-structure-simple-dynamic-string/" itemprop="commentCount"></span>
+    <span class="post-meta-item-icon">
+      <i class="far fa-comment"></i>
+    </span>
+    <span class="post-meta-item-text">Waline：</span>
+  
+    <a title="waline" href="/2023/01/01/redis-data-structure-simple-dynamic-string/#waline" itemprop="discussionUrl">
+      <span class="post-comments-count waline-comment-count" data-path="/2023/01/01/redis-data-structure-simple-dynamic-string/" itemprop="commentCount"></span>
     </a>
   </span>
   
-  <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>11k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
-            </span>
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="本文字数">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">本文字数：</span>
+      <span>11k</span>
+    </span>
+    <span class="post-meta-item" title="阅读时长">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">阅读时长 &asymp;</span>
+      <span>10 分钟</span>
+    </span>
+</div>
 
         </div>
       </header>
@@ -316,19 +306,16 @@
     
     
     
-    <div class="post-body" itemprop="articleBody">
-
-      
-        <p>  Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？</p>
+    <div class="post-body" itemprop="articleBody"><p>  Redis绝大部分操作都会涉及到key，使用特别广泛，从系统设计的角度来看，我们该如何设计实现字符串呢？</p>
 <p>  Redis 设计了简单动态字符串(Simple Dynamic String)的结构，用来表示字符串。相比于 C 语言中的字符串实现，SDS 这种字符串的实现方式，会提升字符串的操作效率，并且可以用来保存二进制数据。</p>
 <h1 id="1-SDS是什么"><a href="#1-SDS是什么" class="headerlink" title="(1) SDS是什么"></a>(1) SDS是什么</h1><p>  Redis 是 Simple Dynamic String 的缩写，中文是<code>简单动态字符串</code></p>
 <p>  SDS结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
-<p>  <img data-src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构"> </p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构"> </p>
 <span id="more"></span>
 
 <h2 id="1-1-为什么Redis里的字符串不用char-？"><a href="#1-1-为什么Redis里的字符串不用char-？" class="headerlink" title="(1.1) 为什么Redis里的字符串不用char*？"></a>(1.1) 为什么Redis里的字符串不用char*？</h2><p>  Redis是用c语言编写的，为什么Redis的key不直接使用char* ?</p>
 <p>  来看看 char* 字符数组的结构。<br>  char字符数组的结构比较简单，用一块连续的内存空间，依次存放了字符串中的每一个字符数组结构，结尾位置就用”\0”表示，表示结束。</p>
-<p>  <img data-src="/img/database/redis/data-structure/sds/c-string.png" alt="C语言字符串"></p>
+<p>  <img src="/img/database/redis/data-structure/sds/c-string.png" alt="C语言字符串"></p>
 <p><strong>不使用char*的原因</strong></p>
 <ol>
 <li>操作效率低：获取字符串长度需遍历整个字符数组，O(N)复杂度</li>
@@ -453,7 +440,7 @@
 </tbody></table>
 <h1 id="4-SDS原理"><a href="#4-SDS原理" class="headerlink" title="(4) SDS原理"></a>(4) SDS原理</h1><p>  redis 6.0版本源码  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/sds.c">https://github.com/redis/redis/blob/6.0/src/sds.c</a> </p>
 <h2 id="4-1-SDS定义"><a href="#4-1-SDS定义" class="headerlink" title="(4.1) SDS定义"></a>(4.1) SDS定义</h2><p>  SDS 结构里包含了一个字符数组 buf[]，用来保存实际数据。<br>  同时，SDS结构里还包含了三个元数据，分别是字符数组现有长度 len、分配给字符数组的空间长度 alloc，以及 SDS 类型 flags。</p>
-<p>  <img data-src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构">  </p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-struct.svg" alt="sdshdr结构">  </p>
 <p>  Redis里SDS定义，可以看到定义了4种sds，分别是<code>sdshdr8</code>、<code>sdshdr16</code>、<code>sdshdr32</code>、<code>sdshdr64</code></p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">char</span> <span class="token operator">*</span>sds<span class="token punctuation">;</span>
 
@@ -486,7 +473,7 @@
 <span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p>  类型 <code>sds</code> 是 <code>char*</code> 的别名（alias），在 Redis 中需要用到字符数组时，就直接使用 sds 这个别名。<br>  结构 <code>sdshdr</code> 则保存了 <code>len</code> 、 <code>alloc</code> <code>flags</code>和 <code>buf[]</code> 四个属性</p>
-<p>  <img data-src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
 <p>  SDS 本质还是字符数组，只是在字符数组基础上增加了额外的元数据。<br>  但是，sds和char*并不等同，sds是二进制安全的，它可以存储任意二进制数据，不能像C语言字符串那样以‘\0’来标识字符串结束</p>
 <p>  真正的SDS指的是 <code>sdshdr8</code>  <code>sdshdr16</code>  <code>sdshdr32</code>  <code>sdshdr64</code></p>
 <p>  <code>__attribute__ ((__packed__))</code> 此字段是为了让编译器以紧凑模式来分配内存。</p>
@@ -513,7 +500,7 @@
 
 <h1 id="5-SDS源码解读"><a href="#5-SDS源码解读" class="headerlink" title="(5) SDS源码解读"></a>(5) SDS源码解读</h1><p>  redis 6.0版本源码  <a target="_blank" rel="noopener" href="https://github.com/redis/redis/blob/6.0/src/sds.c">https://github.com/redis/redis/blob/6.0/src/sds.c</a> </p>
 <h2 id="5-1-创建字符串"><a href="#5-1-创建字符串" class="headerlink" title="(5.1) 创建字符串"></a>(5.1) 创建字符串</h2><p>  在创建新的字符串时，Redis 会调用 SDS 创建函数 sdsnewlen。</p>
-<p>  <img data-src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 
  * 使用“init”指针和“initlen”指定的内容创建一个新的 sds 字符串。
  * 
@@ -741,7 +728,7 @@ sds <span class="token function">sdscatlen</span><span class="token punctuation"
 
 
 
-<h2 id="5-5-内存预分配"><a href="#5-5-内存预分配" class="headerlink" title="(5.5) 内存预分配"></a>(5.5) 内存预分配</h2><p>  <img data-src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
+<h2 id="5-5-内存预分配"><a href="#5-5-内存预分配" class="headerlink" title="(5.5) 内存预分配"></a>(5.5) 内存预分配</h2><p>  <img src="/img/database/redis/data-structure/sds/sds-memory.svg" alt="sds内存分配"></p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file:  src/sds.c</span>
 
 <span class="token comment">/* 
@@ -848,7 +835,7 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
     <span class="token keyword">char</span> buf<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>  <span class="token comment">// 实际存储的数据</span>
 <span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<p>  <img data-src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
+<p>  <img src="/img/database/redis/data-structure/sds/sds-hdr-all.svg" alt="各种sdshdr区别"></p>
 <p>  元数据各自占用的内存空间在 <code>sdshdr8</code>、<code>sdshdr16</code>、<code>sdshdr32</code>、<code>sdshdr64</code> 类型中，则分别是 1字节、2字节、4字节 和 8字节。</p>
 <p>  SDS之所以设计不同的结构头（即不同类型），是为了能灵活保存不同大小的字符串，从而有效节省内存空间。<br>  因为在保存不同大小的字符串时，结构头占用的内存空间也不一样，这样一来，在保存小字符串时，结构头占用空间也比较少。</p>
 <h2 id="6-2-编译优化"><a href="#6-2-编译优化" class="headerlink" title="(6.2) 编译优化"></a>(6.2) 编译优化</h2><p>  Redis 在编程上还使用了专门的编译优化来节省内存空间。<br><code>struct __attribute__ ((__packed__)) sdshdr64</code>  ，attribute ((packed))的作用就是告诉编译器，在编译 sdshdr64 结构时，不要使用字节对齐的方式，而是采用紧凑的方式分配内存。</p>
@@ -889,48 +876,8 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
     
     
     
-      
-  <div class="popular-posts-header">相关文章</div>
-  <ul class="popular-posts">
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2022/01/16/redis-aof/" rel="bookmark">Redis AOF</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/04/16/redis-aof-rewrite/" rel="bookmark">Redis AOF 重写</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/01/15/redis-data-structure-intset/" rel="bookmark">Redis 数据结构 整数集合(intset)</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/01/21/redis-data-structure-linked-list/" rel="bookmark">Redis 数据结构 双向链表(linkedlist)</a></div>
-    </li>
-    <li class="popular-posts-item">
-      <div class="popular-posts-title"><a href="/2023/01/07/redis-data-structure-hash-tables/" rel="bookmark">Redis 数据结构 哈希表(hashtable/dict/map)</a></div>
-    </li>
-  </ul>
 
-        <div class="reward-container">
-  <div></div>
-  <button onclick="var qr = document.getElementById('qr'); qr.style.display = (qr.style.display === 'none') ? 'block' : 'none';">
-    打赏
-  </button>
-  <div id="qr" style="display: none;">
-      
-      <div style="display: inline-block;">
-        <img src="/img/pay/wechatpay.png" alt="WKQ 微信支付">
-        <p>微信支付</p>
-      </div>
-      
-      <div style="display: inline-block;">
-        <img src="/img/pay/alipay.png" alt="WKQ 支付宝">
-        <p>支付宝</p>
-      </div>
-
-  </div>
-</div>
-
-
-      <footer class="post-footer">
+    <footer class="post-footer">
           <div class="post-tags">
               <a href="/tags/redis/" rel="tag"># redis</a>
               <a href="/tags/database/" rel="tag"># database</a>
@@ -938,155 +885,44 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
 
         
 
-
-        
-    <div class="post-nav">
-      <div class="post-nav-item">
-    <a href="/2023/01/01/redis-source-code-overall-overview/" rel="prev" title="Redis源码整体概览">
-      <i class="fa fa-chevron-left"></i> Redis源码整体概览
-    </a></div>
-      <div class="post-nav-item">
-    <a href="/2023/01/07/redis-data-structure-hash-tables/" rel="next" title="Redis 数据结构 哈希表(hashtable/dict/map)">
-      Redis 数据结构 哈希表(hashtable/dict/map) <i class="fa fa-chevron-right"></i>
-    </a></div>
-    </div>
-      </footer>
-    
-  </article>
-  
-  
-  
-
-
-
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2023/01/01/redis-source-code-overall-overview/" rel="prev" title="Redis源码整体概览">
+                  <i class="fa fa-angle-left"></i> Redis源码整体概览
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2023/01/07/redis-data-structure-hash-tables/" rel="next" title="Redis 数据结构 哈希表(hashtable/dict/map)">
+                  Redis 数据结构 哈希表(hashtable/dict/map) <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
           </div>
-          
-    <div class="comments" id="valine-comments"></div>
-
-<script>
-  window.addEventListener('tabs:register', () => {
-    let { activeClass } = CONFIG.comments;
-    if (CONFIG.comments.storage) {
-      activeClass = localStorage.getItem('comments_active') || activeClass;
-    }
-    if (activeClass) {
-      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
-      if (activeTab) {
-        activeTab.click();
-      }
-    }
-  });
-  if (CONFIG.comments.storage) {
-    window.addEventListener('tabs:click', event => {
-      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
-      let commentClass = event.target.classList[1];
-      localStorage.setItem('comments_active', commentClass);
-    });
-  }
-</script>
-
-        </div>
-          
-  
-  <div class="toggle sidebar-toggle">
-    <span class="toggle-line toggle-line-first"></span>
-    <span class="toggle-line toggle-line-middle"></span>
-    <span class="toggle-line toggle-line-last"></span>
-  </div>
-
-  <aside class="sidebar">
-    <div class="sidebar-inner">
-
-      <ul class="sidebar-nav motion-element">
-        <li class="sidebar-nav-toc">
-          文章目录
-        </li>
-        <li class="sidebar-nav-overview">
-          站点概览
-        </li>
-      </ul>
-
-      <!--noindex-->
-      <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-SDS%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-text">(1) SDS是什么</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E4%B8%BA%E4%BB%80%E4%B9%88Redis%E9%87%8C%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8D%E7%94%A8char-%EF%BC%9F"><span class="nav-text">(1.1) 为什么Redis里的字符串不用char*？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-SDS%E4%BC%98%E5%8A%BF"><span class="nav-text">(1.2) SDS优势</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8SDS"><span class="nav-text">(2) 为什么要用SDS</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-SDS%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-text">(3) SDS提供的功能</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-SDS%E5%8E%9F%E7%90%86"><span class="nav-text">(4) SDS原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-SDS%E5%AE%9A%E4%B9%89"><span class="nav-text">(4.1) SDS定义</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-SDS%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-text">(5) SDS源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E5%88%9B%E5%BB%BA%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-text">(5.1) 创建字符串</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-SDS%E9%87%8A%E6%94%BE"><span class="nav-text">(5.2) SDS释放</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-3-SDS%E4%BF%AE%E6%94%B9"><span class="nav-text">(5.3) SDS修改</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-4-%E8%8E%B7%E5%8F%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E9%95%BF%E5%BA%A6"><span class="nav-text">(5.4) 获取字符串长度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-5-%E5%86%85%E5%AD%98%E9%A2%84%E5%88%86%E9%85%8D"><span class="nav-text">(5.5) 内存预分配</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-SDS%E5%86%85%E5%AD%98%E4%BC%98%E5%8C%96"><span class="nav-text">(6) SDS内存优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#6-1-%E7%B4%A7%E5%87%91%E5%9E%8B%E8%AE%BE%E8%AE%A1"><span class="nav-text">(6.1) 紧凑型设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-2-%E7%BC%96%E8%AF%91%E4%BC%98%E5%8C%96"><span class="nav-text">(6.2) 编译优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E4%BD%BF%E7%94%A8SDS%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%9C%B0%E6%96%B9"><span class="nav-text">(7) 使用SDS字符串的地方</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-text">参考资料</span></a></li></ol></div>
-      </div>
-      <!--/noindex-->
-
-      <div class="site-overview-wrap sidebar-panel">
-        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-  <p class="site-author-name" itemprop="name">WKQ</p>
-  <div class="site-description" itemprop="description">不积跬步无以至千里</div>
+    </footer>
+  </article>
 </div>
-<div class="site-state-wrap motion-element">
-  <nav class="site-state">
-      <div class="site-state-item site-state-posts">
-          <a href="/archives/">
-        
-          <span class="site-state-item-count">313</span>
-          <span class="site-state-item-name">日志</span>
-        </a>
-      </div>
-      <div class="site-state-item site-state-categories">
-            <a href="/categories/">
-          
-        <span class="site-state-item-count">17</span>
-        <span class="site-state-item-name">分类</span></a>
-      </div>
-      <div class="site-state-item site-state-tags">
-            <a href="/tags/">
-          
-        <span class="site-state-item-count">58</span>
-        <span class="site-state-item-name">标签</span></a>
-      </div>
-  </nav>
+
+
+
+
+
+
+    <div class="comments" id="waline"></div>
 </div>
-  <div class="sidebar-button motion-element"><i class="fa fa-comment"></i>
-    Chat
-  </a>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2023</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">WKQ</span>
   </div>
-  <div class="links-of-author motion-element">
-      <span class="links-of-author-item">
-        <a href="mailto:weikeqin.cn@gmail.com" title="E-Mail → mailto:weikeqin.cn@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
-      </span>
-  </div>
-
-
-
-<script type="text/javascript" src="//rf.revolvermaps.com/0/0/6.js?i=5rcgvdncuwu&amp;m=7&amp;c=e63100&amp;cr1=ffffff&amp;f=arial&amp;l=0&amp;bv=90&amp;lx=-420&amp;ly=420&amp;hi=20&amp;he=7&amp;hc=a8ddff&amp;rs=80" async="async"></script>
-
-
-      </div>
-
-    </div>
-  </aside>
-  <div id="sidebar-dimmer"></div>
-
-
-      </div>
-    </main>
-
-    <footer class="footer">
-      <div class="footer-inner">
-        
-
-        
-
-<div class="copyright">
-  
-  &copy; 
-  <span itemprop="copyrightYear">2023</span>
-  <span class="with-love">
-    <i class="fa fa-heart"></i>
-  </span>
-  <span class="author" itemprop="copyrightHolder">WKQ</span>
-</div>
-  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
-  </div>
-
-        
 <div class="busuanzi-count">
-  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
-    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
       <span class="post-meta-item-icon">
         <i class="fa fa-user"></i>
       </span>
@@ -1094,8 +930,7 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
         <span id="busuanzi_value_site_uv"></span>
       </span>
     </span>
-    <span class="post-meta-divider">|</span>
-    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
       <span class="post-meta-item-icon">
         <i class="fa fa-eye"></i>
       </span>
@@ -1104,52 +939,35 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
       </span>
     </span>
 </div>
-
-
-
-
-
-
-
-
-      </div>
-    </footer>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
   </div>
 
-  
-  <script src="/lib/anime.min.js"></script>
-  <script src="//cdnjs.cloudflare.com/ajax/libs/lozad.js/1.14.0/lozad.min.js"></script>
-  <script src="/lib/velocity/velocity.min.js"></script>
-  <script src="/lib/velocity/velocity.ui.min.js"></script>
-
-<script src="/js/utils.js"></script>
-
-<script src="/js/motion.js"></script>
-
-
-<script src="/js/schemes/muse.js"></script>
-
-
-<script src="/js/next-boot.js"></script>
-
-<script src="/js/bookmark.js"></script>
-
-
-
+    </div>
+  </footer>
 
   
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
 
-
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
 
 
   
-<script src="/js/local-search.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
 
-
-
-
-
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.4.1/search.js" integrity="sha256-1kfA5uHPf65M5cphT2dvymhkuyHPQp5A53EGZOnOLmc=" crossorigin="anonymous"></script>
+<script src="/js/third-party/search/local-search.js"></script>
 
 
 
@@ -1158,35 +976,20 @@ sds <span class="token function">sdsMakeRoomFor</span><span class="token punctua
 
 
   
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
 
-  
 
 
+
+<script class="next-config" data-name="waline" type="application/json">{"lang":"zh-cn","enable":true,"serverURL":"waline-server-one-omega.vercel.app","cssUrl":"https://unpkg.com/@waline/client@v2/dist/waline.css","commentCount":true,"pageview":false,"placeholder":"欢迎评论","avatar":"mm","meta":["nick","mail","link"],"pageSize":10,"visitor":false,"comment_count":true,"requiredFields":[],"libUrl":"//unpkg.com/@waline/client@v2/dist/waline.js","el":"#waline","comment":true,"path":"/2023/01/01/redis-data-structure-simple-dynamic-string/"}</script>
+<link rel="stylesheet" href="https://unpkg.com/@waline/client@v2/dist/waline.css">
 <script>
-NexT.utils.loadComments(document.querySelector('#valine-comments'), () => {
-  NexT.utils.getScript('//cdnjs.cloudflare.com/ajax/libs/valine/1.5.1/Valine.min.js', () => {
-    var GUEST = ['nick', 'mail', 'link'];
-    var guest = 'nick,mail,link';
-    guest = guest.split(',').filter(item => {
-      return GUEST.includes(item);
-    });
-    new Valine({
-      el         : '#valine-comments',
-      verify     : false,
-      notify     : true,
-      appId      : 'Ca876j76FoCQi1SShjT0qC6k-gzGzoHsz',
-      appKey     : 'IeozLmM20GuvfcslfWgdNXP0',
-      placeholder: "期待您的评论",
-      avatar     : 'mm',
-      meta       : guest,
-      pageSize   : '10' || 10,
-      visitor    : true,
-      lang       : 'zh-cn' || 'zh-cn',
-      path       : location.pathname,
-      recordIP   : true,
-      serverURLs : ''
-    });
-  }, window.Valine);
+document.addEventListener('page:loaded', () => {
+  NexT.utils.loadComments(CONFIG.waline.el).then(() =>
+    NexT.utils.getScript(CONFIG.waline.libUrl, { condition: window.Waline })
+  ).then(() => 
+    Waline.init(Object.assign({}, CONFIG.waline,{ el: document.querySelector(CONFIG.waline.el) }))
+  );
 });
 </script>
 

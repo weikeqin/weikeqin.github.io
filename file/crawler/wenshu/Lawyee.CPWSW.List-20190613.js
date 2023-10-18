@@ -16,7 +16,7 @@
         $("#txthidpagesize").val(pagesize)
         var guid = createGuid() + createGuid() + "-" + createGuid() + "-" + createGuid() + createGuid() + "-" + createGuid() + createGuid() + createGuid(); //CreateGuid();
         $("#txthidGuid").val(guid);
-        $("#divYzmImg").html("<img alt='点击刷新验证码！' name='validateCode' id='ImgYzm' onclick='ref()'  title='点击切换验证码' data-src='/ValiCode/CreateCode/?guid=" + guid + "' style='cursor: pointer;'  />");
+        $("#divYzmImg").html("<img alt='点击刷新验证码！' name='validateCode' id='ImgYzm' onclick='ref()'  title='点击切换验证码' src='/ValiCode/CreateCode/?guid=" + guid + "' style='cursor: pointer;'  />");
     }
     var createGuid = function () {
         return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
@@ -165,7 +165,7 @@
             var param = $(this.setting.param);
             var datalist = "";
             var list_center = $("#resultList");
-            list_center.html("<div style='height:25px;line-height:25px;vertical-align:middle;'><img data-src='/Assets/js/libs/icons/loading.gif'/><span>正在加载，请稍候...</span></div>");
+            list_center.html("<div style='height:25px;line-height:25px;vertical-align:middle;'><img src='/Assets/js/libs/icons/loading.gif'/><span>正在加载，请稍候...</span></div>");
             //center中部数据
             //1.取数据
             var listparam = "";
@@ -423,13 +423,13 @@
                                         + "</table>"
                                             + "<div class=\"scxz\">"
                                                 + "<div class=\"download\">"
-                                                + "<img style=\"cursor:pointer; margin-bottom:5px;\" title='通过中国司法案例网身份认证的会员（主要包括法官、律师、法律学者、法律院校学生）才能推荐裁判文书到中国司法案例网，经全体会员众筹投票，符合条件可收入最高人民法院司法案例库' onclick=\"CasefxNEW('" + key + "');\" data-src=\"/Assets/img/list/wytal-hove.png\" alt=\"通过中国司法案例网身份认证的会员（主要包括法官、律师、法律学者、法律院校学生）才能推荐裁判文书到中国司法案例网，经全体会员众筹投票，符合条件可收入最高人民法院司法案例库\"/>"
+                                                + "<img style=\"cursor:pointer; margin-bottom:5px;\" title='通过中国司法案例网身份认证的会员（主要包括法官、律师、法律学者、法律院校学生）才能推荐裁判文书到中国司法案例网，经全体会员众筹投票，符合条件可收入最高人民法院司法案例库' onclick=\"CasefxNEW('" + key + "');\" src=\"/Assets/img/list/wytal-hove.png\" alt=\"通过中国司法案例网身份认证的会员（主要包括法官、律师、法律学者、法律院校学生）才能推荐裁判文书到中国司法案例网，经全体会员众筹投票，符合条件可收入最高人民法院司法案例库\"/>"
                                                 + "</div>"
                                                 + "<div class=\"download\">"
-                                                + "<img style=\"cursor:pointer;\" title='下载' onclick=\"DownLoadCaseNew('" + listitemid + "');\" data-src=\"/Assets/img/list/list_download.png\" alt=\"下载\"/>"
+                                                + "<img style=\"cursor:pointer;\" title='下载' onclick=\"DownLoadCaseNew('" + listitemid + "');\" src=\"/Assets/img/list/list_download.png\" alt=\"下载\"/>"
                                                 + "</div>"
                                                 + "<div class=\"collect\">"
-                                                + "<img style=\"cursor:pointer;\" title='收藏'  onclick=\"CollectCaseNew('" + listitemid + "');\" data-src=\"/Assets/img/list/list_collect.png\"  alt=\"收藏\"/>"
+                                                + "<img style=\"cursor:pointer;\" title='收藏'  onclick=\"CollectCaseNew('" + listitemid + "');\" src=\"/Assets/img/list/list_collect.png\"  alt=\"收藏\"/>"
                                                 + "</div>"
                                             + "</div>"
                                 + "</div>");
@@ -658,24 +658,24 @@
 
                                 if (arry_arrentId[i] == relateFile[ii].文书ID) {
                                     if (ii == 0) {
-                                        img += "<img data-src=\"/Assets/img/list/bp_18.png\" style=\"padding-left:2px;\"/><img style=\"padding-bottom: 5px;\" data-src=\"/Assets/img/list/dot_10.png\"/>";
+                                        img += "<img src=\"/Assets/img/list/bp_18.png\" style=\"padding-left:2px;\"/><img style=\"padding-bottom: 5px;\" src=\"/Assets/img/list/dot_10.png\"/>";
                                     } else if (ii == relateFile.length - 1 && relateFile.length == 2) {
-                                        img += "<img style=\"padding-left:2px;\" data-src=\"/Assets/img/list/bp_18.png\"/><img style=\"margin-bottom: 10px;margin-right: 5px;\" data-src=\"/Assets/img/list/dot_04.png\"/>";
+                                        img += "<img style=\"padding-left:2px;\" src=\"/Assets/img/list/bp_18.png\"/><img style=\"margin-bottom: 10px;margin-right: 5px;\" src=\"/Assets/img/list/dot_04.png\"/>";
                                     } else if (ii < relateFile.length - 1) {
-                                        img += "<img style=\"margin-bottom:10px;\" data-src=\"/Assets/img/list/bp_18.png\"/><img data-src=\"/Assets/img/list/dotLine_03.png\"/>";
+                                        img += "<img style=\"margin-bottom:10px;\" src=\"/Assets/img/list/bp_18.png\"/><img src=\"/Assets/img/list/dotLine_03.png\"/>";
                                     } else {
-                                        img += "<img data-src=\"/Assets/img/list/bp_18.png\" style=\"padding-left:2px;\" /><img style=\"padding-right: 4px;padding-bottom: 11px;\" data-src=\"/Assets/img/list/dot_07.png\"/>";
+                                        img += "<img src=\"/Assets/img/list/bp_18.png\" style=\"padding-left:2px;\" /><img style=\"padding-right: 4px;padding-bottom: 11px;\" src=\"/Assets/img/list/dot_07.png\"/>";
                                     }
 
                                 } else {
                                     if (ii == 0) {
-                                        img += "<img style=\"padding-bottom: 5px;margin-left:10px;margin-top: 10px;\" data-src=\"/Assets/img/list/dot_10.png\"/>";
+                                        img += "<img style=\"padding-bottom: 5px;margin-left:10px;margin-top: 10px;\" src=\"/Assets/img/list/dot_10.png\"/>";
                                     } else if (ii < relateFile.length - 1) {
-                                        img += "<img style=\"margin-left:45px\" data-src=\"/Assets/img/list/dotLine_03.png\"/>";
+                                        img += "<img style=\"margin-left:45px\" src=\"/Assets/img/list/dotLine_03.png\"/>";
                                     } else if (ii == relateFile.length - 1 && relateFile.length == 2) {
-                                        img += "<img style=\"margin-left:48px;margin-right: 5px;\" data-src=\"/Assets/img/list/dot_04.png\"/>";
+                                        img += "<img style=\"margin-left:48px;margin-right: 5px;\" src=\"/Assets/img/list/dot_04.png\"/>";
                                     } else {
-                                        img += "<img style=\"padding-right: 4px;padding-top: 8px;\" data-src=\"/Assets/img/list/dot_07.png\"/>";
+                                        img += "<img style=\"padding-right: 4px;padding-top: 8px;\" src=\"/Assets/img/list/dot_07.png\"/>";
                                     }
                                 }
                             }

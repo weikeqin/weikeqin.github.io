@@ -5,7 +5,7 @@ function createGuid() {
 function ref() {
     var guid = createGuid() + createGuid() + "-" + createGuid() + "-" + createGuid() + createGuid() + "-" + createGuid() + createGuid() + createGuid();
     $("#txthidGuid").val(guid);
-    $("#divYzmImg").html("<img alt='点击刷新验证码！' name='validateCode' id='ImgYzm' onclick='ref()'  title='点击切换验证码' data-src='/ValiCode/CreateCode/?guid=" + guid + "' style='cursor: pointer;'  />")
+    $("#divYzmImg").html("<img alt='点击刷新验证码！' name='validateCode' id='ImgYzm' onclick='ref()'  title='点击切换验证码' src='/ValiCode/CreateCode/?guid=" + guid + "' style='cursor: pointer;'  />")
 }
 
 function showBg() {
