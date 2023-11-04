@@ -30,7 +30,7 @@
 <meta property="og:description" content="在网页爬虫、垃圾邮件检测、用户频控 等 元素是否存在于某个集合中的判断时，为了节省内存，往往会考虑使用 布隆过滤器。   我们遇到了一个类似的场景，比如 用户是否存在集合中。  最开始用户数少的时候，使用 Redis string对象，set biz:uid  true 来标识用户存在集合中。  查询时根据 get biz:uid 来判断结果为空识别使用是否在集合中。   随着数据量增大到千万">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2023-08-20T09:01:40.000Z">
-<meta property="article:modified_time" content="2023-10-15T07:00:10.560Z">
+<meta property="article:modified_time" content="2023-11-04T00:52:46.368Z">
 <meta property="article:author" content="WKQ">
 <meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
@@ -145,7 +145,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E9%97%AE%E9%A2%98%E5%9C%A8%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0"><span class="nav-number">1.</span> <span class="nav-text">(1) 问题在本地复现</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-%E5%8D%83%E4%B8%87%E7%BA%A7%E6%98%AF%E5%90%A6%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E5%AD%98%E5%9C%A8%E6%96%B9%E6%A1%88%E8%B0%83%E7%A0%94"><span class="nav-number">2.</span> <span class="nav-text">(2) 千万级是否判断是否存在方案调研</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 方案对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-bloom-filter-%E5%BA%94%E7%94%A8"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) bloom filter 应用</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-redis-bloomfilter%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4"><span class="nav-number">3.</span> <span class="nav-text">(3) redis bloomfilter常用命令</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%BB%A3%E7%A0%81%E4%B8%AD%E4%BD%BF%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">(4) 代码中使用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8"><span class="nav-number">5.</span> <span class="nav-text">(6) 内存占用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#7-%E4%B8%8A%E7%BA%BF%E5%90%8Ebloom-filter%E7%9A%84%E5%9D%91"><span class="nav-number">6.</span> <span class="nav-text">(7) 上线后bloom filter的坑</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#7-1-%E6%89%B9%E9%87%8F"><span class="nav-number">6.1.</span> <span class="nav-text">(7.1) 批量</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">7.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E9%97%AE%E9%A2%98%E5%9C%A8%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0"><span class="nav-number">1.</span> <span class="nav-text">(1) 问题在本地复现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-%E5%8D%83%E4%B8%87%E7%BA%A7%E6%98%AF%E5%90%A6%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E5%AD%98%E5%9C%A8%E6%96%B9%E6%A1%88%E8%B0%83%E7%A0%94"><span class="nav-number">2.</span> <span class="nav-text">(2) 千万级是否判断是否存在方案调研</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 方案对比</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-bloom-filter-%E5%BA%94%E7%94%A8"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) bloom filter 应用</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-redis-bloomfilter%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4"><span class="nav-number">3.</span> <span class="nav-text">(3) redis bloomfilter常用命令</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E4%BB%A3%E7%A0%81%E4%B8%AD%E4%BD%BF%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">(4) 代码中使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8"><span class="nav-number">5.</span> <span class="nav-text">(6) 内存占用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-%E4%B8%8A%E7%BA%BF%E5%90%8Ebloom-filter%E7%9A%84%E5%9D%91"><span class="nav-number">6.</span> <span class="nav-text">(7) 上线后bloom filter的坑</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-%E6%89%B9%E9%87%8F"><span class="nav-number">6.1.</span> <span class="nav-text">(7.1) 批量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">7.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -241,7 +241,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2023-10-15 15:00:10" itemprop="dateModified" datetime="2023-10-15T15:00:10+08:00">2023-10-15</time>
+      <time title="修改时间：2023-11-04 08:52:46" itemprop="dateModified" datetime="2023-11-04T08:52:46+08:00">2023-11-04</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -304,20 +304,20 @@
 <p>  后来通过计算，发现 redis string 的内存利用率太低，大概只有 5% 左右，想找一个节省内存的办法。</p>
 <span id="more"></span>
 
-<h1 id="1-问题在本地复现"><a href="#1-问题在本地复现" class="headerlink" title="(1) 问题在本地复现"></a>(1) 问题在本地复现</h1><h1 id="2-千万级是否判断是否存在方案调研"><a href="#2-千万级是否判断是否存在方案调研" class="headerlink" title="(2) 千万级是否判断是否存在方案调研"></a>(2) 千万级是否判断是否存在方案调研</h1><h2 id="2-1-方案对比"><a href="#2-1-方案对比" class="headerlink" title="(2.1) 方案对比"></a>(2.1) 方案对比</h2><h2 id="2-2-bloom-filter-应用"><a href="#2-2-bloom-filter-应用" class="headerlink" title="(2.2) bloom filter 应用"></a>(2.2) bloom filter 应用</h2><ol>
+<h2 id="1-问题在本地复现"><a href="#1-问题在本地复现" class="headerlink" title="(1) 问题在本地复现"></a>(1) 问题在本地复现</h2><h2 id="2-千万级是否判断是否存在方案调研"><a href="#2-千万级是否判断是否存在方案调研" class="headerlink" title="(2) 千万级是否判断是否存在方案调研"></a>(2) 千万级是否判断是否存在方案调研</h2><h3 id="2-1-方案对比"><a href="#2-1-方案对比" class="headerlink" title="(2.1) 方案对比"></a>(2.1) 方案对比</h3><h3 id="2-2-bloom-filter-应用"><a href="#2-2-bloom-filter-应用" class="headerlink" title="(2.2) bloom filter 应用"></a>(2.2) bloom filter 应用</h3><ol>
 <li>网页爬虫对 URL 去重，避免爬取相同 URL 的网页；</li>
 <li>反垃圾邮件，从数十亿个垃圾邮件列表中判断某个邮箱是否垃圾邮箱；</li>
 <li>Medium 使用布隆过滤器避免推荐给用户已经读过的文章；</li>
 <li>Google BigTable，Apache HBbase 和 Apache Cassandra 使用布隆过滤器减少对不存在的行和列的查找。</li>
 </ol>
-<h1 id="3-redis-bloomfilter常用命令"><a href="#3-redis-bloomfilter常用命令" class="headerlink" title="(3) redis bloomfilter常用命令"></a>(3) redis bloomfilter常用命令</h1><p>| :–  | :– | :– |<br>| | | |</p>
-<h1 id="4-代码中使用"><a href="#4-代码中使用" class="headerlink" title="(4) 代码中使用"></a>(4) 代码中使用</h1><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h2 id="3-redis-bloomfilter常用命令"><a href="#3-redis-bloomfilter常用命令" class="headerlink" title="(3) redis bloomfilter常用命令"></a>(3) redis bloomfilter常用命令</h2><p>| :–  | :– | :– |<br>| | | |</p>
+<h2 id="4-代码中使用"><a href="#4-代码中使用" class="headerlink" title="(4) 代码中使用"></a>(4) 代码中使用</h2><pre class="line-numbers language-go" data-language="go"><code class="language-go"><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
 
-<h1 id="6-内存占用"><a href="#6-内存占用" class="headerlink" title="(6) 内存占用"></a>(6) 内存占用</h1><h1 id="7-上线后bloom-filter的坑"><a href="#7-上线后bloom-filter的坑" class="headerlink" title="(7) 上线后bloom filter的坑"></a>(7) 上线后bloom filter的坑</h1><h2 id="7-1-批量"><a href="#7-1-批量" class="headerlink" title="(7.1) 批量"></a>(7.1) 批量</h2><br>
+<h2 id="6-内存占用"><a href="#6-内存占用" class="headerlink" title="(6) 内存占用"></a>(6) 内存占用</h2><h2 id="7-上线后bloom-filter的坑"><a href="#7-上线后bloom-filter的坑" class="headerlink" title="(7) 上线后bloom filter的坑"></a>(7) 上线后bloom filter的坑</h2><h3 id="7-1-批量"><a href="#7-1-批量" class="headerlink" title="(7.1) 批量"></a>(7.1) 批量</h3><br>
 
 
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p>[1] <a target="_blank" rel="noopener" href="https://redis.io/docs/data-types/probabilistic/bloom-filter/">bloom-filter介绍-redis.io</a><br>[2] <a target="_blank" rel="noopener" href="https://docs.redis.com/latest/stack/bloom/">Probabilistic data structures</a><br>[3] <a target="_blank" rel="noopener" href="https://redis.com/blog/redis-redisbloom-bloom-filters">Probably and No: Redis, Probabilistic, and Bloom Filters</a><br>[4] <a target="_blank" rel="noopener" href="https://redis.com/blog/bloom-filter/">Bloom Filter Datatype for Redis</a><br>[5] <a target="_blank" rel="noopener" href="https://redis.com/modules/redis-bloom/">Low latency and compact probabilistic data structures</a></p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><p>[1] <a target="_blank" rel="noopener" href="https://redis.io/docs/data-types/probabilistic/bloom-filter/">bloom-filter介绍-redis.io</a><br>[2] <a target="_blank" rel="noopener" href="https://docs.redis.com/latest/stack/bloom/">Probabilistic data structures</a><br>[3] <a target="_blank" rel="noopener" href="https://redis.com/blog/redis-redisbloom-bloom-filters">Probably and No: Redis, Probabilistic, and Bloom Filters</a><br>[4] <a target="_blank" rel="noopener" href="https://redis.com/blog/bloom-filter/">Bloom Filter Datatype for Redis</a><br>[5] <a target="_blank" rel="noopener" href="https://redis.com/modules/redis-bloom/">Low latency and compact probabilistic data structures</a></p>
 
     </div>
 

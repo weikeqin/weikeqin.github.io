@@ -22,21 +22,21 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"weikeqin.com","root":"/","images":"/images","scheme":"Muse","darkmode":false,"version":"8.18.2","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"waline","storage":true,"lazyload":false,"nav":null,"activeClass":"waline"},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js"></script>
 
-    <meta name="description" content="有一个常见的问题，Redis是如何实现高可用的？ (1) 如何实现高可用  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。      Redis主从是冗余的一种体现。   Redis的高可用是通过主从、哨兵来保障的。在主库挂了以后，哨兵可以把流量切到从库，让从库顶上去，来保障服务可用。   那就有一个问题了，顶上去的从库的数据和主库">
+    <meta name="description" content="有一个常见的问题，Redis是如何实现高可用的？ (1) 如何实现高可用  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。      Redis主从是冗余的一种体现。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis主从数据同步">
 <meta property="og:url" content="http://weikeqin.com/2023/02/12/redis-principal-subordinate-replication/index.html">
 <meta property="og:site_name" content="天道酬勤">
-<meta property="og:description" content="有一个常见的问题，Redis是如何实现高可用的？ (1) 如何实现高可用  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。      Redis主从是冗余的一种体现。   Redis的高可用是通过主从、哨兵来保障的。在主库挂了以后，哨兵可以把流量切到从库，让从库顶上去，来保障服务可用。   那就有一个问题了，顶上去的从库的数据和主库">
+<meta property="og:description" content="有一个常见的问题，Redis是如何实现高可用的？ (1) 如何实现高可用  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。      Redis主从是冗余的一种体现。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/cluster/redis-read-write-separation.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/cluster/redis-read-write-separation.png">
 <meta property="og:image" content="http://weikeqin.com/img/database/redis/cluster/redis-principal-subordinate-replication-process-one.png">
 <meta property="article:published_time" content="2023-02-12T14:43:05.000Z">
-<meta property="article:modified_time" content="2023-05-15T01:27:23.863Z">
+<meta property="article:modified_time" content="2023-11-04T04:18:16.425Z">
 <meta property="article:author" content="WKQ">
-<meta property="article:tag" content="redis">
 <meta property="article:tag" content="database">
+<meta property="article:tag" content="redis">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://weikeqin.com/img/database/redis/cluster/redis-read-write-separation.png">
 
@@ -150,7 +150,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1-%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E9%AB%98%E5%8F%AF%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">(1) 如何实现高可用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2-Redis%E4%B8%BB%E4%BB%8E%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis主从数据同步</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#2-1-%E6%96%B0%E5%A2%9E%E6%95%B0%E6%8D%AE%E6%98%AF%E5%A6%82%E4%BD%95%E4%BF%9D%E5%AD%98%E5%88%B0Redis%E5%89%AF%E6%9C%AC"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 新增数据是如何保存到Redis副本</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-2-Redis%E4%B8%BB%E4%BB%8E%E5%BA%93%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) Redis主从库模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-3-Redis%E4%B8%BB%E4%BB%8E%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%B5%81%E7%A8%8B"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) Redis主从数据同步流程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3-Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis主从复制原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#3-1-%E4%BB%8E%E5%BA%93%E8%AE%BE%E7%BD%AE%E4%B8%BB%E5%BA%93"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 从库设置主库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-2-%E4%B8%BB%E4%BB%8E%E5%BB%BA%E7%AB%8B%E8%BF%9E%E6%8E%A5"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 主从建立连接</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-3-%E4%B8%BB%E4%BB%8E%E6%8F%A1%E6%89%8B"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 主从握手</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-4-%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B%E5%88%A4%E6%96%AD%E4%B8%8E%E6%89%A7%E8%A1%8C"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 复制类型判断与执行</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4-%E4%B8%BB%E4%BB%8E%E5%BA%93%E9%97%B4%E7%BD%91%E7%BB%9C%E6%95%85%E9%9A%9C%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9F"><span class="nav-number">4.</span> <span class="nav-text">(4) 主从库间网络故障怎么办？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5-%E6%80%9D%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">(5) 思考</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#5-1-%E4%B8%BB%E4%BB%8E%E5%85%A8%E9%87%8F%E5%90%8C%E6%AD%A5%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BD%BF%E7%94%A8RDB%E8%80%8C%E4%B8%8D%E4%BD%BF%E7%94%A8AOF%EF%BC%9F"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) 主从全量同步为什么使用RDB而不使用AOF？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-2-repl-backlog-buffer-%E5%92%8C-replication-buffer"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) repl_backlog_buffer 和 replication buffer</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6-%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">6.</span> <span class="nav-text">(6) 主从复制源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#4-1-%E4%BB%8E%E5%BA%93%E8%AE%BE%E7%BD%AE%E4%B8%BB%E5%BA%93"><span class="nav-number">6.1.</span> <span class="nav-text">(4.1) 从库设置主库</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-2-%E4%B8%BB%E4%BB%8E%E5%BB%BA%E7%AB%8B%E8%BF%9E%E6%8E%A5"><span class="nav-number">6.2.</span> <span class="nav-text">(4.2) 主从建立连接</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-3-%E4%B8%BB%E4%BB%8E%E6%8F%A1%E6%89%8B%E5%B9%B6%E5%88%A4%E6%96%AD%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B"><span class="nav-number">6.3.</span> <span class="nav-text">(4.3) 主从握手并判断复制类型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-4-%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B%E5%88%A4%E6%96%AD%E4%B8%8E%E6%89%A7%E8%A1%8C"><span class="nav-number">6.4.</span> <span class="nav-text">(4.4) 复制类型判断与执行</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number">7.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E9%AB%98%E5%8F%AF%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">(1) 如何实现高可用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Redis%E4%B8%BB%E4%BB%8E%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5"><span class="nav-number">2.</span> <span class="nav-text">(2) Redis主从数据同步</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E6%96%B0%E5%A2%9E%E6%95%B0%E6%8D%AE%E6%98%AF%E5%A6%82%E4%BD%95%E4%BF%9D%E5%AD%98%E5%88%B0Redis%E5%89%AF%E6%9C%AC"><span class="nav-number">2.1.</span> <span class="nav-text">(2.1) 新增数据是如何保存到Redis副本</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Redis%E4%B8%BB%E4%BB%8E%E5%BA%93%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.2.</span> <span class="nav-text">(2.2) Redis主从库模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Redis%E4%B8%BB%E4%BB%8E%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%B5%81%E7%A8%8B"><span class="nav-number">2.3.</span> <span class="nav-text">(2.3) Redis主从数据同步流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%8E%9F%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">(3) Redis主从复制原理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E4%BB%8E%E5%BA%93%E8%AE%BE%E7%BD%AE%E4%B8%BB%E5%BA%93"><span class="nav-number">3.1.</span> <span class="nav-text">(3.1) 从库设置主库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E4%B8%BB%E4%BB%8E%E5%BB%BA%E7%AB%8B%E8%BF%9E%E6%8E%A5"><span class="nav-number">3.2.</span> <span class="nav-text">(3.2) 主从建立连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E4%B8%BB%E4%BB%8E%E6%8F%A1%E6%89%8B"><span class="nav-number">3.3.</span> <span class="nav-text">(3.3) 主从握手</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B%E5%88%A4%E6%96%AD%E4%B8%8E%E6%89%A7%E8%A1%8C"><span class="nav-number">3.4.</span> <span class="nav-text">(3.4) 复制类型判断与执行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E4%B8%BB%E4%BB%8E%E5%BA%93%E9%97%B4%E7%BD%91%E7%BB%9C%E6%95%85%E9%9A%9C%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9F"><span class="nav-number">4.</span> <span class="nav-text">(4) 主从库间网络故障怎么办？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E6%80%9D%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">(5) 思考</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E4%B8%BB%E4%BB%8E%E5%85%A8%E9%87%8F%E5%90%8C%E6%AD%A5%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BD%BF%E7%94%A8RDB%E8%80%8C%E4%B8%8D%E4%BD%BF%E7%94%A8AOF%EF%BC%9F"><span class="nav-number">5.1.</span> <span class="nav-text">(5.1) 主从全量同步为什么使用RDB而不使用AOF？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-repl-backlog-buffer-%E5%92%8C-replication-buffer"><span class="nav-number">5.2.</span> <span class="nav-text">(5.2) repl_backlog_buffer 和 replication buffer</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E6%BA%90%E7%A0%81%E8%A7%A3%E8%AF%BB"><span class="nav-number">6.</span> <span class="nav-text">(6) 主从复制源码解读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E4%BB%8E%E5%BA%93%E8%AE%BE%E7%BD%AE%E4%B8%BB%E5%BA%93"><span class="nav-number">6.1.</span> <span class="nav-text">(4.1) 从库设置主库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-%E4%B8%BB%E4%BB%8E%E5%BB%BA%E7%AB%8B%E8%BF%9E%E6%8E%A5"><span class="nav-number">6.2.</span> <span class="nav-text">(4.2) 主从建立连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-%E4%B8%BB%E4%BB%8E%E6%8F%A1%E6%89%8B%E5%B9%B6%E5%88%A4%E6%96%AD%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B"><span class="nav-number">6.3.</span> <span class="nav-text">(4.3) 主从握手并判断复制类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-%E5%A4%8D%E5%88%B6%E7%B1%BB%E5%9E%8B%E5%88%A4%E6%96%AD%E4%B8%8E%E6%89%A7%E8%A1%8C"><span class="nav-number">6.4.</span> <span class="nav-text">(4.4) 复制类型判断与执行</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="nav-number"></span> <span class="nav-text">参考资料</span></a></div>
         </div>
         <!--/noindex-->
 
@@ -246,7 +246,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2023-05-15 09:27:23" itemprop="dateModified" datetime="2023-05-15T09:27:23+08:00">2023-05-15</time>
+      <time title="修改时间：2023-11-04 12:18:16" itemprop="dateModified" datetime="2023-11-04T12:18:16+08:00">2023-11-04</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -304,46 +304,46 @@
     
     
     <div class="post-body" itemprop="articleBody"><p>  有一个常见的问题，Redis是如何实现高可用的？</p>
-<h1 id="1-如何实现高可用"><a href="#1-如何实现高可用" class="headerlink" title="(1) 如何实现高可用"></a>(1) 如何实现高可用</h1><p>  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。</p>
+<h2 id="1-如何实现高可用"><a href="#1-如何实现高可用" class="headerlink" title="(1) 如何实现高可用"></a>(1) 如何实现高可用</h2><p>  在分布式环境中，有可能出现某台机器挂了，为了保障高可用，首先要提高服务的分区容错性，一般都会通过冗余来实现。</p>
 <p>  <img src="/img/database/redis/cluster/redis-read-write-separation.png" alt="图片"></p>
 <p>  Redis主从是冗余的一种体现。</p>
+<span id="more"></span>
+
 <p>  Redis的高可用是通过<code>主从</code>、<code>哨兵</code>来保障的。在主库挂了以后，<code>哨兵</code>可以把流量切到<code>从库</code>，让从库顶上去，来保障服务可用。</p>
 <p>  那就有一个问题了，顶上去的从库的数据和主库数据一样吗？还有Redis是如何实现主从数据同步的？</p>
 <br>
 
 
 
-<h1 id="2-Redis主从数据同步"><a href="#2-Redis主从数据同步" class="headerlink" title="(2) Redis主从数据同步"></a>(2) Redis主从数据同步</h1><p>  Redis多个副本(主库和从库)之间的数据如何保持一致呢？<br>  数据读写操作可以发给所有的实例吗？</p>
-<h2 id="2-1-新增数据是如何保存到Redis副本"><a href="#2-1-新增数据是如何保存到Redis副本" class="headerlink" title="(2.1) 新增数据是如何保存到Redis副本"></a>(2.1) 新增数据是如何保存到Redis副本</h2><p>  Redis是通过读写分离的方式，通过主从库模式来保障多个副本数据一致。 (MySQL、Kafka也是类似)</p>
+<h2 id="2-Redis主从数据同步"><a href="#2-Redis主从数据同步" class="headerlink" title="(2) Redis主从数据同步"></a>(2) Redis主从数据同步</h2><p>  Redis多个副本(主库和从库)之间的数据如何保持一致呢？<br>  数据读写操作可以发给所有的实例吗？</p>
+<h3 id="2-1-新增数据是如何保存到Redis副本"><a href="#2-1-新增数据是如何保存到Redis副本" class="headerlink" title="(2.1) 新增数据是如何保存到Redis副本"></a>(2.1) 新增数据是如何保存到Redis副本</h3><p>  Redis是通过读写分离的方式，通过主从库模式来保障多个副本数据一致。 (MySQL、Kafka也是类似)</p>
 <p>  为什么要采用读写分离的方式呢？<br>  set key v1<br>  set key v2</p>
 <p>  <img src="/img/database/redis/cluster/redis-read-write-separation.png" alt="Redis主从分离"></p>
 <p>  如果允许所有副本接收写操作(新增 修改 删除)，数据在这多个副本可能就不一致了(分别是 v1 和 v2）。</p>
 <p>  如果必须保障新增的数据在多个副本上一致，就要涉及到<code>加锁</code>、<code>实例间协商是否完成修改</code>等一系列操作，但这会带来巨额的开销，当然是不太能接受的。</p>
-<span id="more"></span>
-
-<h2 id="2-2-Redis主从库模式"><a href="#2-2-Redis主从库模式" class="headerlink" title="(2.2) Redis主从库模式"></a>(2.2) Redis主从库模式</h2><p>Redis 提供了主从库模式，以保证数据副本的一致，主从库之间采用的是读写分离的方式。<br>读操作：主库、从库都可以接收；<br>写操作：首先到主库执行，然后，主库将写操作同步给从库。</p>
-<h2 id="2-3-Redis主从数据同步流程"><a href="#2-3-Redis主从数据同步流程" class="headerlink" title="(2.3) Redis主从数据同步流程"></a>(2.3) Redis主从数据同步流程</h2><p>从原理上来说，Redis 的主从数据同步主要包括了<code>全量复制</code>、<code>增量复制</code>和<code>长连接同步</code>三种情况。</p>
+<h3 id="2-2-Redis主从库模式"><a href="#2-2-Redis主从库模式" class="headerlink" title="(2.2) Redis主从库模式"></a>(2.2) Redis主从库模式</h3><p>Redis 提供了主从库模式，以保证数据副本的一致，主从库之间采用的是读写分离的方式。<br>读操作：主库、从库都可以接收；<br>写操作：首先到主库执行，然后，主库将写操作同步给从库。</p>
+<h3 id="2-3-Redis主从数据同步流程"><a href="#2-3-Redis主从数据同步流程" class="headerlink" title="(2.3) Redis主从数据同步流程"></a>(2.3) Redis主从数据同步流程</h3><p>从原理上来说，Redis 的主从数据同步主要包括了<code>全量复制</code>、<code>增量复制</code>和<code>长连接同步</code>三种情况。</p>
 <ol>
 <li><code>全量复制</code>传输 RDB 文件；</li>
 <li><code>增量复制</code>传输主从断连期间的命令；</li>
 <li><code>长连接同步</code>则是把主节点正常收到的请求传输给从节点。</li>
 </ol>
 <p>  <img src="/img/database/redis/cluster/redis-principal-subordinate-replication-process-one.png"></p>
-<h1 id="3-Redis主从复制原理"><a href="#3-Redis主从复制原理" class="headerlink" title="(3) Redis主从复制原理"></a>(3) Redis主从复制原理</h1><ol>
+<h2 id="3-Redis主从复制原理"><a href="#3-Redis主从复制原理" class="headerlink" title="(3) Redis主从复制原理"></a>(3) Redis主从复制原理</h2><ol>
 <li>从库设置主库</li>
 <li>主从建立连接</li>
 <li>主从握手并判断复制类型</li>
 <li>复制类型判断与执行</li>
 </ol>
-<h2 id="3-1-从库设置主库"><a href="#3-1-从库设置主库" class="headerlink" title="(3.1) 从库设置主库"></a>(3.1) 从库设置主库</h2><p>  主要是获得了主库的 IP 和端口号。<br>  可以用三种方式来设置。<br>  方式一：在实例 A 上执行 <code>replicaof masterip masterport</code> 的主从复制命令，指明实例 B 的 IP（masterip）和端口号（masterport）。<br>  方式二：在实例 A 的配置文件中设置 <code>replicaof masterip masterport</code>，实例 A 可以通过解析文件获得主库 IP 和端口号。<br>  方式三：在实例 A 启动时，设置启动参数–<code>replicaof [masterip] [masterport]</code>。实例 A 解析启动参数，就能获得主库的 IP 和端口号。</p>
-<h2 id="3-2-主从建立连接"><a href="#3-2-主从建立连接" class="headerlink" title="(3.2) 主从建立连接"></a>(3.2) 主从建立连接</h2><p>  从库获得了主库的IP和端口号，就会尝试和主库建立TCP网络连接，并且会在建立好的网络连接上，监听是否有主库发送的命令。</p>
-<h2 id="3-3-主从握手"><a href="#3-3-主从握手" class="headerlink" title="(3.3) 主从握手"></a>(3.3) 主从握手</h2><p>  当从库和主库建立好连接之后，从库就开始和主库进行握手。<br>  简单来说，握手过程就是主从库间相互发送PING-PONG消息，同时从库根据配置信息向主库进行验证。<br>  从库把自己的 IP、端口号，以及对无盘复制和 PSYNC 2 协议的支持情况发给主库。</p>
-<h2 id="3-4-复制类型判断与执行"><a href="#3-4-复制类型判断与执行" class="headerlink" title="(3.4) 复制类型判断与执行"></a>(3.4) 复制类型判断与执行</h2><p>  等到主从库之间的握手完成后，从库就会给主库发送 PSYNC 命令。主库会根据从库发送的命令参数作出相应的三种回复，分别是执行<code>全量复制</code>、执行增量复制、发生错误。<br>  最后，从库在收到上述回复后，就会根据回复的复制类型，开始执行具体的复制操作。</p>
+<h3 id="3-1-从库设置主库"><a href="#3-1-从库设置主库" class="headerlink" title="(3.1) 从库设置主库"></a>(3.1) 从库设置主库</h3><p>  主要是获得了主库的 IP 和端口号。<br>  可以用三种方式来设置。<br>  方式一：在实例 A 上执行 <code>replicaof masterip masterport</code> 的主从复制命令，指明实例 B 的 IP（masterip）和端口号（masterport）。<br>  方式二：在实例 A 的配置文件中设置 <code>replicaof masterip masterport</code>，实例 A 可以通过解析文件获得主库 IP 和端口号。<br>  方式三：在实例 A 启动时，设置启动参数–<code>replicaof [masterip] [masterport]</code>。实例 A 解析启动参数，就能获得主库的 IP 和端口号。</p>
+<h3 id="3-2-主从建立连接"><a href="#3-2-主从建立连接" class="headerlink" title="(3.2) 主从建立连接"></a>(3.2) 主从建立连接</h3><p>  从库获得了主库的IP和端口号，就会尝试和主库建立TCP网络连接，并且会在建立好的网络连接上，监听是否有主库发送的命令。</p>
+<h3 id="3-3-主从握手"><a href="#3-3-主从握手" class="headerlink" title="(3.3) 主从握手"></a>(3.3) 主从握手</h3><p>  当从库和主库建立好连接之后，从库就开始和主库进行握手。<br>  简单来说，握手过程就是主从库间相互发送PING-PONG消息，同时从库根据配置信息向主库进行验证。<br>  从库把自己的 IP、端口号，以及对无盘复制和 PSYNC 2 协议的支持情况发给主库。</p>
+<h3 id="3-4-复制类型判断与执行"><a href="#3-4-复制类型判断与执行" class="headerlink" title="(3.4) 复制类型判断与执行"></a>(3.4) 复制类型判断与执行</h3><p>  等到主从库之间的握手完成后，从库就会给主库发送 PSYNC 命令。主库会根据从库发送的命令参数作出相应的三种回复，分别是执行<code>全量复制</code>、执行增量复制、发生错误。<br>  最后，从库在收到上述回复后，就会根据回复的复制类型，开始执行具体的复制操作。</p>
 <br>
 
 
 
-<h1 id="4-主从库间网络故障怎么办？"><a href="#4-主从库间网络故障怎么办？" class="headerlink" title="(4) 主从库间网络故障怎么办？"></a>(4) 主从库间网络故障怎么办？</h1><p>  在 Redis 2.8 之前，如果主从库在命令传播时出现了网络闪断，那么，从库就会和主库重新进行一次全量复制，开销非常大。<br>  从 Redis 2.8 开始，网络断了之后，主从库会采用增量复制的方式继续同步。</p>
+<h2 id="4-主从库间网络故障怎么办？"><a href="#4-主从库间网络故障怎么办？" class="headerlink" title="(4) 主从库间网络故障怎么办？"></a>(4) 主从库间网络故障怎么办？</h2><p>  在 Redis 2.8 之前，如果主从库在命令传播时出现了网络闪断，那么，从库就会和主库重新进行一次全量复制，开销非常大。<br>  从 Redis 2.8 开始，网络断了之后，主从库会采用增量复制的方式继续同步。</p>
 <p>  增量复制时，主从库之间具体是怎么保持同步的呢？这里的奥妙就在于 repl_backlog_buffer 这个缓冲区。</p>
 <ol>
 <li><p>一个从库如果和主库断连时间过长，造成它在主库repl_backlog_buffer的slave_repl_offset位置上的数据已经被覆盖掉了，此时从库和主库间将进行全量复制。</p>
@@ -351,18 +351,18 @@
 <li><p>每个从库会记录自己的slave_repl_offset，每个从库的复制进度也不一定相同。在和主库重连进行恢复时，从库会通过psync命令把自己记录的slave_repl_offset发给主库，主库会根据从库各自的复制进度，来决定这个从库可以进行增量复制，还是全量复制。</p>
 </li>
 </ol>
-<h1 id="5-思考"><a href="#5-思考" class="headerlink" title="(5) 思考"></a>(5) 思考</h1><h2 id="5-1-主从全量同步为什么使用RDB而不使用AOF？"><a href="#5-1-主从全量同步为什么使用RDB而不使用AOF？" class="headerlink" title="(5.1) 主从全量同步为什么使用RDB而不使用AOF？"></a>(5.1) 主从全量同步为什么使用RDB而不使用AOF？</h2><p>  主从库间的数据复制同步使用的是 RDB 文件，前面我们学习过，AOF 记录的操作命令更全，相比于 RDB 丢失的数据更少。那么，为什么主从库间的复制不使用 AOF 呢？</p>
+<h2 id="5-思考"><a href="#5-思考" class="headerlink" title="(5) 思考"></a>(5) 思考</h2><h3 id="5-1-主从全量同步为什么使用RDB而不使用AOF？"><a href="#5-1-主从全量同步为什么使用RDB而不使用AOF？" class="headerlink" title="(5.1) 主从全量同步为什么使用RDB而不使用AOF？"></a>(5.1) 主从全量同步为什么使用RDB而不使用AOF？</h3><p>  主从库间的数据复制同步使用的是 RDB 文件，前面我们学习过，AOF 记录的操作命令更全，相比于 RDB 丢失的数据更少。那么，为什么主从库间的复制不使用 AOF 呢？</p>
 <p>主从全量同步使用RDB而不使用AOF的原因：</p>
 <p>1、RDB文件内容是经过压缩的二进制数据(不同数据类型数据做了针对性优化)，文件很小。<br>  而AOF文件记录的是每一次写操作的命令，写操作越多文件会变得很大，其中还包括很多对同一个key的多次冗余操作。<br>  在主从全量数据同步时，传输RDB文件可以尽量降低对主库机器网络带宽的消耗。</p>
 <p>2、从库在加载RDB文件时，一是文件小，读取整个文件的速度会很快，二是因为RDB文件存储的都是二进制数据，从库直接按照RDB协议解析还原数据即可，速度会非常快，而AOF需要依次重放每个写命令，这个过程会经历冗长的处理逻辑，恢复速度相比RDB会慢得多，所以使用RDB进行主从全量同步的成本最低。</p>
 <p>3、假设要使用AOF做全量同步，意味着必须打开AOF功能，打开AOF就要选择文件刷盘的策略，选择不当会严重影响Redis性能。<br>  而RDB只有在需要定时备份和主从全量同步数据时才会触发生成一次快照。<br>  在很多丢失数据不敏感的业务场景，其实是不需要开启AOF的。</p>
-<h2 id="5-2-repl-backlog-buffer-和-replication-buffer"><a href="#5-2-repl-backlog-buffer-和-replication-buffer" class="headerlink" title="(5.2) repl_backlog_buffer 和 replication buffer"></a>(5.2) repl_backlog_buffer 和 replication buffer</h2><p>1、repl_backlog_buffer：就是上面我解释到的，它是为了从库断开之后，如何找到主从差异数据而设计的环形缓冲区，从而避免全量同步带来的性能开销。如果从库断开时间太久，repl_backlog_buffer环形缓冲区被主库的写命令覆盖了，那么从库连上主库后只能乖乖地进行一次全量同步，所以repl_backlog_buffer配置尽量大一些，可以降低主从断开后全量同步的概率。而在repl_backlog_buffer中找主从差异的数据后，如何发给从库呢？这就用到了replication buffer。</p>
+<h3 id="5-2-repl-backlog-buffer-和-replication-buffer"><a href="#5-2-repl-backlog-buffer-和-replication-buffer" class="headerlink" title="(5.2) repl_backlog_buffer 和 replication buffer"></a>(5.2) repl_backlog_buffer 和 replication buffer</h3><p>1、repl_backlog_buffer：就是上面我解释到的，它是为了从库断开之后，如何找到主从差异数据而设计的环形缓冲区，从而避免全量同步带来的性能开销。如果从库断开时间太久，repl_backlog_buffer环形缓冲区被主库的写命令覆盖了，那么从库连上主库后只能乖乖地进行一次全量同步，所以repl_backlog_buffer配置尽量大一些，可以降低主从断开后全量同步的概率。而在repl_backlog_buffer中找主从差异的数据后，如何发给从库呢？这就用到了replication buffer。</p>
 <p>2、replication buffer：Redis和客户端通信也好，和从库通信也好，Redis都需要给分配一个 内存buffer进行数据交互，客户端是一个client，从库也是一个client，我们每个client连上Redis后，Redis都会分配一个client buffer，所有数据交互都是通过这个buffer进行的：Redis先把数据写到这个buffer中，然后再把buffer中的数据发到client socket中再通过网络发送出去，这样就完成了数据交互。所以主从在增量同步时，从库作为一个client，也会分配一个buffer，只不过这个buffer专门用来传播用户的写命令到从库，保证主从数据一致，我们通常把它叫做replication buffer。</p>
 <p>3、再延伸一下，既然有这个内存buffer存在，那么这个buffer有没有限制呢？如果主从在传播命令时，因为某些原因从库处理得非常慢，那么主库上的这个buffer就会持续增长，消耗大量的内存资源，甚至OOM。所以Redis提供了client-output-buffer-limit参数限制这个buffer的大小，如果超过限制，主库会强制断开这个client的连接，也就是说从库处理慢导致主库内存buffer的积压达到限制后，主库会强制断开从库的连接，此时主从复制会中断，中断后如果从库再次发起复制请求，那么此时可能会导致恶性循环，引发复制风暴，这种情况需要格外注意。</p>
 <br>
 
 
-<h1 id="6-主从复制源码解读"><a href="#6-主从复制源码解读" class="headerlink" title="(6) 主从复制源码解读"></a>(6) 主从复制源码解读</h1><p>  主从复制中的状态机具体对应的是什么呢？</p>
+<h2 id="6-主从复制源码解读"><a href="#6-主从复制源码解读" class="headerlink" title="(6) 主从复制源码解读"></a>(6) 主从复制源码解读</h2><p>  主从复制中的状态机具体对应的是什么呢？</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.h</span>
 
 <span class="token comment">/*
@@ -399,7 +399,7 @@
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h2 id="4-1-从库设置主库"><a href="#4-1-从库设置主库" class="headerlink" title="(4.1) 从库设置主库"></a>(4.1) 从库设置主库</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.c</span>
+<h3 id="4-1-从库设置主库"><a href="#4-1-从库设置主库" class="headerlink" title="(4.1) 从库设置主库"></a>(4.1) 从库设置主库</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">// file: src/server.c</span>
 
 <span class="token keyword">void</span> <span class="token function">initServerConfig</span><span class="token punctuation">(</span><span class="token keyword">void</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
 
@@ -513,7 +513,7 @@
 
 
 <p>  replicationSetMaster 函数除了会记录主库的 IP、端口号之外，还会把从库实例的状态机设置为 REPL_STATE_CONNECT。<br>  此时，主从复制的状态机会从 <code>REPL_STATE_NONE</code> 变迁为 <code>REPL_STATE_CONNECT</code>。</p>
-<h2 id="4-2-主从建立连接"><a href="#4-2-主从建立连接" class="headerlink" title="(4.2) 主从建立连接"></a>(4.2) 主从建立连接</h2><p>  从库是何时开始和主库建立网络连接的呢？</p>
+<h3 id="4-2-主从建立连接"><a href="#4-2-主从建立连接" class="headerlink" title="(4.2) 主从建立连接"></a>(4.2) 主从建立连接</h3><p>  从库是何时开始和主库建立网络连接的呢？</p>
 <p>  replicationCron() 任务。这个任务的执行频率是每 1000ms 执行一次</p>
 <p>  replicationCron() 任务的函数实现逻辑是在 server.c 中，在该任务中，一个重要的判断就是，检查从库的复制状态机状态。如果状态机状态是 REPL_STATE_CONNECT，那么从库就开始和主库建立连接。连接的建立是通过调用 connectWithMaster() 函数来完成的。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/*
@@ -798,9 +798,9 @@
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
-<h2 id="4-3-主从握手并判断复制类型"><a href="#4-3-主从握手并判断复制类型" class="headerlink" title="(4.3) 主从握手并判断复制类型"></a>(4.3) 主从握手并判断复制类型</h2><p>  从库建立TCP连接后，从库实例其实并没有立即开始进行数据同步，而是会先和主库之间进行握手通信。</p>
+<h3 id="4-3-主从握手并判断复制类型"><a href="#4-3-主从握手并判断复制类型" class="headerlink" title="(4.3) 主从握手并判断复制类型"></a>(4.3) 主从握手并判断复制类型</h3><p>  从库建立TCP连接后，从库实例其实并没有立即开始进行数据同步，而是会先和主库之间进行握手通信。</p>
 <p>  握手通信的目的，主要包括从库和主库进行验证，以及从库将自身的 IP 和端口号发给主库。</p>
-<h2 id="4-4-复制类型判断与执行"><a href="#4-4-复制类型判断与执行" class="headerlink" title="(4.4) 复制类型判断与执行"></a>(4.4) 复制类型判断与执行</h2><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Try a partial resynchronization with the master if we are about to reconnect.
+<h3 id="4-4-复制类型判断与执行"><a href="#4-4-复制类型判断与执行" class="headerlink" title="(4.4) 复制类型判断与执行"></a>(4.4) 复制类型判断与执行</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Try a partial resynchronization with the master if we are about to reconnect.
  * If there is no cached master structure, at least try to issue a
  * "PSYNC ? -1" command in order to trigger a full resync using the PSYNC
  * command in order to obtain the master replid and the master replication
@@ -1028,8 +1028,8 @@
 
     <footer class="post-footer">
           <div class="post-tags">
-              <a href="/tags/redis/" rel="tag"># redis</a>
               <a href="/tags/database/" rel="tag"># database</a>
+              <a href="/tags/redis/" rel="tag"># redis</a>
           </div>
 
         
@@ -1041,8 +1041,8 @@
                 </a>
             </div>
             <div class="post-nav-item">
-                <a href="/2023/03/18/redis-serialization-protocol/" rel="next" title="Redis序列化协议 RESP">
-                  Redis序列化协议 RESP <i class="fa fa-angle-right"></i>
+                <a href="/2023/03/18/redis-serialization-protocol/" rel="next" title="Redis 序列化协议 RESP">
+                  Redis 序列化协议 RESP <i class="fa fa-angle-right"></i>
                 </a>
             </div>
           </div>
